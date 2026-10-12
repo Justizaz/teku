@@ -15,7 +15,6 @@ package tech.pegasys.teku.spec.config;
 
 import java.util.Objects;
 import java.util.Optional;
-
 import tech.pegasys.teku.infrastructure.unsigned.UInt64;
 import tech.pegasys.teku.spec.SpecMilestone;
 

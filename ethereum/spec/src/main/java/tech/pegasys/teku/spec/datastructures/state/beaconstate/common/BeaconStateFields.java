@@ -35,13 +35,13 @@ import tech.pegasys.teku.spec.SpecMilestone;
 import tech.pegasys.teku.spec.config.SpecConfig;
 import tech.pegasys.teku.spec.datastructures.blocks.BeaconBlockHeader;
 import tech.pegasys.teku.spec.datastructures.blocks.Eth1Data;
+import tech.pegasys.teku.spec.datastructures.operations.RandaoCommitmentRegistration;
 import tech.pegasys.teku.spec.datastructures.state.Checkpoint;
 import tech.pegasys.teku.spec.datastructures.state.Fork;
 import tech.pegasys.teku.spec.datastructures.state.Validator;
 import tech.pegasys.teku.spec.datastructures.state.beaconstate.BeaconState;
 import tech.pegasys.teku.spec.datastructures.state.beaconstate.BeaconStateSchema;
 import tech.pegasys.teku.spec.datastructures.state.beaconstate.MutableBeaconState;
-import tech.pegasys.teku.spec.datastructures.operations.RandaoCommitmentRegistration;
 
 public enum BeaconStateFields implements SszFieldName {
   PTC_WINDOW,
@@ -283,13 +283,13 @@ public enum BeaconStateFields implements SszFieldName {
                 SszVectorSchema.create(
                     SszPrimitiveSchemas.BYTES32_SCHEMA, specConfig.getEpochsPerHistoricalVector()));
     SszField randaoCommitmentRegistrationsField =
-            new SszField(
-                    21, // Pakeisk numerį pagal tvarką, jei reikia
-                    BeaconStateFields.RANDAO_COMMITMENT_REGISTRATIONS,
-                    () ->
-                            SszListSchema.create(
-                                    RandaoCommitmentRegistration.SSZ_SCHEMA,
-                                    (long) specConfig.getRandaoHashChainLength()));
+        new SszField(
+            21, // Pakeisk numerį pagal tvarką, jei reikia
+            BeaconStateFields.RANDAO_COMMITMENT_REGISTRATIONS,
+            () ->
+                SszListSchema.create(
+                    RandaoCommitmentRegistration.SSZ_SCHEMA,
+                    (long) specConfig.getRandaoHashChainLength()));
     SszField slashingsField =
         new SszField(
             14,

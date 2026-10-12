@@ -28,6 +28,7 @@ import tech.pegasys.teku.infrastructure.ssz.primitive.SszUInt64;
 import tech.pegasys.teku.infrastructure.unsigned.UInt64;
 import tech.pegasys.teku.spec.datastructures.blocks.BeaconBlockHeader;
 import tech.pegasys.teku.spec.datastructures.blocks.Eth1Data;
+import tech.pegasys.teku.spec.datastructures.operations.RandaoCommitmentRegistration;
 import tech.pegasys.teku.spec.datastructures.state.Checkpoint;
 import tech.pegasys.teku.spec.datastructures.state.Fork;
 import tech.pegasys.teku.spec.datastructures.state.ForkInfo;
@@ -43,7 +44,6 @@ import tech.pegasys.teku.spec.datastructures.state.beaconstate.versions.electra.
 import tech.pegasys.teku.spec.datastructures.state.beaconstate.versions.fulu.BeaconStateFulu;
 import tech.pegasys.teku.spec.datastructures.state.beaconstate.versions.gloas.BeaconStateGloas;
 import tech.pegasys.teku.spec.datastructures.state.beaconstate.versions.phase0.BeaconStatePhase0;
-import tech.pegasys.teku.spec.datastructures.operations.RandaoCommitmentRegistration;
 
 public interface BeaconState extends SszContainer, ValidatorStats {
 
@@ -128,7 +128,8 @@ public interface BeaconState extends SszContainer, ValidatorStats {
 
   // EIP-8321: Registruotų RANDAO commitments sąrašas
   default SszList<RandaoCommitmentRegistration> getRandaoCommitmentRegistrations() {
-    final int fieldIndex = getSchema().getFieldIndex(BeaconStateFields.RANDAO_COMMITMENT_REGISTRATIONS);
+    final int fieldIndex =
+        getSchema().getFieldIndex(BeaconStateFields.RANDAO_COMMITMENT_REGISTRATIONS);
     return getAny(fieldIndex);
   }
 

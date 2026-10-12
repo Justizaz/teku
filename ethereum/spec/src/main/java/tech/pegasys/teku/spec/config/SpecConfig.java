@@ -37,6 +37,7 @@ public interface SpecConfig extends NetworkingSpecConfig {
   Map<String, Object> getRawConfig();
 
   int getRandaoHashChainLength();
+
   UInt64 getRandaoCommitmentWindow();
 
   // Config: Genesis
