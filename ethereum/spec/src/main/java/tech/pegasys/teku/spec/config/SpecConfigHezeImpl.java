@@ -15,6 +15,8 @@ package tech.pegasys.teku.spec.config;
 
 import java.util.Objects;
 import java.util.Optional;
+
+import tech.pegasys.teku.infrastructure.unsigned.UInt64;
 import tech.pegasys.teku.spec.SpecMilestone;
 
 public class SpecConfigHezeImpl extends DelegatingSpecConfigGloas implements SpecConfigHeze {
@@ -60,6 +62,16 @@ public class SpecConfigHezeImpl extends DelegatingSpecConfigGloas implements Spe
   @Override
   public int getInclusionListCommitteeSize() {
     return inclusionListCommitteeSize;
+  }
+
+  @Override
+  public int getRandaoHashChainLength() {
+    return 0;
+  }
+
+  @Override
+  public UInt64 getRandaoCommitmentWindow() {
+    return null;
   }
 
   @Override
