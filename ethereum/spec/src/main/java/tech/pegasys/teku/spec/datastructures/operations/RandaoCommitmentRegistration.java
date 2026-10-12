@@ -1,15 +1,62 @@
 package tech.pegasys.teku.spec.datastructures.operations;
 
 import org.apache.tuweni.bytes.Bytes32;
+import tech.pegasys.teku.infrastructure.ssz.containers.Container3;
+import tech.pegasys.teku.infrastructure.ssz.containers.ContainerSchema3;
+import tech.pegasys.teku.infrastructure.ssz.primitive.SszBytes32;
+import tech.pegasys.teku.infrastructure.ssz.primitive.SszUInt64;
+import tech.pegasys.teku.infrastructure.ssz.schema.SszPrimitiveSchemas;
+import tech.pegasys.teku.infrastructure.ssz.tree.TreeNode;
 import tech.pegasys.teku.infrastructure.unsigned.UInt64;
 
-/**
- * EIP-8321: Hash-Chain RANDAO Commitment Registration
- */
-public record RandaoCommitmentRegistration(
-        UInt64 validatorIndex,
-        Bytes32 commitment,
-        UInt64 sequenceNumber
-) {
-    // Pradinė struktūra EIP-8321 užduočiai
+public class RandaoCommitmentRegistration extends Container3<RandaoCommitmentRegistration, SszUInt64, SszBytes32, SszUInt64> {
+
+    public static class RandaoCommitmentRegistrationSchema
+            extends ContainerSchema3<RandaoCommitmentRegistration, SszUInt64, SszBytes32, SszUInt64> {
+
+        public static final RandaoCommitmentRegistrationSchema INSTANCE = new RandaoCommitmentRegistrationSchema();
+
+        private RandaoCommitmentRegistrationSchema() {
+            super(
+                    "RandaoCommitmentRegistration",
+                    namedSchema("validator_index", SszPrimitiveSchemas.UINT64_SCHEMA),
+                    namedSchema("commitment", SszPrimitiveSchemas.BYTES32_SCHEMA),
+                    namedSchema("sequence_number", SszPrimitiveSchemas.UINT64_SCHEMA));
+        }
+
+        @Override
+        public RandaoCommitmentRegistration createFromBackingNode(TreeNode node) {
+            return new RandaoCommitmentRegistration(this, node);
+        }
+    }
+
+    public static final RandaoCommitmentRegistrationSchema SSZ_SCHEMA = RandaoCommitmentRegistrationSchema.INSTANCE;
+
+    public RandaoCommitmentRegistration(
+            final RandaoCommitmentRegistrationSchema schema, final TreeNode node) {
+        super(schema, node);
+    }
+
+    public RandaoCommitmentRegistration(
+            final UInt64 validatorIndex,
+            final Bytes32 commitment,
+            final UInt64 sequenceNumber) {
+        super(
+                SSZ_SCHEMA,
+                SszUInt64.of(validatorIndex),
+                SszBytes32.of(commitment),
+                SszUInt64.of(sequenceNumber));
+    }
+
+    public UInt64 getValidatorIndex() {
+        return getField0().get();
+    }
+
+    public Bytes32 getCommitment() {
+        return getField1().get();
+    }
+
+    public UInt64 getSequenceNumber() {
+        return getField2().get();
+    }
 }

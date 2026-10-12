@@ -41,8 +41,11 @@ import tech.pegasys.teku.spec.datastructures.state.Validator;
 import tech.pegasys.teku.spec.datastructures.state.beaconstate.BeaconState;
 import tech.pegasys.teku.spec.datastructures.state.beaconstate.BeaconStateSchema;
 import tech.pegasys.teku.spec.datastructures.state.beaconstate.MutableBeaconState;
+import tech.pegasys.teku.spec.datastructures.operations.RandaoCommitmentRegistration;
 
 public enum BeaconStateFields implements SszFieldName {
+  PTC_WINDOW,
+  RANDAO_COMMITMENT_REGISTRATIONS,
   GENESIS_TIME,
   GENESIS_VALIDATORS_ROOT,
   SLOT,
@@ -96,8 +99,7 @@ public enum BeaconStateFields implements SszFieldName {
   BUILDER_PENDING_PAYMENTS,
   BUILDER_PENDING_WITHDRAWALS,
   LATEST_BLOCK_HASH,
-  PAYLOAD_EXPECTED_WITHDRAWALS,
-  PTC_WINDOW;
+  PAYLOAD_EXPECTED_WITHDRAWALS;
 
   private final String sszFieldName;
 
@@ -280,6 +282,14 @@ public enum BeaconStateFields implements SszFieldName {
             () ->
                 SszVectorSchema.create(
                     SszPrimitiveSchemas.BYTES32_SCHEMA, specConfig.getEpochsPerHistoricalVector()));
+    SszField randaoCommitmentRegistrationsField =
+            new SszField(
+                    21, // Pakeisk numerį pagal tvarką, jei reikia
+                    BeaconStateFields.RANDAO_COMMITMENT_REGISTRATIONS,
+                    () ->
+                            SszListSchema.create(
+                                    RandaoCommitmentRegistration.SSZ_SCHEMA,
+                                    (long) specConfig.getRandaoHashChainLength()));
     SszField slashingsField =
         new SszField(
             14,
@@ -314,6 +324,7 @@ public enum BeaconStateFields implements SszFieldName {
         validatorsField,
         balancesField,
         randaoMixesField,
+        randaoCommitmentRegistrationsField,
         slashingsField,
         justificationBitsField,
         previousJustifiedCheckpointField,
