@@ -19,16 +19,18 @@ public interface SpecConfigHeze extends SpecConfigGloas, NetworkingSpecConfigHez
 
   static SpecConfigHeze required(final SpecConfig specConfig) {
     return specConfig
-        .toVersionHeze()
-        .orElseThrow(
-            () ->
-                new IllegalArgumentException(
-                    "Expected Heze spec config but got: " + specConfig.getClass().getSimpleName()));
+            .toVersionHeze()
+            .orElseThrow(
+                    () ->
+                            new IllegalArgumentException(
+                                    "Expected Heze spec config but got: " + specConfig.getClass().getSimpleName()));
   }
 
   int getInclusionListDueBps();
 
   int getInclusionListCommitteeSize();
+
+  int getMaxRandaoCommitmentRegistrationsPerBlock();
 
   @Override
   default Optional<SpecConfigHeze> toVersionHeze() {
