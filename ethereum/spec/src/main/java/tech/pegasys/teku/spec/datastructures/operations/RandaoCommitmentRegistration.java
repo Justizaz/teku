@@ -1,6 +1,5 @@
 package tech.pegasys.teku.spec.datastructures.operations;
 
-import org.apache.tuweni.bytes.Bytes;
 import org.apache.tuweni.bytes.Bytes32;
 import tech.pegasys.teku.bls.BLSSignature;
 import tech.pegasys.teku.infrastructure.ssz.collections.SszByteVector;
