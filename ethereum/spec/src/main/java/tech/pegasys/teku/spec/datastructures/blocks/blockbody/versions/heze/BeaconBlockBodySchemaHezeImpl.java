@@ -169,13 +169,15 @@ public class BeaconBlockBodySchemaHezeImpl
     }
 
     @Override
-    public SafeFuture<? extends BeaconBlockBody> createBlockBody(Function<BeaconBlockBodyBuilder, SafeFuture<Void>> bodyBuilder) {
-        return null;
+    public SafeFuture<? extends BeaconBlockBody> createBlockBody(
+            final Function<BeaconBlockBodyBuilder, SafeFuture<Void>> bodyBuilder) {
+        final BeaconBlockBodyBuilderHeze builder = new BeaconBlockBodyBuilderHeze(this);
+        return bodyBuilder.apply(builder).thenApply(__ -> builder.build());
     }
 
     @Override
     public BeaconBlockBody createEmpty() {
-        return null;
+        return new BeaconBlockBodyHezeImpl(this);
     }
 
     @Override
@@ -183,29 +185,39 @@ public class BeaconBlockBodySchemaHezeImpl
         return new BeaconBlockBodyHezeImpl(this, node);
     }
 
+    @SuppressWarnings("unchecked")
     @Override
     public SszListSchema<ProposerSlashing, ?> getProposerSlashingsSchema() {
-        return null;
+        return (SszListSchema<ProposerSlashing, ?>)
+                getChildSchema(getFieldIndex(BlockBodyFields.PROPOSER_SLASHINGS));
     }
 
+    @SuppressWarnings("unchecked")
     @Override
     public SszListSchema<AttesterSlashing, ?> getAttesterSlashingsSchema() {
-        return null;
+        return (SszListSchema<AttesterSlashing, ?>)
+                getChildSchema(getFieldIndex(BlockBodyFields.ATTESTER_SLASHINGS));
     }
 
+    @SuppressWarnings("unchecked")
     @Override
     public SszListSchema<Attestation, ?> getAttestationsSchema() {
-        return null;
+        return (SszListSchema<Attestation, ?>)
+                getChildSchema(getFieldIndex(BlockBodyFields.ATTESTATIONS));
     }
 
+    @SuppressWarnings("unchecked")
     @Override
     public SszListSchema<Deposit, ?> getDepositsSchema() {
-        return null;
+        return (SszListSchema<Deposit, ?>)
+                getChildSchema(getFieldIndex(BlockBodyFields.DEPOSITS));
     }
 
+    @SuppressWarnings("unchecked")
     @Override
     public SszListSchema<SignedVoluntaryExit, ?> getVoluntaryExitsSchema() {
-        return null;
+        return (SszListSchema<SignedVoluntaryExit, ?>)
+                getChildSchema(getFieldIndex(BlockBodyFields.VOLUNTARY_EXITS));
     }
 
     @Override
@@ -220,14 +232,18 @@ public class BeaconBlockBodySchemaHezeImpl
                 getChildSchema(getFieldIndex("randao_commitment_registrations"));
     }
 
+    @SuppressWarnings("unchecked")
     @Override
     public SszListSchema<PayloadAttestation, ?> getPayloadAttestationsSchema() {
-        return null;
+        return (SszListSchema<PayloadAttestation, ?>)
+                getChildSchema(getFieldIndex(BlockBodyFields.PAYLOAD_ATTESTATIONS));
     }
 
+    @SuppressWarnings("unchecked")
     @Override
     public ExecutionRequestsSchema<?> getParentExecutionRequestsSchema() {
-        return null;
+        return (ExecutionRequestsSchema<?>)
+                getChildSchema(getFieldIndex(BlockBodyFields.PARENT_EXECUTION_REQUESTS));
     }
 
     @Override
@@ -245,9 +261,11 @@ public class BeaconBlockBodySchemaHezeImpl
         return 0;
     }
 
+    @SuppressWarnings("unchecked")
     @Override
     public SszListSchema<SignedBlsToExecutionChange, ?> getBlsToExecutionChangesSchema() {
-        return null;
+        return (SszListSchema<SignedBlsToExecutionChange, ?>)
+                getChildSchema(getFieldIndex(BlockBodyFields.BLS_TO_EXECUTION_CHANGES));
     }
 
     @Override
@@ -255,8 +273,10 @@ public class BeaconBlockBodySchemaHezeImpl
         return null;
     }
 
+    @SuppressWarnings("unchecked")
     @Override
     public SyncAggregateSchema getSyncAggregateSchema() {
-        return null;
+        return (SyncAggregateSchema)
+                getChildSchema(getFieldIndex(BlockBodyFields.SYNC_AGGREGATE));
     }
 }
