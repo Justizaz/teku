@@ -13,12 +13,17 @@
 
 package tech.pegasys.teku.spec.datastructures.blocks.blockbody.versions.eip8321;
 
+import tech.pegasys.teku.infrastructure.ssz.primitive.SszBytes32;
 import tech.pegasys.teku.infrastructure.ssz.schema.SszListSchema;
+import tech.pegasys.teku.infrastructure.ssz.schema.SszSchema;
 import tech.pegasys.teku.spec.datastructures.blocks.blockbody.versions.electra.BeaconBlockBodySchemaElectra;
+import tech.pegasys.teku.spec.datastructures.blocks.blockbody.versions.gloas.BeaconBlockBodySchemaGloas;
 import tech.pegasys.teku.spec.datastructures.operations.SignedRandaoCommitmentRegistration;
 
 public interface BeaconBlockBodySchemaEip8321<T extends BeaconBlockBodyEip8321>
-        extends BeaconBlockBodySchemaElectra<T> {
+        extends BeaconBlockBodySchemaGloas<T> {
+
+    SszSchema<SszBytes32> getHashChainRevealSchema();
 
     SszListSchema<SignedRandaoCommitmentRegistration, ?> getRandaoCommitmentRegistrationsSchema();
 }

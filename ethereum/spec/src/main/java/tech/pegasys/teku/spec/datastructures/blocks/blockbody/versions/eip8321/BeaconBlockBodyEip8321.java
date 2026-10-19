@@ -14,12 +14,16 @@
 package tech.pegasys.teku.spec.datastructures.blocks.blockbody.versions.eip8321;
 
 import java.util.Optional;
+
+import org.apache.tuweni.bytes.Bytes32;
 import tech.pegasys.teku.infrastructure.ssz.SszList;
+import tech.pegasys.teku.infrastructure.ssz.primitive.SszBytes32;
 import tech.pegasys.teku.spec.datastructures.blocks.blockbody.BeaconBlockBody;
 import tech.pegasys.teku.spec.datastructures.blocks.blockbody.versions.electra.BeaconBlockBodyElectra;
+import tech.pegasys.teku.spec.datastructures.blocks.blockbody.versions.gloas.BeaconBlockBodyGloas;
 import tech.pegasys.teku.spec.datastructures.operations.SignedRandaoCommitmentRegistration;
 
-public interface BeaconBlockBodyEip8321 extends BeaconBlockBodyElectra {
+public interface BeaconBlockBodyEip8321 extends BeaconBlockBodyGloas {
 
     static BeaconBlockBodyEip8321 required(final BeaconBlockBody body) {
         if (body instanceof BeaconBlockBodyEip8321) {
@@ -28,6 +32,10 @@ public interface BeaconBlockBodyEip8321 extends BeaconBlockBodyElectra {
         throw new IllegalArgumentException(
                 "Expected Eip8321 block body but got " + body.getClass().getSimpleName());
     }
+
+    Bytes32 getHashChainReveal();
+
+    SszBytes32 getHashChainRevealSsz();
 
     SszList<SignedRandaoCommitmentRegistration> getRandaoCommitmentRegistrations();
 

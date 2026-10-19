@@ -13,20 +13,19 @@
 
 package tech.pegasys.teku.spec.datastructures.blocks.blockbody.versions.eip8321;
 
-import static com.google.common.base.Preconditions.checkArgument;
-
 import org.apache.tuweni.bytes.Bytes32;
 import tech.pegasys.teku.bls.BLSSignature;
 import tech.pegasys.teku.infrastructure.ssz.SszList;
-import tech.pegasys.teku.infrastructure.ssz.containers.Container14;
+import tech.pegasys.teku.infrastructure.ssz.containers.Container15;
 import tech.pegasys.teku.infrastructure.ssz.primitive.SszBytes32;
 import tech.pegasys.teku.infrastructure.ssz.tree.TreeNode;
 import tech.pegasys.teku.spec.datastructures.blocks.Eth1Data;
 import tech.pegasys.teku.spec.datastructures.blocks.blockbody.BeaconBlockBody;
 import tech.pegasys.teku.spec.datastructures.blocks.blockbody.versions.altair.SyncAggregate;
+import tech.pegasys.teku.spec.datastructures.blocks.blockbody.versions.gloas.BeaconBlockBodySchemaGloasImpl;
+import tech.pegasys.teku.spec.datastructures.epbs.versions.gloas.PayloadAttestation;
+import tech.pegasys.teku.spec.datastructures.epbs.versions.gloas.SignedExecutionPayloadBid;
 import tech.pegasys.teku.spec.datastructures.execution.ExecutionRequests;
-import tech.pegasys.teku.spec.datastructures.execution.versions.deneb.ExecutionPayloadDeneb;
-import tech.pegasys.teku.spec.datastructures.execution.versions.deneb.ExecutionPayloadDenebImpl;
 import tech.pegasys.teku.spec.datastructures.operations.Attestation;
 import tech.pegasys.teku.spec.datastructures.operations.AttesterSlashing;
 import tech.pegasys.teku.spec.datastructures.operations.Deposit;
@@ -34,11 +33,12 @@ import tech.pegasys.teku.spec.datastructures.operations.ProposerSlashing;
 import tech.pegasys.teku.spec.datastructures.operations.SignedBlsToExecutionChange;
 import tech.pegasys.teku.spec.datastructures.operations.SignedRandaoCommitmentRegistration;
 import tech.pegasys.teku.spec.datastructures.operations.SignedVoluntaryExit;
-import tech.pegasys.teku.spec.datastructures.type.SszKZGCommitment;
 import tech.pegasys.teku.spec.datastructures.type.SszSignature;
 
+import static com.google.common.base.Preconditions.checkArgument;
+
 public class BeaconBlockBodyEip8321Impl
-        extends Container14<
+    extends Container15<
         BeaconBlockBodyEip8321Impl,
         SszSignature,
         Eth1Data,
@@ -49,146 +49,158 @@ public class BeaconBlockBodyEip8321Impl
         SszList<Deposit>,
         SszList<SignedVoluntaryExit>,
         SyncAggregate,
-        ExecutionPayloadDenebImpl,
         SszList<SignedBlsToExecutionChange>,
-        SszList<SszKZGCommitment>,
+        SignedExecutionPayloadBid,
+        SszList<PayloadAttestation>,
         ExecutionRequests,
+        SszBytes32,
         SszList<SignedRandaoCommitmentRegistration>>
-        implements BeaconBlockBodyEip8321 {
+    implements BeaconBlockBodyEip8321 {
 
-    public BeaconBlockBodyEip8321Impl(
-            final BeaconBlockBodySchemaEip8321Impl type,
-            final SszSignature randaoReveal,
-            final Eth1Data eth1Data,
-            final SszBytes32 graffiti,
-            final SszList<ProposerSlashing> proposerSlashings,
-            final SszList<AttesterSlashing> attesterSlashings,
-            final SszList<Attestation> attestations,
-            final SszList<Deposit> deposits,
-            final SszList<SignedVoluntaryExit> voluntaryExits,
-            final SyncAggregate syncAggregate,
-            final ExecutionPayloadDenebImpl executionPayload,
-            final SszList<SignedBlsToExecutionChange> blsToExecutionChanges,
-            final SszList<SszKZGCommitment> blobKzgCommitments,
-            final ExecutionRequests executionRequests,
-            final SszList<SignedRandaoCommitmentRegistration> randaoCommitmentRegistrations) {
-        super(
-                type,
-                randaoReveal,
-                eth1Data,
-                graffiti,
-                proposerSlashings,
-                attesterSlashings,
-                attestations,
-                deposits,
-                voluntaryExits,
-                syncAggregate,
-                executionPayload,
-                blsToExecutionChanges,
-                blobKzgCommitments,
-                executionRequests,
-                randaoCommitmentRegistrations);
-    }
+  BeaconBlockBodyEip8321Impl(
+      final BeaconBlockBodySchemaEip8321Impl type,
+      final SszSignature randaoReveal,
+      final Eth1Data eth1Data,
+      final SszBytes32 graffiti,
+      final SszList<ProposerSlashing> proposerSlashings,
+      final SszList<AttesterSlashing> attesterSlashings,
+      final SszList<Attestation> attestations,
+      final SszList<Deposit> deposits,
+      final SszList<SignedVoluntaryExit> voluntaryExits,
+      final SyncAggregate syncAggregate,
+      final SszList<SignedBlsToExecutionChange> blsToExecutionChanges,
+      final SignedExecutionPayloadBid signedExecutionPayloadBid,
+      final SszList<PayloadAttestation> payloadAttestations,
+      final ExecutionRequests parentExecutionRequests,
+      final SszBytes32 hashChainReveal,
+      final SszList<SignedRandaoCommitmentRegistration> randaoCommitmentRegistrations) {
+    super(
+        type,
+        randaoReveal,
+        eth1Data,
+        graffiti,
+        proposerSlashings,
+        attesterSlashings,
+        attestations,
+        deposits,
+        voluntaryExits,
+        syncAggregate,
+        blsToExecutionChanges,
+        signedExecutionPayloadBid,
+        payloadAttestations,
+        parentExecutionRequests,
+            hashChainReveal,
+            randaoCommitmentRegistrations);
+  }
 
-    public BeaconBlockBodyEip8321Impl(final BeaconBlockBodySchemaEip8321Impl type) {
-        super(type);
-    }
+  BeaconBlockBodyEip8321Impl(final BeaconBlockBodySchemaEip8321Impl type) {
+    super(type);
+  }
 
-    public BeaconBlockBodyEip8321Impl(
-            final BeaconBlockBodySchemaEip8321Impl type, final TreeNode backingNode) {
-        super(type, backingNode);
-    }
+  BeaconBlockBodyEip8321Impl(final BeaconBlockBodySchemaEip8321Impl type, final TreeNode backingNode) {
+    super(type, backingNode);
+  }
 
-    public static BeaconBlockBodyEip8321Impl required(final BeaconBlockBody body) {
-        checkArgument(
-                body instanceof BeaconBlockBodyEip8321Impl,
-                "Expected Eip8321 block body but got %s",
-                body.getClass());
-        return (BeaconBlockBodyEip8321Impl) body;
-    }
+  public static BeaconBlockBodyEip8321Impl required(final BeaconBlockBody body) {
+    checkArgument(
+        body instanceof BeaconBlockBodyEip8321Impl,
+        "Expected Gloas block body but got %s",
+        body.getClass());
+    return (BeaconBlockBodyEip8321Impl) body;
+  }
 
-    @Override
-    public BLSSignature getRandaoReveal() {
-        return getField0().getSignature();
-    }
+  @Override
+  public BLSSignature getRandaoReveal() {
+    return getField0().getSignature();
+  }
 
-    @Override
-    public SszSignature getRandaoRevealSsz() {
-        return getField0();
-    }
+  @Override
+  public SszSignature getRandaoRevealSsz() {
+    return getField0();
+  }
 
-    @Override
-    public Eth1Data getEth1Data() {
-        return getField1();
-    }
+  @Override
+  public Eth1Data getEth1Data() {
+    return getField1();
+  }
 
-    @Override
-    public Bytes32 getGraffiti() {
-        return getField2().get();
-    }
+  @Override
+  public Bytes32 getGraffiti() {
+    return getField2().get();
+  }
 
-    @Override
-    public SszBytes32 getGraffitiSsz() {
-        return getField2();
-    }
+  @Override
+  public SszBytes32 getGraffitiSsz() {
+    return getField2();
+  }
 
-    @Override
-    public SszList<ProposerSlashing> getProposerSlashings() {
-        return getField3();
-    }
+  @Override
+  public SszList<ProposerSlashing> getProposerSlashings() {
+    return getField3();
+  }
 
-    @Override
-    public SszList<AttesterSlashing> getAttesterSlashings() {
-        return getField4();
-    }
+  @Override
+  public SszList<AttesterSlashing> getAttesterSlashings() {
+    return getField4();
+  }
 
-    @Override
-    public SszList<Attestation> getAttestations() {
-        return getField5();
-    }
+  @Override
+  public SszList<Attestation> getAttestations() {
+    return getField5();
+  }
 
-    @Override
-    public SszList<Deposit> getDeposits() {
-        return getField6();
-    }
+  @Override
+  public SszList<Deposit> getDeposits() {
+    return getField6();
+  }
 
-    @Override
-    public SszList<SignedVoluntaryExit> getVoluntaryExits() {
-        return getField7();
-    }
+  @Override
+  public SszList<SignedVoluntaryExit> getVoluntaryExits() {
+    return getField7();
+  }
 
-    @Override
-    public SyncAggregate getSyncAggregate() {
-        return getField8();
-    }
+  @Override
+  public SyncAggregate getSyncAggregate() {
+    return getField8();
+  }
 
-    @Override
-    public ExecutionPayloadDeneb getExecutionPayload() {
-        return getField9();
-    }
+  @Override
+  public SszList<SignedBlsToExecutionChange> getBlsToExecutionChanges() {
+    return getField9();
+  }
 
-    @Override
-    public SszList<SignedBlsToExecutionChange> getBlsToExecutionChanges() {
-        return getField10();
-    }
+  @Override
+  public SignedExecutionPayloadBid getSignedExecutionPayloadBid() {
+    return getField10();
+  }
 
-    @Override
-    public SszList<SszKZGCommitment> getBlobKzgCommitments() {
-        return getField11();
-    }
+  @Override
+  public SszList<PayloadAttestation> getPayloadAttestations() {
+    return getField11();
+  }
 
-    @Override
-    public ExecutionRequests getExecutionRequests() {
-        return getField12();
-    }
+  @Override
+  public ExecutionRequests getParentExecutionRequests() {
+    return getField12();
+  }
 
-    @Override
-    public SszList<SignedRandaoCommitmentRegistration> getRandaoCommitmentRegistrations() {
-        return getField13();
-    }
+  @Override
+  public Bytes32 getHashChainReveal() {
+    return getField13().get();
+  }
 
-    @Override
-    public BeaconBlockBodySchemaEip8321Impl getSchema() {
-        return (BeaconBlockBodySchemaEip8321Impl) super.getSchema();
-    }
+  @Override
+  public SszBytes32 getHashChainRevealSsz() {
+    return getField13();
+  }
+
+  @Override
+  public SszList<SignedRandaoCommitmentRegistration> getRandaoCommitmentRegistrations() {
+    return getField14();
+  }
+
+  @Override
+  public BeaconBlockBodySchemaEip8321Impl getSchema() {
+    return (BeaconBlockBodySchemaEip8321Impl) super.getSchema();
+  }
 }

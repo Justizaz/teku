@@ -163,6 +163,7 @@ import tech.pegasys.teku.spec.datastructures.blocks.blockbody.versions.capella.B
 import tech.pegasys.teku.spec.datastructures.blocks.blockbody.versions.capella.BlindedBeaconBlockBodySchemaCapellaImpl;
 import tech.pegasys.teku.spec.datastructures.blocks.blockbody.versions.deneb.BeaconBlockBodySchemaDenebImpl;
 import tech.pegasys.teku.spec.datastructures.blocks.blockbody.versions.deneb.BlindedBeaconBlockBodySchemaDenebImpl;
+import tech.pegasys.teku.spec.datastructures.blocks.blockbody.versions.eip8321.BeaconBlockBodySchemaEip8321Impl;
 import tech.pegasys.teku.spec.datastructures.blocks.blockbody.versions.electra.BeaconBlockBodySchemaElectraImpl;
 import tech.pegasys.teku.spec.datastructures.blocks.blockbody.versions.electra.BlindedBeaconBlockBodySchemaElectraImpl;
 import tech.pegasys.teku.spec.datastructures.blocks.blockbody.versions.gloas.BeaconBlockBodySchemaGloasImpl;
@@ -825,6 +826,13 @@ public class SchemaRegistryBuilder {
             (registry, specConfig, schemaName) ->
                 BeaconBlockBodySchemaGloasImpl.create(
                     SpecConfigGloas.required(specConfig), schemaName, registry))
+            .withCreator(
+                    EIP8321,
+                    (registry, specConfig, schemaName) ->
+                            BeaconBlockBodySchemaEip8321Impl.create(
+                                    SpecConfigEip8321.required(specConfig),
+                                    schemaName,
+                                    registry))
         .build();
   }
 

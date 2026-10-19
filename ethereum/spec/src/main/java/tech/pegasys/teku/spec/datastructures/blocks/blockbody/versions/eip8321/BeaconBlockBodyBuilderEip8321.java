@@ -13,71 +13,142 @@
 
 package tech.pegasys.teku.spec.datastructures.blocks.blockbody.versions.eip8321;
 
-import static com.google.common.base.Preconditions.checkNotNull;
-
+import org.apache.tuweni.bytes.Bytes32;
 import tech.pegasys.teku.infrastructure.ssz.SszList;
 import tech.pegasys.teku.infrastructure.ssz.primitive.SszBytes32;
 import tech.pegasys.teku.spec.datastructures.blocks.blockbody.BeaconBlockBody;
 import tech.pegasys.teku.spec.datastructures.blocks.blockbody.BeaconBlockBodyBuilder;
 import tech.pegasys.teku.spec.datastructures.blocks.blockbody.BeaconBlockBodySchema;
-import tech.pegasys.teku.spec.datastructures.blocks.blockbody.versions.electra.BeaconBlockBodyBuilderElectra;
+import tech.pegasys.teku.spec.datastructures.blocks.blockbody.versions.gloas.BeaconBlockBodyBuilderGloas;
+import tech.pegasys.teku.spec.datastructures.epbs.versions.gloas.PayloadAttestation;
+import tech.pegasys.teku.spec.datastructures.epbs.versions.gloas.SignedExecutionPayloadBid;
 import tech.pegasys.teku.spec.datastructures.execution.ExecutionRequests;
-import tech.pegasys.teku.spec.datastructures.execution.versions.deneb.ExecutionPayloadDenebImpl;
 import tech.pegasys.teku.spec.datastructures.operations.SignedRandaoCommitmentRegistration;
 import tech.pegasys.teku.spec.datastructures.type.SszSignature;
 
-public class BeaconBlockBodyBuilderEip8321 extends BeaconBlockBodyBuilderElectra {
+import static com.google.common.base.Preconditions.checkNotNull;
 
-    private ExecutionRequests executionRequests;
-    private SszList<SignedRandaoCommitmentRegistration> randaoCommitmentRegistrations;
+public class BeaconBlockBodyBuilderEip8321 extends BeaconBlockBodyBuilderGloas {
 
-    @SuppressWarnings({"rawtypes", "unchecked"})
-    public BeaconBlockBodyBuilderEip8321(
-            final BeaconBlockBodySchema<?> schema,
-            final BeaconBlockBodySchema<?> blindedSchema) {
-        super((BeaconBlockBodySchema) schema, (BeaconBlockBodySchema) blindedSchema);
-    }
+  private SignedExecutionPayloadBid signedExecutionPayloadBid;
+  private SszList<PayloadAttestation> payloadAttestations;
+  private ExecutionRequests parentExecutionRequests;
+  private Bytes32 hashChainReveal = Bytes32.ZERO;
+  private SszList<SignedRandaoCommitmentRegistration> randaoCommitmentRegistrations;
 
-    @Override
-    public BeaconBlockBodyBuilder executionRequests(final ExecutionRequests executionRequests) {
-        this.executionRequests = executionRequests;
-        super.executionRequests(executionRequests);
-        return this;
-    }
+  public BeaconBlockBodyBuilderEip8321(
+      final BeaconBlockBodySchema<? extends BeaconBlockBodyEip8321> schema) {
+    super(schema);
+  }
 
-    public BeaconBlockBodyBuilderEip8321 randaoCommitmentRegistrations(
-            final SszList<SignedRandaoCommitmentRegistration> randaoCommitmentRegistrations) {
-        this.randaoCommitmentRegistrations = randaoCommitmentRegistrations;
-        return this;
-    }
+  @Override
+  public Boolean supportsExecutionPayload() {
+    return false;
+  }
 
-    @Override
-    protected void validate() {
-        super.validate();
-        checkNotNull(executionRequests, "execution_requests must be specified");
-        checkNotNull(randaoCommitmentRegistrations, "randao_commitment_registrations must be specified");
-    }
+  @Override
+  public Boolean supportsKzgCommitments() {
+    return false;
+  }
 
-    @Override
-    public BeaconBlockBody build() {
-        validate();
-        final BeaconBlockBodySchemaEip8321Impl schema =
-                getAndValidateSchema(false, BeaconBlockBodySchemaEip8321Impl.class);
-        return new BeaconBlockBodyEip8321Impl(
-                schema,
-                new SszSignature(randaoReveal),
-                eth1Data,
-                SszBytes32.of(graffiti),
-                proposerSlashings,
-                attesterSlashings,
-                attestations,
-                deposits,
-                voluntaryExits,
-                syncAggregate,
-                (ExecutionPayloadDenebImpl) executionPayload.toVersionDeneb().orElseThrow(),
-                getBlsToExecutionChanges(),
-                getBlobKzgCommitments(),
-                executionRequests,
-                randaoCommitmentRegistrations);
-    }
+  @Override
+  public boolean supportsExecutionRequests() {
+    return false;
+  }
+
+  @Override
+  public Boolean supportsSignedExecutionPayloadBid() {
+    return true;
+  }
+
+  @Override
+  public BeaconBlockBodyBuilder signedExecutionPayloadBid(
+      final SignedExecutionPayloadBid signedExecutionPayloadBid) {
+    this.signedExecutionPayloadBid = signedExecutionPayloadBid;
+    return this;
+  }
+
+  @Override
+  public Boolean supportsPayloadAttestations() {
+    return true;
+  }
+
+  @Override
+  public BeaconBlockBodyBuilder payloadAttestations(
+      final SszList<PayloadAttestation> payloadAttestations) {
+    this.payloadAttestations = payloadAttestations;
+    return this;
+  }
+
+  @Override
+  public Boolean supportsParentExecutionRequests() {
+    return true;
+  }
+
+  @Override
+  public BeaconBlockBodyBuilder parentExecutionRequests(
+      final ExecutionRequests parentExecutionRequests) {
+    this.parentExecutionRequests = parentExecutionRequests;
+    return this;
+  }
+
+  public BeaconBlockBodyBuilderEip8321 hashChainReveal(final Bytes32 hashChainReveal) {
+    this.hashChainReveal = hashChainReveal;
+    return this;
+  }
+
+  public BeaconBlockBodyBuilderEip8321 randaoCommitmentRegistrations(final SszList<SignedRandaoCommitmentRegistration> randaoCommitmentRegistrations) {
+    this.randaoCommitmentRegistrations = randaoCommitmentRegistrations;
+    return this;
+  }
+
+  @Override
+  protected void validate() {
+    // skipping super.validate() because fields were removed
+    // old fields
+    checkNotNull(randaoReveal, "randaoReveal must be specified");
+    checkNotNull(eth1Data, "eth1Data must be specified");
+    checkNotNull(graffiti, "graffiti must be specified");
+    checkNotNull(attestations, "attestations must be specified");
+    checkNotNull(proposerSlashings, "proposerSlashings must be specified");
+    checkNotNull(attesterSlashings, "attesterSlashings must be specified");
+    checkNotNull(deposits, "deposits must be specified");
+    checkNotNull(voluntaryExits, "voluntaryExits must be specified");
+    checkNotNull(syncAggregate, "syncAggregate must be specified");
+    checkNotNull(blsToExecutionChanges, "blsToExecutionChanges must be specified");
+    // new fields
+    checkNotNull(signedExecutionPayloadBid, "signedExecutionPayloadBid must be specified");
+    checkNotNull(payloadAttestations, "payloadAttestations must be specified");
+    checkNotNull(parentExecutionRequests, "parentExecutionRequests must be specified");
+    checkNotNull(randaoCommitmentRegistrations, "randaoCommitmentRegistrations must be specified");
+  }
+
+  @Override
+  protected Boolean isBlinded() {
+    return false;
+  }
+
+  @Override
+  public BeaconBlockBody build() {
+    validate();
+    final BeaconBlockBodySchemaEip8321Impl schema =
+        getAndValidateSchema(false, BeaconBlockBodySchemaEip8321Impl.class);
+    return new BeaconBlockBodyEip8321Impl(
+        schema,
+        new SszSignature(randaoReveal),
+        eth1Data,
+        SszBytes32.of(graffiti),
+        proposerSlashings,
+        attesterSlashings,
+        attestations,
+        deposits,
+        voluntaryExits,
+        syncAggregate,
+        getBlsToExecutionChanges(),
+        signedExecutionPayloadBid,
+        payloadAttestations,
+        parentExecutionRequests,
+            SszBytes32.of(hashChainReveal),
+            randaoCommitmentRegistrations);
+  }
 }
