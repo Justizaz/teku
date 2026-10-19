@@ -42,10 +42,12 @@ public interface MutableBeaconStateEip8321 extends MutableBeaconStateGloas, Beac
     return Optional.of(this);
   }
 
+  @Override
   SszMutableList<SszBytes32> getRandaoCommitments();
 
   void setRandaoCommitments(SszList<SszBytes32> randaoCommitments);
 
+  @Override
   SszMutableList<PendingRandaoCommitment> getPendingRandaoCommitments();
 
   void setPendingRandaoCommitments(SszList<PendingRandaoCommitment> pendingRandaoCommitments);

@@ -103,10 +103,6 @@ public class BeaconStateSchemaElectra
         .toList();
   }
 
-    public static int getElectraFields(SpecConfigEip8321 specConfig) {
-        return 0;
-    }
-
     @SuppressWarnings("unchecked")
   public SszPrimitiveListSchema<Byte, SszByte, ?> getPreviousEpochParticipationSchema() {
     return (SszPrimitiveListSchema<Byte, SszByte, ?>)

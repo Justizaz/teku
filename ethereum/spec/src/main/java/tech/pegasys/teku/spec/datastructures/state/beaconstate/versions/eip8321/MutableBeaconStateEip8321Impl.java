@@ -66,7 +66,7 @@ public class MutableBeaconStateEip8321Impl extends AbstractMutableBeaconState<Be
   }
 
   @Override
-  public void setRandaoCommitments(SszList<SszBytes32> randaoCommitments) {
+  public void setRandaoCommitments(final SszList<SszBytes32> randaoCommitments) {
     final int index = getSchema().getFieldIndex("randao_commitments");
     set(index, randaoCommitments);
   }
@@ -78,7 +78,7 @@ public class MutableBeaconStateEip8321Impl extends AbstractMutableBeaconState<Be
   }
 
   @Override
-  public void setPendingRandaoCommitments(SszList<PendingRandaoCommitment> pendingRandaoCommitments) {
+  public void setPendingRandaoCommitments(final SszList<PendingRandaoCommitment> pendingRandaoCommitments) {
     final int index = getSchema().getFieldIndex("pending_randao_commitments");
     set(index, pendingRandaoCommitments);
   }

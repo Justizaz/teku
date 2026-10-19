@@ -16,15 +16,16 @@ package tech.pegasys.teku.spec.datastructures.state.beaconstate.versions.eip8321
 import com.google.common.annotations.VisibleForTesting;
 import tech.pegasys.teku.infrastructure.ssz.primitive.SszByte;
 import tech.pegasys.teku.infrastructure.ssz.primitive.SszBytes32;
-import tech.pegasys.teku.infrastructure.ssz.schema.*;
-import tech.pegasys.teku.infrastructure.ssz.schema.collections.SszBitvectorSchema;
+import tech.pegasys.teku.infrastructure.ssz.schema.ProgressiveSchemaUtils;
+import tech.pegasys.teku.infrastructure.ssz.schema.SszListSchema;
+import tech.pegasys.teku.infrastructure.ssz.schema.SszPrimitiveSchemas;
+import tech.pegasys.teku.infrastructure.ssz.schema.SszProgressiveListSchema;
 import tech.pegasys.teku.infrastructure.ssz.schema.collections.SszPrimitiveListSchema;
 import tech.pegasys.teku.infrastructure.ssz.schema.collections.SszUInt64ListSchema;
 import tech.pegasys.teku.infrastructure.ssz.schema.collections.SszUInt64VectorSchema;
 import tech.pegasys.teku.infrastructure.ssz.sos.SszField;
 import tech.pegasys.teku.infrastructure.ssz.tree.TreeNode;
 import tech.pegasys.teku.spec.config.SpecConfig;
-import tech.pegasys.teku.spec.datastructures.execution.versions.capella.Withdrawal;
 import tech.pegasys.teku.spec.datastructures.operations.PendingRandaoCommitment;
 import tech.pegasys.teku.spec.datastructures.state.beaconstate.BeaconState;
 import tech.pegasys.teku.spec.datastructures.state.beaconstate.BeaconStateCache;
@@ -32,19 +33,12 @@ import tech.pegasys.teku.spec.datastructures.state.beaconstate.BeaconStateSchema
 import tech.pegasys.teku.spec.datastructures.state.beaconstate.common.AbstractBeaconStateSchema;
 import tech.pegasys.teku.spec.datastructures.state.beaconstate.common.BeaconStateFields;
 import tech.pegasys.teku.spec.datastructures.state.beaconstate.common.SlotCaches;
-import tech.pegasys.teku.spec.datastructures.state.beaconstate.versions.gloas.*;
-import tech.pegasys.teku.spec.datastructures.state.versions.electra.PendingConsolidation;
+import tech.pegasys.teku.spec.datastructures.state.beaconstate.versions.gloas.BeaconStateSchemaGloas;
 import tech.pegasys.teku.spec.datastructures.state.versions.electra.PendingDeposit;
-import tech.pegasys.teku.spec.datastructures.state.versions.electra.PendingPartialWithdrawal;
 import tech.pegasys.teku.spec.datastructures.state.versions.gloas.Builder;
-import tech.pegasys.teku.spec.datastructures.state.versions.gloas.BuilderPendingPayment;
-import tech.pegasys.teku.spec.datastructures.state.versions.gloas.BuilderPendingWithdrawal;
-import tech.pegasys.teku.spec.datastructures.state.versions.gloas.PayloadTimelinessCommitteeWindowSchema;
 import tech.pegasys.teku.spec.schemas.registry.SchemaRegistry;
 
 import java.util.List;
-import java.util.Set;
-import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import static com.google.common.base.Preconditions.checkArgument;
@@ -58,28 +52,10 @@ public class BeaconStateSchemaEip8321
   private static final boolean[] ACTIVE_FIELDS =
       ProgressiveSchemaUtils.allActive(PENDING_RANDAO_COMMITMENTS_FIELD_INDEX + 1);
 
-  private static final Set<String> PROGRESSIVE_INLINE_LIST_FIELD_NAMES =
-      Stream.of(
-              BeaconStateFields.PREVIOUS_EPOCH_PARTICIPATION,
-              BeaconStateFields.CURRENT_EPOCH_PARTICIPATION,
-              BeaconStateFields.INACTIVITY_SCORES,
-              BeaconStateFields.BUILDERS)
-          .map(BeaconStateFields::getSszFieldName)
-          .collect(Collectors.toSet());
-
   @VisibleForTesting
   BeaconStateSchemaEip8321(final SpecConfig specConfig, final SchemaRegistry schemaRegistry) {
     super(
         "BeaconStateEip8321", ACTIVE_FIELDS, getUniqueFields(specConfig, schemaRegistry), specConfig);
-  }
-
-  private static SszField toProgressiveListFieldIfListed(final SszField field) {
-    if (!PROGRESSIVE_INLINE_LIST_FIELD_NAMES.contains(field.getName())) {
-      return field;
-    }
-    final SszSchema<?> progressiveSchema =
-        BeaconStateFields.toProgressiveListSchema((SszListSchema<?, ?>) field.getSchema().get());
-    return new SszField(field.getIndex(), field.getName(), () -> progressiveSchema);
   }
 
   private static List<SszField> getUniqueFields(
