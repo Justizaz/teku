@@ -30,6 +30,7 @@ public interface BeaconBlockBodyHeze extends BeaconBlockBodyGloas {
 
     SszList<RandaoCommitmentRegistration> getRandaoCommitmentRegistrations();
 
+    @Override
     default Optional<SszList<RandaoCommitmentRegistration>> getOptionalRandaoCommitmentRegistrations() {
         return Optional.of(getRandaoCommitmentRegistrations());
     }

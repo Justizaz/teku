@@ -138,6 +138,11 @@ public interface SchemaDefinitions {
     return Optional.empty();
   }
 
+  @NonSchema
+  default Optional<SchemaDefinitionsEip8321> toVersionEip8321() {
+    return Optional.empty();
+  }
+
   @Retention(RetentionPolicy.RUNTIME)
   @Target(ElementType.METHOD)
   @interface NonSchema {}

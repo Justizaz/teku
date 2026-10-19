@@ -42,9 +42,9 @@ import tech.pegasys.teku.spec.schemas.SchemaDefinitionsGloas;
 
 public class BlockProcessorHeze extends BlockProcessorGloas {
 
-    private static final Logger LOG = LogManager.getLogger();
+    //private static final Logger LOG = LogManager.getLogger();
 
-    private final SpecConfigHeze specConfigHeze;
+    //private final SpecConfigHeze specConfigHeze;
 
     public BlockProcessorHeze(
             final SpecConfigHeze specConfig,
@@ -78,7 +78,7 @@ public class BlockProcessorHeze extends BlockProcessorGloas {
                 withdrawalsHelpers,
                 executionRequestsDataCodec,
                 executionRequestsProcessor);
-        this.specConfigHeze = specConfig;
+        //this.specConfigHeze = specConfig;
     }
 
     @Override
