@@ -40,6 +40,10 @@ public class Domain {
   public static final Bytes4 PROPOSER_PREFERENCES = Bytes4.fromHexString("0x0D000000");
   public static final Bytes4 BUILDER_DEPOSIT = Bytes4.fromHexString("0x0E000000");
 
+  // EIP-8321
+  public static final Bytes4 DOMAIN_RANDAO_COMMITMENT_REGISTRATION =
+      Bytes4.fromHexString("0x0F000000");
+
   // Heze
   public static final Bytes4 INCLUSION_LIST_COMMITTEE = Bytes4.fromHexString("0x10000000");
 
