@@ -13,14 +13,12 @@ class RandaoCommitmentRegistrationTest {
     void shouldSerializeAndDeserializeCorrectly() {
         final UInt64 validatorIndex = UInt64.valueOf(42);
         final Bytes32 commitment = Bytes32.ZERO;
-        final BLSSignature signature = BLSSignature.empty();
 
         final RandaoCommitmentRegistration registration =
-                new RandaoCommitmentRegistration(validatorIndex, commitment, signature);
+                new RandaoCommitmentRegistration(validatorIndex, commitment);
 
         assertThat(registration.getValidatorIndex()).isEqualTo(validatorIndex);
         assertThat(registration.getCommitment()).isEqualTo(commitment);
-        assertThat(registration.getSignature()).isEqualTo(signature);
 
         final RandaoCommitmentRegistration deserialized =
                 RandaoCommitmentRegistration.SSZ_SCHEMA.sszDeserialize(registration.sszSerialize());
