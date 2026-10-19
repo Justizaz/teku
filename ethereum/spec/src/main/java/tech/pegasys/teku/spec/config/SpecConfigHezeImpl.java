@@ -23,38 +23,18 @@ public class SpecConfigHezeImpl extends DelegatingSpecConfigGloas implements Spe
   private final int maxRequestInclusionList;
   private final int maxTransactionsBytesPerInclusionList;
   private final int inclusionListCommitteeSize;
-  private final int maxRandaoCommitmentRegistrationsPerBlock;
 
-  public SpecConfigHezeImpl(
-          final SpecConfigGloas specConfig,
-          final int inclusionListDueBps,
-          final int maxRequestInclusionList,
-          final int maxTransactionsBytesPerInclusionList,
-          final int inclusionListCommitteeSize,
-          final int maxRandaoCommitmentRegistrationsPerBlock) {
-    super(specConfig);
-    this.inclusionListDueBps = inclusionListDueBps;
-    this.maxRequestInclusionList = maxRequestInclusionList;
-    this.maxTransactionsBytesPerInclusionList = maxTransactionsBytesPerInclusionList;
-    this.inclusionListCommitteeSize = inclusionListCommitteeSize;
-    this.maxRandaoCommitmentRegistrationsPerBlock = maxRandaoCommitmentRegistrationsPerBlock;
-  }
-
-  // Papildomas konstruktorius, kad veiktų senieji builderio kvietimai
   public SpecConfigHezeImpl(
           final SpecConfigGloas specConfig,
           final int inclusionListDueBps,
           final int maxRequestInclusionList,
           final int maxTransactionsBytesPerInclusionList,
           final int inclusionListCommitteeSize) {
-    this(
-            specConfig,
-            inclusionListDueBps,
-            maxRequestInclusionList,
-            maxTransactionsBytesPerInclusionList,
-            inclusionListCommitteeSize,
-            16 // Numatytoji vertė
-    );
+    super(specConfig);
+    this.inclusionListDueBps = inclusionListDueBps;
+    this.maxRequestInclusionList = maxRequestInclusionList;
+    this.maxTransactionsBytesPerInclusionList = maxTransactionsBytesPerInclusionList;
+    this.inclusionListCommitteeSize = inclusionListCommitteeSize;
   }
 
   @Override
@@ -83,11 +63,6 @@ public class SpecConfigHezeImpl extends DelegatingSpecConfigGloas implements Spe
   }
 
   @Override
-  public int getMaxRandaoCommitmentRegistrationsPerBlock() {
-    return maxRandaoCommitmentRegistrationsPerBlock;
-  }
-
-  @Override
   public Optional<SpecConfigHeze> toVersionHeze() {
     return Optional.of(this);
   }
@@ -104,8 +79,7 @@ public class SpecConfigHezeImpl extends DelegatingSpecConfigGloas implements Spe
     return inclusionListDueBps == that.inclusionListDueBps
             && maxRequestInclusionList == that.maxRequestInclusionList
             && maxTransactionsBytesPerInclusionList == that.maxTransactionsBytesPerInclusionList
-            && inclusionListCommitteeSize == that.inclusionListCommitteeSize
-            && maxRandaoCommitmentRegistrationsPerBlock == that.maxRandaoCommitmentRegistrationsPerBlock;
+            && inclusionListCommitteeSize == that.inclusionListCommitteeSize;
   }
 
   @Override
@@ -115,7 +89,6 @@ public class SpecConfigHezeImpl extends DelegatingSpecConfigGloas implements Spe
             inclusionListDueBps,
             maxRequestInclusionList,
             maxTransactionsBytesPerInclusionList,
-            inclusionListCommitteeSize,
-            maxRandaoCommitmentRegistrationsPerBlock);
+            inclusionListCommitteeSize);
   }
 }

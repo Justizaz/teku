@@ -14,7 +14,7 @@
 package tech.pegasys.teku.spec.logic.versions.eip8321;
 
 import tech.pegasys.teku.infrastructure.time.TimeProvider;
-import tech.pegasys.teku.spec.config.SpecConfigHeze;
+import tech.pegasys.teku.spec.config.SpecConfigEip8321;
 import tech.pegasys.teku.spec.datastructures.execution.ExecutionRequestsDataCodec;
 import tech.pegasys.teku.spec.logic.common.AbstractSpecLogic;
 import tech.pegasys.teku.spec.logic.common.execution.ExecutionPayloadVerifier;
@@ -34,6 +34,7 @@ import tech.pegasys.teku.spec.logic.common.withdrawals.WithdrawalsHelpers;
 import tech.pegasys.teku.spec.logic.versions.altair.statetransition.epoch.ValidatorStatusFactoryAltair;
 import tech.pegasys.teku.spec.logic.versions.bellatrix.helpers.BellatrixTransitionHelpers;
 import tech.pegasys.teku.spec.logic.versions.capella.operations.validation.OperationValidatorCapella;
+import tech.pegasys.teku.spec.logic.versions.eip8321.forktransition.Eip8321StateUpgrade;
 import tech.pegasys.teku.spec.logic.versions.electra.operations.validation.VoluntaryExitValidatorElectra;
 import tech.pegasys.teku.spec.logic.versions.fulu.util.BlindBlockUtilFulu;
 import tech.pegasys.teku.spec.logic.versions.fulu.util.BlockProposalUtilFulu;
@@ -54,8 +55,7 @@ import tech.pegasys.teku.spec.logic.versions.gloas.util.ProposerPreferencesUtilG
 import tech.pegasys.teku.spec.logic.versions.gloas.util.ValidatorsUtilGloas;
 import tech.pegasys.teku.spec.logic.versions.gloas.weaksubjectivity.WeakSubjectivityCalculatorGloas;
 import tech.pegasys.teku.spec.logic.versions.gloas.withdrawals.WithdrawalsHelpersGloas;
-import tech.pegasys.teku.spec.logic.versions.heze.forktransition.HezeStateUpgrade;
-import tech.pegasys.teku.spec.schemas.SchemaDefinitionsHeze;
+import tech.pegasys.teku.spec.schemas.SchemaDefinitionsEip8321;
 
 import java.util.Optional;
 
@@ -94,7 +94,7 @@ public class SpecLogicEip8321 extends AbstractSpecLogic {
       final SyncCommitteeUtil syncCommitteeUtil,
       final LightClientUtil lightClientUtil,
       final ExecutionPayloadProposalUtil executionPayloadProposalUtil,
-      final HezeStateUpgrade stateUpgrade,
+      final Eip8321StateUpgrade stateUpgrade,
       final DataColumnSidecarUtil dataColumnSidecarUtil,
       final ProposerPreferencesUtil proposerPreferencesUtil) {
     super(
@@ -127,8 +127,8 @@ public class SpecLogicEip8321 extends AbstractSpecLogic {
   }
 
   public static SpecLogicEip8321 create(
-      final SpecConfigHeze config,
-      final SchemaDefinitionsHeze schemaDefinitions,
+      final SpecConfigEip8321 config,
+      final SchemaDefinitionsEip8321 schemaDefinitions,
       final TimeProvider timeProvider) {
     // Helpers
     final PredicatesGloas predicates = new PredicatesGloas(config);
@@ -243,8 +243,8 @@ public class SpecLogicEip8321 extends AbstractSpecLogic {
         new ExecutionPayloadProposalUtil(schemaDefinitions);
 
     // State upgrade
-    final HezeStateUpgrade stateUpgrade =
-        new HezeStateUpgrade(config, schemaDefinitions, beaconStateAccessors);
+    final Eip8321StateUpgrade stateUpgrade =
+        new Eip8321StateUpgrade(config, schemaDefinitions, beaconStateAccessors);
 
     // Data column sidecar util
     final DataColumnSidecarUtil dataColumnSidecarUtil = new DataColumnSidecarUtilGloas(miscHelpers);

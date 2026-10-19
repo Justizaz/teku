@@ -70,7 +70,7 @@ public interface BeaconStateGloas extends BeaconStateFulu {
     }
   }
 
-  static void describeCustomGloasFields(
+  public static void describeCustomGloasFields(
       final MoreObjects.ToStringHelper stringBuilder, final BeaconStateGloas state) {
     BeaconStateFulu.describeCustomFuluFields(stringBuilder, state);
     stringBuilder.add("latest_block_hash", state.getLatestBlockHash());

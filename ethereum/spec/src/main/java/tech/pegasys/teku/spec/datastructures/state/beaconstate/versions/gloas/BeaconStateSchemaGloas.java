@@ -103,7 +103,7 @@ public class BeaconStateSchemaGloas
     return new SszField(field.getIndex(), field.getName(), () -> progressiveSchema);
   }
 
-  private static List<SszField> getUniqueFields(
+  public static List<SszField> getUniqueFields(
       final SpecConfig specConfig, final SchemaRegistry schemaRegistry) {
     final List<SszField> newFields =
         List.of(

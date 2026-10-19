@@ -16,75 +16,75 @@ package tech.pegasys.teku.spec.datastructures.state.beaconstate.versions.eip8321
 import com.google.common.base.MoreObjects;
 import tech.pegasys.teku.infrastructure.ssz.SszData;
 import tech.pegasys.teku.infrastructure.ssz.SszList;
+import tech.pegasys.teku.infrastructure.ssz.SszMutableList;
 import tech.pegasys.teku.infrastructure.ssz.cache.IntCache;
-import tech.pegasys.teku.infrastructure.ssz.tree.TreeNode;
 import tech.pegasys.teku.infrastructure.ssz.primitive.SszBytes32;
+import tech.pegasys.teku.infrastructure.ssz.tree.TreeNode;
 import tech.pegasys.teku.spec.datastructures.operations.PendingRandaoCommitment;
-import tech.pegasys.teku.spec.datastructures.state.beaconstate.BeaconStateSchema;
+import tech.pegasys.teku.spec.datastructures.state.beaconstate.BeaconStateCache;
 import tech.pegasys.teku.spec.datastructures.state.beaconstate.common.AbstractMutableBeaconState;
 import tech.pegasys.teku.spec.datastructures.state.beaconstate.common.SlotCaches;
 import tech.pegasys.teku.spec.datastructures.state.beaconstate.common.TransitionCaches;
 import tech.pegasys.teku.spec.datastructures.state.beaconstate.versions.altair.ValidatorStatsAltair;
 
 public class MutableBeaconStateEip8321Impl extends AbstractMutableBeaconState<BeaconStateEip8321Impl>
-        implements MutableBeaconStateEip8321, ValidatorStatsAltair {
+    implements MutableBeaconStateEip8321, BeaconStateCache, ValidatorStatsAltair {
 
-    public MutableBeaconStateEip8321Impl(final BeaconStateEip8321Impl backingState) {
-        super(backingState);
-    }
+  MutableBeaconStateEip8321Impl(final BeaconStateEip8321Impl backingImmutableView) {
+    super(backingImmutableView);
+  }
 
-    @Override
-    protected BeaconStateEip8321Impl createImmutableBeaconState(
-            final TreeNode backingNode,
-            final IntCache<SszData> cache,
-            final TransitionCaches transitionCaches,
-            final SlotCaches slotCaches) {
-        return new BeaconStateEip8321Impl(
-                getBeaconStateSchema(), backingNode, cache, transitionCaches, slotCaches);
-    }
+  MutableBeaconStateEip8321Impl(
+      final BeaconStateEip8321Impl backingImmutableView, final boolean builder) {
+    super(backingImmutableView, builder);
+  }
 
-    @SuppressWarnings("unchecked")
-    public BeaconStateSchema<BeaconStateEip8321, MutableBeaconStateEip8321> getBeaconStateSchema() {
-        return (BeaconStateSchema<BeaconStateEip8321, MutableBeaconStateEip8321>) super.getSchema();
-    }
+  @Override
+  protected BeaconStateEip8321Impl createImmutableBeaconState(
+      final TreeNode backingNode,
+      final IntCache<SszData> viewCache,
+      final TransitionCaches transitionCaches,
+      final SlotCaches slotCaches) {
+    return new BeaconStateEip8321Impl(
+        getSchema(), backingNode, viewCache, transitionCaches, slotCaches);
+  }
 
-    @Override
-    public MutableBeaconStateEip8321 createWritableCopy() {
-        return this;
-    }
+  @Override
+  protected void addCustomFields(final MoreObjects.ToStringHelper stringBuilder) {
+    BeaconStateEip8321.describeCustomEip8321Fields(stringBuilder, this);
+  }
 
-    @Override
-    public BeaconStateEip8321 commitChanges() {
-        return (BeaconStateEip8321) super.commitChanges();
-    }
+  @Override
+  public BeaconStateEip8321 commitChanges() {
+    return (BeaconStateEip8321) super.commitChanges();
+  }
 
-    @Override
-    public SszList<SszBytes32> getRandaoCommitments() {
-        final int index = getBeaconStateSchema().getFieldIndex("randao_commitments");
-        return getAny(index);
-    }
+  @Override
+  public SszMutableList<SszBytes32> getRandaoCommitments() {
+    final int index = getSchema().getFieldIndex("randao_commitments");
+    return getAnyByRef(index);
+  }
 
-    @Override
-    public SszList<PendingRandaoCommitment> getPendingRandaoCommitments() {
-        final int index = getBeaconStateSchema().getFieldIndex("pending_randao_commitments");
-        return getAny(index);
-    }
+  @Override
+  public void setRandaoCommitments(SszList<SszBytes32> randaoCommitments) {
+    final int index = getSchema().getFieldIndex("randao_commitments");
+    set(index, randaoCommitments);
+  }
 
-    @Override
-    public void setRandaoCommitments(final SszList<SszBytes32> randaoCommitments) {
-        final int index = getBeaconStateSchema().getFieldIndex("randao_commitments");
-        set(index, randaoCommitments);
-    }
+  @Override
+  public SszMutableList<PendingRandaoCommitment> getPendingRandaoCommitments() {
+    final int index = getSchema().getFieldIndex("pending_randao_commitments");
+    return getAnyByRef(index);
+  }
 
-    @Override
-    public void setPendingRandaoCommitments(final SszList<PendingRandaoCommitment> pendingRandaoCommitments) {
-        final int index = getBeaconStateSchema().getFieldIndex("pending_randao_commitments");
-        set(index, pendingRandaoCommitments);
-    }
+  @Override
+  public void setPendingRandaoCommitments(SszList<PendingRandaoCommitment> pendingRandaoCommitments) {
+    final int index = getSchema().getFieldIndex("pending_randao_commitments");
+    set(index, pendingRandaoCommitments);
+  }
 
-    @Override
-    protected void addCustomFields(final MoreObjects.ToStringHelper stringBuilder) {
-        stringBuilder.add("rand_ao_commitments", getRandaoCommitments());
-        stringBuilder.add("pending_rand_ao_commitments", getPendingRandaoCommitments());
-    }
+  @Override
+  public MutableBeaconStateEip8321 createWritableCopy() {
+    return (MutableBeaconStateEip8321) super.createWritableCopy();
+  }
 }

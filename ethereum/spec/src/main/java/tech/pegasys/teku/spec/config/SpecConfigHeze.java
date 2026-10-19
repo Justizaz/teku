@@ -30,8 +30,6 @@ public interface SpecConfigHeze extends SpecConfigGloas, NetworkingSpecConfigHez
 
   int getInclusionListCommitteeSize();
 
-  int getMaxRandaoCommitmentRegistrationsPerBlock();
-
   @Override
   default Optional<SpecConfigHeze> toVersionHeze() {
     return Optional.of(this);

@@ -14,22 +14,39 @@
 package tech.pegasys.teku.spec.datastructures.state.beaconstate.versions.eip8321;
 
 import tech.pegasys.teku.infrastructure.ssz.SszList;
+import tech.pegasys.teku.infrastructure.ssz.SszMutableList;
 import tech.pegasys.teku.infrastructure.ssz.primitive.SszBytes32;
 import tech.pegasys.teku.spec.datastructures.operations.PendingRandaoCommitment;
-import tech.pegasys.teku.spec.datastructures.state.beaconstate.versions.electra.MutableBeaconStateElectra;
+import tech.pegasys.teku.spec.datastructures.state.beaconstate.MutableBeaconState;
+import tech.pegasys.teku.spec.datastructures.state.beaconstate.common.BeaconStateFields;
+import tech.pegasys.teku.spec.datastructures.state.beaconstate.versions.gloas.MutableBeaconStateGloas;
+import tech.pegasys.teku.spec.datastructures.state.versions.gloas.Builder;
 
-public interface MutableBeaconStateEip8321
-        extends BeaconStateEip8321, MutableBeaconStateElectra {
+import java.util.Optional;
 
-    static MutableBeaconStateEip8321 required(final Object state) {
-        if (state instanceof MutableBeaconStateEip8321) {
-            return (MutableBeaconStateEip8321) state;
-        }
-        throw new IllegalArgumentException(
-                "Expected MutableEip8321 state but got " + state.getClass().getSimpleName());
-    }
+public interface MutableBeaconStateEip8321 extends MutableBeaconStateGloas, BeaconStateEip8321 {
+  static MutableBeaconStateEip8321 required(final MutableBeaconState state) {
+    return state
+        .toMutableVersionEip8321()
+        .orElseThrow(
+            () ->
+                new IllegalArgumentException(
+                    "Expected a Eip8321 state but got: " + state.getClass().getSimpleName()));
+  }
 
-    void setRandaoCommitments(SszList<SszBytes32> randaoCommitments);
+  @Override
+  BeaconStateEip8321 commitChanges();
 
-    void setPendingRandaoCommitments(SszList<PendingRandaoCommitment> pendingRandaoCommitments);
+  @Override
+  default Optional<MutableBeaconStateEip8321> toMutableVersionEip8321() {
+    return Optional.of(this);
+  }
+
+  SszMutableList<SszBytes32> getRandaoCommitments();
+
+  void setRandaoCommitments(SszList<SszBytes32> randaoCommitments);
+
+  SszMutableList<PendingRandaoCommitment> getPendingRandaoCommitments();
+
+  void setPendingRandaoCommitments(SszList<PendingRandaoCommitment> pendingRandaoCommitments);
 }
