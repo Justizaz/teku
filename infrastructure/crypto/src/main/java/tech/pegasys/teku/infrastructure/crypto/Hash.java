@@ -16,6 +16,7 @@ package tech.pegasys.teku.infrastructure.crypto;
 import java.security.MessageDigest;
 import org.apache.tuweni.bytes.Bytes;
 import org.apache.tuweni.bytes.Bytes32;
+import org.bouncycastle.crypto.digests.Blake3Digest;
 
 public class Hash {
 
@@ -56,6 +57,15 @@ public class Hash {
     final MessageDigest digest = KECCAK_256_MESSAGE_DIGEST_THREAD_LOCAL.get();
     input.update(digest);
     return Bytes32.wrap(digest.digest());
+  }
+
+  public static Bytes32 blake3(final Bytes input) {
+    final Blake3Digest digest = new Blake3Digest();
+    final byte[] inputBytes = input.toArrayUnsafe();
+    digest.update(inputBytes, 0, inputBytes.length);
+    final byte[] out = new byte[32];
+    digest.doFinal(out, 0);
+    return Bytes32.wrap(out);
   }
 
   /**
