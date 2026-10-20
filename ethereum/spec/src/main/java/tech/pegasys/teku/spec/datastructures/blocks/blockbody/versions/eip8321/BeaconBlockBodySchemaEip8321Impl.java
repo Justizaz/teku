@@ -180,7 +180,7 @@ public class BeaconBlockBodySchemaEip8321Impl
             namedSchema(HASH_CHAIN_REVEAL, SszPrimitiveSchemas.BYTES32_SCHEMA),
             namedSchema(
                     RANDAO_COMMITMENT_REGISTRATIONS,
-                    SszListSchema.create(
+                    SszProgressiveListSchema.create(
                             SignedRandaoCommitmentRegistration.SSZ_SCHEMA,
                             specConfig.getMaxRandaoCommitmentRegistrations())));
   }

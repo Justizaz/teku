@@ -67,7 +67,7 @@ public class BeaconStateSchemaEip8321
                     RANDAO_COMMITMENTS_FIELD_INDEX,
                     "randao_commitments",
                     () ->
-                        SszListSchema.create(
+                        SszProgressiveListSchema.create(
                             SszPrimitiveSchemas.BYTES32_SCHEMA,
                             specConfig.getValidatorRegistryLimit())),
                 new SszField(
