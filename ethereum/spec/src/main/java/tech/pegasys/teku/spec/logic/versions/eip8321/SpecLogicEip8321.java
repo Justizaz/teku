@@ -33,9 +33,9 @@ import tech.pegasys.teku.spec.logic.common.util.ValidatorsUtil;
 import tech.pegasys.teku.spec.logic.common.withdrawals.WithdrawalsHelpers;
 import tech.pegasys.teku.spec.logic.versions.altair.statetransition.epoch.ValidatorStatusFactoryAltair;
 import tech.pegasys.teku.spec.logic.versions.bellatrix.helpers.BellatrixTransitionHelpers;
-import tech.pegasys.teku.spec.logic.versions.capella.operations.validation.OperationValidatorCapella;
 import tech.pegasys.teku.spec.logic.versions.eip8321.block.BlockProcessorEip8321;
 import tech.pegasys.teku.spec.logic.versions.eip8321.forktransition.Eip8321StateUpgrade;
+import tech.pegasys.teku.spec.logic.versions.eip8321.operations.validation.OperationValidatorEip8321;
 import tech.pegasys.teku.spec.logic.versions.electra.operations.validation.VoluntaryExitValidatorElectra;
 import tech.pegasys.teku.spec.logic.versions.fulu.util.BlindBlockUtilFulu;
 import tech.pegasys.teku.spec.logic.versions.fulu.util.BlockProposalUtilFulu;
@@ -160,7 +160,7 @@ public class SpecLogicEip8321 extends AbstractSpecLogic {
         final VoluntaryExitValidatorElectra voluntaryExitValidator =
                 new VoluntaryExitValidatorElectra(config, predicates, beaconStateAccessors);
         final OperationValidator operationValidator =
-                new OperationValidatorCapella(
+                new OperationValidatorEip8321(
                         predicates,
                         beaconStateAccessors,
                         attestationDataValidator,
