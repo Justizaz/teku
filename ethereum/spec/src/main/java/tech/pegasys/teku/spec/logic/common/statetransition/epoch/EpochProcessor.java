@@ -83,6 +83,8 @@ public interface EpochProcessor {
   void processRegistryUpdates(MutableBeaconState state, List<ValidatorStatus> statuses)
       throws EpochProcessingException;
 
+  void processPendingRandaoCommitments(MutableBeaconState state);
+
   void processSlashings(MutableBeaconState state, ValidatorStatuses validatorStatuses);
 
   void processParticipationUpdates(MutableBeaconState genericState);

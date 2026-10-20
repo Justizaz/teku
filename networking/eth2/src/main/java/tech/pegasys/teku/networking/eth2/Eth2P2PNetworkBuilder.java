@@ -419,7 +419,7 @@ public class Eth2P2PNetworkBuilder {
               executionProofOperationProcessor,
               config.isExecutionProofTopicEnabled(),
               isSuperNodeSupplier);
-      case GLOAS, HEZE ->
+      case GLOAS, HEZE, EIP8321 ->
           new GossipForkSubscriptionsGloas(
               forkAndSpecMilestone.getFork(),
               spec,

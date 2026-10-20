@@ -1,0 +1,75 @@
+/*
+ * Copyright Consensys Software Inc., 2026
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software distributed under the License is distributed on
+ * an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the
+ * specific language governing permissions and limitations under the License.
+ */
+
+package tech.pegasys.teku.spec.config;
+
+import tech.pegasys.teku.spec.SpecMilestone;
+
+import java.util.Objects;
+import java.util.Optional;
+
+public class SpecConfigEip8321Impl extends SpecConfigHezeImpl implements SpecConfigEip8321 {
+
+  private final int commitmentRegistrationDelay;
+  private final int maxRandaoCommitmentRegistrations;
+
+  public SpecConfigEip8321Impl(
+          final SpecConfigHeze specConfig,
+          final int commitmentRegistrationDelay,
+          final int maxRandaoCommitmentRegistrations) {
+    super(specConfig, specConfig.getInclusionListDueBps(), specConfig.getMaxRequestInclusionList(), specConfig.getMaxTransactionsBytesPerInclusionList(), specConfig.getInclusionListCommitteeSize());
+    this.commitmentRegistrationDelay = commitmentRegistrationDelay;
+    this.maxRandaoCommitmentRegistrations = maxRandaoCommitmentRegistrations;
+  }
+
+  @Override
+  public SpecMilestone getMilestone() {
+    return SpecMilestone.EIP8321;
+  }
+
+  @Override
+  public int getCommitmentRegistrationDelay() {
+    return commitmentRegistrationDelay;
+  }
+
+  @Override
+  public int getMaxRandaoCommitmentRegistrations() {
+    return maxRandaoCommitmentRegistrations;
+  }
+
+  @Override
+  public Optional<SpecConfigEip8321> toVersionEip8321() {
+    return Optional.of(this);
+  }
+
+  @Override
+  public boolean equals(final Object o) {
+    if (o == null || getClass() != o.getClass()) {
+      return false;
+    }
+    if (!super.equals(o)) {
+      return false;
+    }
+    SpecConfigEip8321Impl that = (SpecConfigEip8321Impl) o;
+    return commitmentRegistrationDelay == that.commitmentRegistrationDelay
+            && maxRandaoCommitmentRegistrations == that.maxRandaoCommitmentRegistrations;
+  }
+
+  @Override
+  public int hashCode() {
+    return Objects.hash(
+            super.hashCode(),
+            commitmentRegistrationDelay,
+            maxRandaoCommitmentRegistrations);
+  }
+}

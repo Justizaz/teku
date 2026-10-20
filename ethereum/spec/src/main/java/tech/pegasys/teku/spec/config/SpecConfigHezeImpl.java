@@ -25,11 +25,11 @@ public class SpecConfigHezeImpl extends DelegatingSpecConfigGloas implements Spe
   private final int inclusionListCommitteeSize;
 
   public SpecConfigHezeImpl(
-      final SpecConfigGloas specConfig,
-      final int inclusionListDueBps,
-      final int maxRequestInclusionList,
-      final int maxTransactionsBytesPerInclusionList,
-      final int inclusionListCommitteeSize) {
+          final SpecConfigGloas specConfig,
+          final int inclusionListDueBps,
+          final int maxRequestInclusionList,
+          final int maxTransactionsBytesPerInclusionList,
+          final int inclusionListCommitteeSize) {
     super(specConfig);
     this.inclusionListDueBps = inclusionListDueBps;
     this.maxRequestInclusionList = maxRequestInclusionList;
@@ -77,18 +77,18 @@ public class SpecConfigHezeImpl extends DelegatingSpecConfigGloas implements Spe
     }
     SpecConfigHezeImpl that = (SpecConfigHezeImpl) o;
     return inclusionListDueBps == that.inclusionListDueBps
-        && maxRequestInclusionList == that.maxRequestInclusionList
-        && maxTransactionsBytesPerInclusionList == that.maxTransactionsBytesPerInclusionList
-        && inclusionListCommitteeSize == that.inclusionListCommitteeSize;
+            && maxRequestInclusionList == that.maxRequestInclusionList
+            && maxTransactionsBytesPerInclusionList == that.maxTransactionsBytesPerInclusionList
+            && inclusionListCommitteeSize == that.inclusionListCommitteeSize;
   }
 
   @Override
   public int hashCode() {
     return Objects.hash(
-        super.hashCode(),
-        inclusionListDueBps,
-        maxRequestInclusionList,
-        maxTransactionsBytesPerInclusionList,
-        inclusionListCommitteeSize);
+            super.hashCode(),
+            inclusionListDueBps,
+            maxRequestInclusionList,
+            maxTransactionsBytesPerInclusionList,
+            inclusionListCommitteeSize);
   }
 }

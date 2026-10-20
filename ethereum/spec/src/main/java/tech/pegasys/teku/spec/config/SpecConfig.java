@@ -77,6 +77,10 @@ public interface SpecConfig extends NetworkingSpecConfig {
 
   UInt64 getHezeForkEpoch();
 
+  Bytes4 getEip8321ForkVersion();
+
+  UInt64 getEip8321ForkEpoch();
+
   // Config: Time parameters
   int getSecondsPerSlot();
 
@@ -244,6 +248,10 @@ public interface SpecConfig extends NetworkingSpecConfig {
   }
 
   default Optional<SpecConfigHeze> toVersionHeze() {
+    return Optional.empty();
+  }
+
+  default Optional<SpecConfigEip8321> toVersionEip8321() {
     return Optional.empty();
   }
 

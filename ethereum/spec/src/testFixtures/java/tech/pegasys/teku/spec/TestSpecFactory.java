@@ -52,6 +52,7 @@ public class TestSpecFactory {
       case FULU -> createMinimalFulu();
       case GLOAS -> createMinimalGloas();
       case HEZE -> createMinimalHeze();
+      case EIP8321 -> createMinimalEip8321();
     };
   }
 
@@ -66,6 +67,7 @@ public class TestSpecFactory {
       case FULU -> createMainnetFulu();
       case GLOAS -> createMainnetGloas();
       case HEZE -> createMainnetHeze();
+      case EIP8321 -> createMainnetEip8321();
     };
   }
 
@@ -163,6 +165,18 @@ public class TestSpecFactory {
     final SpecConfigAndParent<? extends SpecConfig> specConfig =
         getHezeSpecConfig(Eth2Network.MINIMAL, configAdapter);
     return create(specConfig, SpecMilestone.HEZE);
+  }
+
+  public static Spec createMinimalEip8321() {
+    final SpecConfigAndParent<? extends SpecConfig> specConfig =
+        getEip8321SpecConfig(Eth2Network.MINIMAL);
+    return create(specConfig, SpecMilestone.EIP8321);
+  }
+
+  public static Spec createMinimalEip8321(final Consumer<SpecConfigBuilder> configAdapter) {
+    final SpecConfigAndParent<? extends SpecConfig> specConfig =
+        getEip8321SpecConfig(Eth2Network.MINIMAL, configAdapter);
+    return create(specConfig, SpecMilestone.EIP8321);
   }
 
   /**
@@ -283,6 +297,26 @@ public class TestSpecFactory {
     return create(config, SpecMilestone.HEZE);
   }
 
+  /**
+   * Create a spec that forks to Eip8321 at the provided epoch
+   *
+   * @param eip8321ForkEpoch The Eip8321 fork epoch
+   * @return A spec with Eip8321 enabled, forking to Eip8321 at the given epoch
+   */
+  public static Spec createMinimalWithEip8321ForkEpoch(final UInt64 eip8321ForkEpoch) {
+    final SpecConfigAndParent<? extends SpecConfig> config =
+        getEip8321SpecConfig(
+            Eth2Network.MINIMAL,
+            UInt64.ZERO,
+            UInt64.ZERO,
+            UInt64.ZERO,
+            UInt64.ZERO,
+            UInt64.ZERO,
+            UInt64.ZERO,
+            eip8321ForkEpoch);
+    return create(config, SpecMilestone.EIP8321);
+  }
+
   public static Spec createMinimalPhase0(final Consumer<SpecConfigBuilder> configAdapter) {
     return create(SpecMilestone.PHASE0, Eth2Network.MINIMAL, configAdapter);
   }
@@ -355,6 +389,12 @@ public class TestSpecFactory {
     return create(specConfig, SpecMilestone.HEZE);
   }
 
+  public static Spec createMainnetEip8321() {
+    final SpecConfigAndParent<? extends SpecConfig> specConfig =
+        getEip8321SpecConfig(Eth2Network.MAINNET);
+    return create(specConfig, SpecMilestone.EIP8321);
+  }
+
   public static Spec createPhase0(final SpecConfigAndParent<? extends SpecConfig> config) {
     return create(config, SpecMilestone.PHASE0);
   }
@@ -408,6 +448,9 @@ public class TestSpecFactory {
     }
     if (specMilestone.isGreaterThanOrEqualTo(SpecMilestone.HEZE)) {
       defaultModifier = defaultModifier.andThen(builder -> builder.hezeForkEpoch(UInt64.ZERO));
+    }
+    if (specMilestone.isGreaterThanOrEqualTo(SpecMilestone.EIP8321)) {
+      defaultModifier = defaultModifier.andThen(builder -> builder.eip8321ForkEpoch(UInt64.ZERO));
     }
 
     return create(
@@ -695,6 +738,56 @@ public class TestSpecFactory {
             }));
   }
 
+  private static SpecConfigAndParent<? extends SpecConfig> getEip8321SpecConfig(
+      final Eth2Network network) {
+    return getEip8321SpecConfig(
+        network, UInt64.ZERO, UInt64.ZERO, UInt64.ZERO, UInt64.ZERO, UInt64.ZERO, UInt64.ZERO, ZERO);
+  }
+
+  private static SpecConfigAndParent<? extends SpecConfig> getEip8321SpecConfig(
+      final Eth2Network network,
+      final UInt64 capellaForkEpoch,
+      final UInt64 denebForkEpoch,
+      final UInt64 electraForkEpoch,
+      final UInt64 fuluForkEpoch,
+      final UInt64 gloasForkEpoch,
+      final UInt64 hezeForkEpoch,
+      final UInt64 eip8321ForkEpoch) {
+    return getEip8321SpecConfig(
+        network,
+        builder ->
+          builder
+              .altairForkEpoch(ZERO)
+              .bellatrixForkEpoch(UInt64.ZERO)
+              .capellaForkEpoch(capellaForkEpoch)
+              .denebForkEpoch(denebForkEpoch)
+              .electraForkEpoch(electraForkEpoch)
+              .fuluForkEpoch(fuluForkEpoch)
+              .gloasForkEpoch(gloasForkEpoch)
+              .hezeForkEpoch(hezeForkEpoch)
+              .eip8321ForkEpoch(eip8321ForkEpoch));
+  }
+
+  private static SpecConfigAndParent<? extends SpecConfig> getEip8321SpecConfig(
+      final Eth2Network network, final Consumer<SpecConfigBuilder> configAdapter) {
+    return requireEip8321(
+        SpecConfigLoader.loadConfig(
+            network.configName(),
+            builder -> {
+              builder
+                  .altairForkEpoch(ZERO)
+                  .bellatrixForkEpoch(UInt64.ZERO)
+                  .capellaForkEpoch(UInt64.ZERO)
+                  .denebForkEpoch(UInt64.ZERO)
+                  .electraForkEpoch(UInt64.ZERO)
+                  .fuluForkEpoch(UInt64.ZERO)
+                  .gloasForkEpoch(UInt64.ZERO)
+                  .hezeForkEpoch(ZERO)
+                  .eip8321ForkEpoch(ZERO);
+              configAdapter.accept(builder);
+            }));
+  }
+
   public static Spec createMinimalWithCapellaDenebElectraAndFuluForkEpoch(
       final UInt64 capellaForkEpoch,
       final UInt64 denebForkEpoch,
@@ -775,6 +868,12 @@ public class TestSpecFactory {
   private static SpecConfigAndParent<? extends SpecConfig> requireHeze(
       final SpecConfigAndParent<? extends SpecConfig> specConfigAndParent) {
     checkArgument(specConfigAndParent.specConfig().toVersionHeze().isPresent());
+    return specConfigAndParent;
+  }
+
+  private static SpecConfigAndParent<? extends SpecConfig> requireEip8321(
+      final SpecConfigAndParent<? extends SpecConfig> specConfigAndParent) {
+    checkArgument(specConfigAndParent.specConfig().toVersionEip8321().isPresent());
     return specConfigAndParent;
   }
 }

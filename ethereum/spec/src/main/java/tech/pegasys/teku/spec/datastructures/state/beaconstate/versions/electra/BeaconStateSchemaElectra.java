@@ -29,6 +29,7 @@ import tech.pegasys.teku.infrastructure.ssz.schema.collections.SszUInt64ListSche
 import tech.pegasys.teku.infrastructure.ssz.sos.SszField;
 import tech.pegasys.teku.infrastructure.ssz.tree.TreeNode;
 import tech.pegasys.teku.spec.config.SpecConfig;
+import tech.pegasys.teku.spec.config.SpecConfigEip8321;
 import tech.pegasys.teku.spec.datastructures.state.beaconstate.BeaconStateSchema;
 import tech.pegasys.teku.spec.datastructures.state.beaconstate.common.AbstractBeaconStateSchema;
 import tech.pegasys.teku.spec.datastructures.state.beaconstate.common.BeaconStateFields;
@@ -102,7 +103,7 @@ public class BeaconStateSchemaElectra
         .toList();
   }
 
-  @SuppressWarnings("unchecked")
+    @SuppressWarnings("unchecked")
   public SszPrimitiveListSchema<Byte, SszByte, ?> getPreviousEpochParticipationSchema() {
     return (SszPrimitiveListSchema<Byte, SszByte, ?>)
         getChildSchema(getFieldIndex(BeaconStateFields.PREVIOUS_EPOCH_PARTICIPATION));
