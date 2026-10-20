@@ -22,4 +22,5 @@ public class TestFork {
   public static final String ELECTRA = "electra";
   public static final String FULU = "fulu";
   public static final String GLOAS = "gloas";
+  public static final String EIP8321 = "eip8321";
 }

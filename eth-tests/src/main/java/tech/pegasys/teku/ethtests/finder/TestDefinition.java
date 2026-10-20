@@ -75,6 +75,7 @@ public class TestDefinition {
       case TestFork.ELECTRA -> SpecMilestone.ELECTRA;
       case TestFork.FULU -> SpecMilestone.FULU;
       case TestFork.GLOAS -> SpecMilestone.GLOAS;
+      case TestFork.EIP8321 -> SpecMilestone.EIP8321;
       default -> throw new IllegalArgumentException("Unknown fork: " + fork);
     };
   }
