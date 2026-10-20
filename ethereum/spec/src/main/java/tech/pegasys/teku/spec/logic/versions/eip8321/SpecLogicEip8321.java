@@ -35,7 +35,9 @@ import tech.pegasys.teku.spec.logic.versions.altair.statetransition.epoch.Valida
 import tech.pegasys.teku.spec.logic.versions.bellatrix.helpers.BellatrixTransitionHelpers;
 import tech.pegasys.teku.spec.logic.versions.eip8321.block.BlockProcessorEip8321;
 import tech.pegasys.teku.spec.logic.versions.eip8321.forktransition.Eip8321StateUpgrade;
+import tech.pegasys.teku.spec.logic.versions.eip8321.helpers.BeaconStateMutatorsEip8321;
 import tech.pegasys.teku.spec.logic.versions.eip8321.operations.validation.OperationValidatorEip8321;
+import tech.pegasys.teku.spec.logic.versions.eip8321.statetransition.epoch.EpochProcessorEip8321;
 import tech.pegasys.teku.spec.logic.versions.electra.operations.validation.VoluntaryExitValidatorElectra;
 import tech.pegasys.teku.spec.logic.versions.fulu.util.BlindBlockUtilFulu;
 import tech.pegasys.teku.spec.logic.versions.fulu.util.BlockProposalUtilFulu;
@@ -137,8 +139,8 @@ public class SpecLogicEip8321 extends AbstractSpecLogic {
                 new MiscHelpersGloas(config, predicates, schemaDefinitions);
         final BeaconStateAccessorsGloas beaconStateAccessors =
                 new BeaconStateAccessorsGloas(config, schemaDefinitions, predicates, miscHelpers);
-        final BeaconStateMutatorsGloas beaconStateMutators =
-                new BeaconStateMutatorsGloas(config, miscHelpers, beaconStateAccessors, schemaDefinitions);
+        final BeaconStateMutatorsEip8321 beaconStateMutators =
+                new BeaconStateMutatorsEip8321(config, miscHelpers, beaconStateAccessors, schemaDefinitions);
 
         // Operation validation
         final OperationSignatureVerifierGloas operationSignatureVerifier =
@@ -174,8 +176,8 @@ public class SpecLogicEip8321 extends AbstractSpecLogic {
                         predicates,
                         miscHelpers,
                         beaconStateAccessors);
-        final EpochProcessorGloas epochProcessor =
-                new EpochProcessorGloas(
+        final EpochProcessorEip8321 epochProcessor =
+                new EpochProcessorEip8321(
                         config,
                         miscHelpers,
                         beaconStateAccessors,
