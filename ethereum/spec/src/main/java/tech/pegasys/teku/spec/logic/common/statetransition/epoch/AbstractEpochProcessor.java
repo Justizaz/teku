@@ -124,6 +124,7 @@ public abstract class AbstractEpochProcessor implements EpochProcessor {
     processInactivityUpdates(state, validatorStatuses);
     processRewardsAndPenalties(state, validatorStatuses);
     processRegistryUpdates(state, validatorStatuses.getStatuses());
+    processPendingRandaoCommitments(state);
     processSlashings(state, validatorStatuses);
     processEth1DataReset(state);
     processPendingDeposits(state);
@@ -568,6 +569,11 @@ public abstract class AbstractEpochProcessor implements EpochProcessor {
     state
         .getRandaoMixes()
         .setElement(randaoIndex, beaconStateAccessors.getRandaoMix(state, currentEpoch));
+  }
+
+  @Override
+  public void processPendingRandaoCommitments(final MutableBeaconState state) {
+    // Default implementation does nothing
   }
 
   @Override

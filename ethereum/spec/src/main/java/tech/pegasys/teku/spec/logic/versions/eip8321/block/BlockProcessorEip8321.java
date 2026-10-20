@@ -13,24 +13,38 @@
 
 package tech.pegasys.teku.spec.logic.versions.eip8321.block;
 
+import com.google.errorprone.annotations.CheckReturnValue;
+
+import java.util.HashSet;
 import java.util.Optional;
+import java.util.Set;
+import java.util.function.Supplier;
 
 import org.apache.tuweni.bytes.Bytes32;
 import tech.pegasys.teku.bls.BLSSignature;
 import tech.pegasys.teku.bls.BLSSignatureVerifier;
 import tech.pegasys.teku.infrastructure.crypto.Hash;
+import tech.pegasys.teku.infrastructure.ssz.SszList;
 import tech.pegasys.teku.infrastructure.ssz.primitive.SszBytes32;
 import tech.pegasys.teku.infrastructure.unsigned.UInt64;
+import tech.pegasys.teku.spec.cache.IndexedAttestationCache;
 import tech.pegasys.teku.spec.config.SpecConfigEip8321;
 import tech.pegasys.teku.spec.datastructures.blocks.BeaconBlock;
+import tech.pegasys.teku.spec.datastructures.blocks.SignedBeaconBlock;
 import tech.pegasys.teku.spec.datastructures.blocks.blockbody.BeaconBlockBody;
 import tech.pegasys.teku.spec.datastructures.blocks.blockbody.versions.eip8321.BeaconBlockBodyEip8321;
 import tech.pegasys.teku.spec.datastructures.execution.ExecutionRequestsDataCodec;
+import tech.pegasys.teku.spec.datastructures.operations.Deposit;
+import tech.pegasys.teku.spec.datastructures.operations.PendingRandaoCommitment;
+import tech.pegasys.teku.spec.datastructures.operations.RandaoCommitmentRegistration;
+import tech.pegasys.teku.spec.datastructures.operations.SignedRandaoCommitmentRegistration;
 import tech.pegasys.teku.spec.datastructures.state.beaconstate.BeaconState;
 import tech.pegasys.teku.spec.datastructures.state.beaconstate.MutableBeaconState;
 import tech.pegasys.teku.spec.datastructures.state.beaconstate.versions.eip8321.BeaconStateEip8321;
 import tech.pegasys.teku.spec.datastructures.state.beaconstate.versions.eip8321.MutableBeaconStateEip8321;
+import tech.pegasys.teku.spec.logic.common.helpers.BeaconStateMutators;
 import tech.pegasys.teku.spec.logic.common.operations.OperationSignatureVerifier;
+import tech.pegasys.teku.spec.logic.common.operations.validation.OperationInvalidReason;
 import tech.pegasys.teku.spec.logic.common.operations.validation.OperationValidator;
 import tech.pegasys.teku.spec.logic.common.statetransition.blockvalidator.BlockValidationResult;
 import tech.pegasys.teku.spec.logic.common.statetransition.exceptions.BlockProcessingException;
@@ -49,6 +63,8 @@ import tech.pegasys.teku.spec.logic.versions.gloas.withdrawals.WithdrawalsHelper
 import tech.pegasys.teku.spec.schemas.SchemaDefinitionsEip8321;
 
 public class BlockProcessorEip8321 extends BlockProcessorGloas {
+
+    private final SpecConfigEip8321 specConfigEip8321;
 
     public BlockProcessorEip8321(
             final SpecConfigEip8321 specConfig,
@@ -82,6 +98,119 @@ public class BlockProcessorEip8321 extends BlockProcessorGloas {
                 withdrawalsHelpers,
                 executionRequestsDataCodec,
                 executionRequestsProcessor);
+        this.specConfigEip8321 = specConfig;
+    }
+
+    @Override
+    @CheckReturnValue
+    protected BlockValidationResult validateBlockPreProcessing(
+            final BeaconState preState,
+            final SignedBeaconBlock block,
+            final BLSSignatureVerifier signatureVerifier)
+            throws BlockProcessingException {
+        final BlockValidationResult superResult =
+                super.validateBlockPreProcessing(preState, block, signatureVerifier);
+        if (!superResult.isValid()) {
+            return superResult;
+        }
+
+        final BeaconBlockBody blockBody = block.getMessage().getBody();
+        if (blockBody instanceof BeaconBlockBodyEip8321 eip8321Body) {
+            final SszList<SignedRandaoCommitmentRegistration> registrations =
+                    eip8321Body.getRandaoCommitmentRegistrations();
+            if (!registrations.isEmpty()) {
+                final SszList<Deposit> deposits = blockBody.getDeposits();
+                BeaconState validationState = preState;
+                if (!deposits.isEmpty()) {
+                    final MutableBeaconStateEip8321 mutableBeaconState =
+                            BeaconStateEip8321.required(preState).createWritableCopy();
+                    processDeposits(mutableBeaconState, deposits);
+                    validationState = mutableBeaconState.commitChanges();
+                }
+                return verifyRandaoCommitmentRegistrationsPreProcessing(
+                        validationState, registrations, signatureVerifier);
+            }
+        }
+
+        return BlockValidationResult.SUCCESSFUL;
+    }
+
+    public BlockValidationResult verifyRandaoCommitmentRegistrationsPreProcessing(
+            final BeaconState state,
+            final SszList<SignedRandaoCommitmentRegistration> signedRegistrations,
+            final BLSSignatureVerifier signatureVerifier) {
+        final Set<UInt64> validatorsSeenInBlock = new HashSet<>();
+        for (final SignedRandaoCommitmentRegistration signedRegistration : signedRegistrations) {
+            final RandaoCommitmentRegistration registration = signedRegistration.getMessage();
+            final UInt64 validatorIndex = registration.getValidatorIndex();
+
+            if (!validatorsSeenInBlock.add(validatorIndex)) {
+                return BlockValidationResult.failed(
+                        "Duplicated RandaoCommitmentRegistration for validator " + validatorIndex);
+            }
+
+            final Optional<OperationInvalidReason> operationInvalidReason =
+                    operationValidator.validateRandaoCommitmentRegistration(
+                            state.getFork(), state, registration);
+            if (operationInvalidReason.isPresent()) {
+                return BlockValidationResult.failed(operationInvalidReason.get().describe());
+            }
+
+            final boolean signatureValid =
+                    operationSignatureVerifier.verifyRandaoCommitmentRegistrationSignature(
+                            state, signedRegistration, signatureVerifier);
+            if (!signatureValid) {
+                return BlockValidationResult.failed(
+                        "RandaoCommitmentRegistration signature is invalid: " + signedRegistration);
+            }
+        }
+        return BlockValidationResult.SUCCESSFUL;
+    }
+
+    @Override
+    protected void processOperationsNoValidation(
+            final MutableBeaconState state,
+            final BeaconBlockBody body,
+            final IndexedAttestationCache indexedAttestationCache,
+            final Supplier<BeaconStateMutators.ValidatorExitContext> validatorExitContextSupplier,
+            final UInt64 parentSlot)
+            throws BlockProcessingException {
+        super.processOperationsNoValidation(
+                state, body, indexedAttestationCache, validatorExitContextSupplier, parentSlot);
+
+        if (body instanceof BeaconBlockBodyEip8321 eip8321Body) {
+            safelyProcess(
+                    () ->
+                            processRandaoCommitmentRegistrations(
+                                    state, eip8321Body.getRandaoCommitmentRegistrations()));
+        }
+    }
+
+    public void processRandaoCommitmentRegistrations(
+            final MutableBeaconState state,
+            final SszList<SignedRandaoCommitmentRegistration> registrations)
+            throws BlockProcessingException {
+        final BlockValidationResult result =
+                verifyRandaoCommitmentRegistrationsPreProcessing(
+                        state, registrations, BLSSignatureVerifier.SIMPLE);
+        if (!result.isValid()) {
+            throw new BlockProcessingException(result.getFailureReason());
+        }
+
+        final MutableBeaconStateEip8321 stateEip8321 = MutableBeaconStateEip8321.required(state);
+        final UInt64 currentEpoch = beaconStateAccessors.getCurrentEpoch(state);
+        final UInt64 activationEpoch =
+                currentEpoch.plus(specConfigEip8321.getCommitmentRegistrationDelay());
+
+        for (final SignedRandaoCommitmentRegistration signedRegistration : registrations) {
+            final RandaoCommitmentRegistration registration = signedRegistration.getMessage();
+            final PendingRandaoCommitment pending =
+                    new PendingRandaoCommitment(
+                            registration.getValidatorIndex(),
+                            registration.getCommitment(),
+                            activationEpoch);
+            stateEip8321.getPendingRandaoCommitments().append(pending);
+        }
     }
 
     @Override

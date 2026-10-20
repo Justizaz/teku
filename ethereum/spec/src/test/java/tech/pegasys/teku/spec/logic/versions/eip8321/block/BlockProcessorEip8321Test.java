@@ -14,6 +14,9 @@
 package tech.pegasys.teku.spec.logic.versions.eip8321.block;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+
+import java.util.Optional;
 
 import org.apache.tuweni.bytes.Bytes;
 import org.apache.tuweni.bytes.Bytes32;
@@ -25,12 +28,15 @@ import tech.pegasys.teku.bls.BLSSignatureVerifier;
 import tech.pegasys.teku.bls.BLSTestUtil;
 import tech.pegasys.teku.infrastructure.async.SafeFuture;
 import tech.pegasys.teku.infrastructure.crypto.Hash;
+import tech.pegasys.teku.infrastructure.ssz.SszList;
 import tech.pegasys.teku.infrastructure.ssz.primitive.SszBytes32;
 import tech.pegasys.teku.infrastructure.unsigned.UInt64;
 import tech.pegasys.teku.spec.Spec;
 import tech.pegasys.teku.spec.TestSpecFactory;
+import tech.pegasys.teku.spec.cache.IndexedAttestationCache;
 import tech.pegasys.teku.spec.constants.Domain;
 import tech.pegasys.teku.spec.datastructures.blocks.BeaconBlock;
+import tech.pegasys.teku.spec.datastructures.blocks.SignedBeaconBlock;
 import tech.pegasys.teku.spec.datastructures.blocks.blockbody.BeaconBlockBody;
 import tech.pegasys.teku.spec.datastructures.blocks.blockbody.versions.eip8321.BeaconBlockBodyBuilderEip8321;
 import tech.pegasys.teku.spec.datastructures.blocks.blockbody.versions.eip8321.BeaconBlockBodyEip8321;
@@ -42,6 +48,7 @@ import tech.pegasys.teku.spec.datastructures.state.beaconstate.BeaconState;
 import tech.pegasys.teku.spec.datastructures.state.beaconstate.versions.eip8321.BeaconStateEip8321;
 import tech.pegasys.teku.spec.datastructures.state.beaconstate.versions.eip8321.MutableBeaconStateEip8321;
 import tech.pegasys.teku.spec.logic.common.statetransition.blockvalidator.BlockValidationResult;
+import tech.pegasys.teku.spec.logic.common.statetransition.exceptions.BlockProcessingException;
 import tech.pegasys.teku.spec.logic.common.util.HashChainRandaoUtil;
 import tech.pegasys.teku.spec.util.DataStructureUtil;
 
@@ -293,6 +300,291 @@ class BlockProcessorEip8321Test {
         assertThat(result.isValid()).isTrue();
     }
 
+    @Test
+    void verifyRandaoCommitmentRegistrations_validRegistration_shouldSucceed() {
+        final BeaconStateEip8321 state = createStateWithProposer(proposerKeyPair, Bytes32.ZERO);
+        final BLSKeyPair validatorKeyPair = BLSTestUtil.randomKeyPair(100);
+        final BeaconStateEip8321 stateWithValidator = setValidatorPubKey(state, 1, validatorKeyPair);
+
+        final Bytes32 commitment = dataStructureUtil.randomBytes32();
+        final SignedRandaoCommitmentRegistration registration =
+                createSignedRegistration(stateWithValidator, validatorKeyPair, 1, commitment);
+
+        final SszList<SignedRandaoCommitmentRegistration> registrations =
+                createRegistrationsList(registration);
+
+        final BlockValidationResult result =
+                blockProcessor.verifyRandaoCommitmentRegistrationsPreProcessing(
+                        stateWithValidator, registrations, BLSSignatureVerifier.SIMPLE);
+
+        assertThat(result.isValid()).isTrue();
+    }
+
+    @Test
+    void verifyRandaoCommitmentRegistrations_duplicateInBlock_shouldFail() {
+        final BeaconStateEip8321 state = createStateWithProposer(proposerKeyPair, Bytes32.ZERO);
+        final BLSKeyPair validatorKeyPair = BLSTestUtil.randomKeyPair(100);
+        final BeaconStateEip8321 stateWithValidator = setValidatorPubKey(state, 1, validatorKeyPair);
+
+        final SignedRandaoCommitmentRegistration reg1 =
+                createSignedRegistration(stateWithValidator, validatorKeyPair, 1, dataStructureUtil.randomBytes32());
+        final SignedRandaoCommitmentRegistration reg2 =
+                createSignedRegistration(stateWithValidator, validatorKeyPair, 1, dataStructureUtil.randomBytes32());
+
+        final SszList<SignedRandaoCommitmentRegistration> registrations =
+                createRegistrationsList(reg1, reg2);
+
+        final BlockValidationResult result =
+                blockProcessor.verifyRandaoCommitmentRegistrationsPreProcessing(
+                        stateWithValidator, registrations, BLSSignatureVerifier.SIMPLE);
+
+        assertThat(result.isValid()).isFalse();
+        assertThat(result.getFailureReason()).contains("Duplicated RandaoCommitmentRegistration for validator 1");
+    }
+
+    @Test
+    void verifyRandaoCommitmentRegistrations_invalidSignature_shouldFail() {
+        final BeaconStateEip8321 state = createStateWithProposer(proposerKeyPair, Bytes32.ZERO);
+        final BLSKeyPair validatorKeyPair = BLSTestUtil.randomKeyPair(100);
+        final BLSKeyPair wrongKeyPair = BLSTestUtil.randomKeyPair(101);
+        final BeaconStateEip8321 stateWithValidator = setValidatorPubKey(state, 1, validatorKeyPair);
+
+        // Signed with wrong key
+        final SignedRandaoCommitmentRegistration registration =
+                createSignedRegistration(stateWithValidator, wrongKeyPair, 1, dataStructureUtil.randomBytes32());
+
+        final SszList<SignedRandaoCommitmentRegistration> registrations =
+                createRegistrationsList(registration);
+
+        final BlockValidationResult result =
+                blockProcessor.verifyRandaoCommitmentRegistrationsPreProcessing(
+                        stateWithValidator, registrations, BLSSignatureVerifier.SIMPLE);
+
+        assertThat(result.isValid()).isFalse();
+        assertThat(result.getFailureReason()).contains("RandaoCommitmentRegistration signature is invalid");
+    }
+
+    @Test
+    void verifyRandaoCommitmentRegistrations_alreadyRegistered_shouldFail() {
+        final BeaconStateEip8321 state = createStateWithProposer(proposerKeyPair, Bytes32.ZERO);
+        final BLSKeyPair validatorKeyPair = BLSTestUtil.randomKeyPair(100);
+        final BeaconStateEip8321 stateWithValidator =
+                setValidatorPubKey(state, 1, validatorKeyPair)
+                        .updatedEip8321(
+                                mutableState ->
+                                        mutableState
+                                                .getRandaoCommitments()
+                                                .set(1, SszBytes32.of(dataStructureUtil.randomBytes32())));
+
+        final SignedRandaoCommitmentRegistration registration =
+                createSignedRegistration(stateWithValidator, validatorKeyPair, 1, dataStructureUtil.randomBytes32());
+
+        final SszList<SignedRandaoCommitmentRegistration> registrations =
+                createRegistrationsList(registration);
+
+        final BlockValidationResult result =
+                blockProcessor.verifyRandaoCommitmentRegistrationsPreProcessing(
+                        stateWithValidator, registrations, BLSSignatureVerifier.SIMPLE);
+
+        assertThat(result.isValid()).isFalse();
+        assertThat(result.getFailureReason()).contains("already has a registered commitment");
+    }
+
+    @Test
+    void verifyRandaoCommitmentRegistrations_zeroCommitment_shouldFail() {
+        final BeaconStateEip8321 state = createStateWithProposer(proposerKeyPair, Bytes32.ZERO);
+        final BLSKeyPair validatorKeyPair = BLSTestUtil.randomKeyPair(100);
+        final BeaconStateEip8321 stateWithValidator = setValidatorPubKey(state, 1, validatorKeyPair);
+
+        final SignedRandaoCommitmentRegistration registration =
+                createSignedRegistration(stateWithValidator, validatorKeyPair, 1, Bytes32.ZERO);
+
+        final SszList<SignedRandaoCommitmentRegistration> registrations =
+                createRegistrationsList(registration);
+
+        final BlockValidationResult result =
+                blockProcessor.verifyRandaoCommitmentRegistrationsPreProcessing(
+                        stateWithValidator, registrations, BLSSignatureVerifier.SIMPLE);
+
+        assertThat(result.isValid()).isFalse();
+        assertThat(result.getFailureReason()).contains("Commitment cannot be zero");
+    }
+
+    @Test
+    void processRandaoCommitmentRegistrations_shouldAppendPendingCommitment() throws Exception {
+        final BeaconStateEip8321 state = createStateWithProposer(proposerKeyPair, Bytes32.ZERO);
+        final BLSKeyPair validator1KeyPair = BLSTestUtil.randomKeyPair(101);
+        final BLSKeyPair validator2KeyPair = BLSTestUtil.randomKeyPair(102);
+        BeaconStateEip8321 stateWithValidators = setValidatorPubKey(state, 1, validator1KeyPair);
+        stateWithValidators = setValidatorPubKey(stateWithValidators, 2, validator2KeyPair);
+
+        final Bytes32 commitment1 = dataStructureUtil.randomBytes32();
+        final Bytes32 commitment2 = dataStructureUtil.randomBytes32();
+
+        final SignedRandaoCommitmentRegistration reg1 =
+                createSignedRegistration(stateWithValidators, validator1KeyPair, 1, commitment1);
+        final SignedRandaoCommitmentRegistration reg2 =
+                createSignedRegistration(stateWithValidators, validator2KeyPair, 2, commitment2);
+
+        final SszList<SignedRandaoCommitmentRegistration> registrations =
+                createRegistrationsList(reg1, reg2);
+
+        final MutableBeaconStateEip8321 mutableState = stateWithValidators.createWritableCopy();
+        blockProcessor.processRandaoCommitmentRegistrations(mutableState, registrations);
+
+        final UInt64 expectedActivationEpoch =
+                spec.computeEpochAtSlot(mutableState.getSlot())
+                        .plus(spec.getGenesisSpecConfig().toVersionEip8321().orElseThrow().getCommitmentRegistrationDelay());
+
+        assertThat(mutableState.getPendingRandaoCommitments()).hasSize(2);
+        assertThat(mutableState.getPendingRandaoCommitments().get(0).getValidatorIndex())
+                .isEqualTo(UInt64.valueOf(1));
+        assertThat(mutableState.getPendingRandaoCommitments().get(0).getCommitment())
+                .isEqualTo(commitment1);
+        assertThat(mutableState.getPendingRandaoCommitments().get(0).getActivationEpoch())
+                .isEqualTo(expectedActivationEpoch);
+
+        assertThat(mutableState.getPendingRandaoCommitments().get(1).getValidatorIndex())
+                .isEqualTo(UInt64.valueOf(2));
+        assertThat(mutableState.getPendingRandaoCommitments().get(1).getCommitment())
+                .isEqualTo(commitment2);
+        assertThat(mutableState.getPendingRandaoCommitments().get(1).getActivationEpoch())
+                .isEqualTo(expectedActivationEpoch);
+    }
+
+    @Test
+    void validateBlockPreProcessing_withRegistrations_shouldSucceed() throws Exception {
+        final BeaconStateEip8321 state = createStateWithProposer(proposerKeyPair, Bytes32.ZERO);
+        final BLSKeyPair validatorKeyPair = BLSTestUtil.randomKeyPair(100);
+        final BeaconStateEip8321 stateWithValidator = setValidatorPubKey(state, 1, validatorKeyPair);
+
+        final Bytes32 commitment = dataStructureUtil.randomBytes32();
+        final SignedRandaoCommitmentRegistration registration =
+                createSignedRegistration(stateWithValidator, validatorKeyPair, 1, commitment);
+
+        final BeaconBlock block =
+                createBlock(
+                        UInt64.ZERO,
+                        UInt64.valueOf(spec.getBeaconProposerIndex(stateWithValidator, UInt64.ZERO)),
+                        BLSSignature.infinity(),
+                        Bytes32.ZERO,
+                        registration);
+
+        final SignedBeaconBlock signedBlock =
+                spec.getGenesisSchemaDefinitions().getSignedBeaconBlockSchema().create(block, BLSSignature.empty());
+
+        final BlockValidationResult result =
+                blockProcessor.validateBlockPreProcessing(
+                        stateWithValidator, signedBlock, BLSSignatureVerifier.SIMPLE);
+
+        assertThat(result.isValid()).isTrue();
+    }
+
+    @Test
+    void processOperationsNoValidation_withRegistrations_shouldAppendPendingCommitment() throws Exception {
+        final BeaconStateEip8321 state = createStateWithProposer(proposerKeyPair, Bytes32.ZERO);
+        final BLSKeyPair validatorKeyPair = BLSTestUtil.randomKeyPair(100);
+        final BeaconStateEip8321 stateWithValidator = setValidatorPubKey(state, 1, validatorKeyPair);
+
+        final Bytes32 commitment = dataStructureUtil.randomBytes32();
+        final SignedRandaoCommitmentRegistration registration =
+                createSignedRegistration(stateWithValidator, validatorKeyPair, 1, commitment);
+
+        final BeaconBlockBody body =
+                createBlockBody(BLSSignature.infinity(), Bytes32.ZERO, registration);
+
+        final MutableBeaconStateEip8321 mutableState = stateWithValidator.createWritableCopy();
+        blockProcessor.processOperationsNoValidation(
+                mutableState,
+                body,
+                IndexedAttestationCache.NOOP,
+                () -> null,
+                UInt64.ZERO);
+
+        final UInt64 expectedActivationEpoch =
+                spec.computeEpochAtSlot(mutableState.getSlot())
+                        .plus(spec.getGenesisSpecConfig().toVersionEip8321().orElseThrow().getCommitmentRegistrationDelay());
+
+        assertThat(mutableState.getPendingRandaoCommitments()).hasSize(1);
+        assertThat(mutableState.getPendingRandaoCommitments().get(0).getValidatorIndex())
+                .isEqualTo(UInt64.valueOf(1));
+        assertThat(mutableState.getPendingRandaoCommitments().get(0).getCommitment())
+                .isEqualTo(commitment);
+        assertThat(mutableState.getPendingRandaoCommitments().get(0).getActivationEpoch())
+                .isEqualTo(expectedActivationEpoch);
+    }
+
+    @Test
+    void processOperationsNoValidation_invalidRegistration_shouldThrowBlockProcessingException() {
+        final BeaconStateEip8321 state = createStateWithProposer(proposerKeyPair, Bytes32.ZERO);
+        final BLSKeyPair validatorKeyPair = BLSTestUtil.randomKeyPair(100);
+        final BLSKeyPair wrongKeyPair = BLSTestUtil.randomKeyPair(101);
+        final BeaconStateEip8321 stateWithValidator = setValidatorPubKey(state, 1, validatorKeyPair);
+
+        final SignedRandaoCommitmentRegistration badRegistration =
+                createSignedRegistration(stateWithValidator, wrongKeyPair, 1, dataStructureUtil.randomBytes32());
+
+        final BeaconBlockBody body =
+                createBlockBody(BLSSignature.infinity(), Bytes32.ZERO, badRegistration);
+
+        final MutableBeaconStateEip8321 mutableState = stateWithValidator.createWritableCopy();
+
+        assertThatThrownBy(
+                () ->
+                        blockProcessor.processOperationsNoValidation(
+                                mutableState,
+                                body,
+                                IndexedAttestationCache.NOOP,
+                                () -> null,
+                                UInt64.ZERO))
+                .isInstanceOf(BlockProcessingException.class)
+                .hasMessageContaining("RandaoCommitmentRegistration signature is invalid");
+    }
+
+    private BeaconStateEip8321 setValidatorPubKey(
+            final BeaconStateEip8321 state, final int validatorIndex, final BLSKeyPair keyPair) {
+        return state.updatedEip8321(
+                mutableState -> {
+                    final Validator current = mutableState.getValidators().get(validatorIndex);
+                    final Validator updated =
+                            new Validator(
+                                    keyPair.getPublicKey(),
+                                    current.getWithdrawalCredentials(),
+                                    current.getEffectiveBalance(),
+                                    current.isSlashed(),
+                                    current.getActivationEligibilityEpoch(),
+                                    current.getActivationEpoch(),
+                                    current.getExitEpoch(),
+                                    current.getWithdrawableEpoch());
+                    mutableState.getValidators().set(validatorIndex, updated);
+                });
+    }
+
+    private SignedRandaoCommitmentRegistration createSignedRegistration(
+            final BeaconState state,
+            final BLSKeyPair keyPair,
+            final int validatorIndex,
+            final Bytes32 commitment) {
+        final RandaoCommitmentRegistration registration =
+                new RandaoCommitmentRegistration(UInt64.valueOf(validatorIndex), commitment);
+        final Bytes32 domain =
+                spec.getGenesisSpec()
+                        .miscHelpers()
+                        .computeDomain(Domain.DOMAIN_RANDAO_COMMITMENT_REGISTRATION, state.getGenesisValidatorsRoot());
+        final Bytes signingRoot =
+                spec.getGenesisSpec().miscHelpers().computeSigningRoot(registration, domain);
+        final BLSSignature signature = BLS.sign(keyPair.getSecretKey(), signingRoot);
+        return new SignedRandaoCommitmentRegistration(registration, signature);
+    }
+
+    private SszList<SignedRandaoCommitmentRegistration> createRegistrationsList(
+            final SignedRandaoCommitmentRegistration... registrations) {
+        final BeaconBlockBodySchemaEip8321<?> schema =
+                (BeaconBlockBodySchemaEip8321<?>)
+                        spec.getGenesisSchemaDefinitions().getBeaconBlockBodySchema();
+        return schema.getRandaoCommitmentRegistrationsSchema().of(registrations);
+    }
+
     private BeaconStateEip8321 createStateWithProposer(
             final BLSKeyPair proposerKeyPair, final Bytes32 proposerCommitment) {
         final Spec specGloas = TestSpecFactory.createMinimalGloas();
@@ -338,8 +630,9 @@ class BlockProcessorEip8321Test {
             final UInt64 slot,
             final UInt64 proposerIndex,
             final BLSSignature randaoReveal,
-            final Bytes32 hashChainReveal) {
-        final BeaconBlockBody body = createBlockBody(randaoReveal, hashChainReveal);
+            final Bytes32 hashChainReveal,
+            final SignedRandaoCommitmentRegistration... registrations) {
+        final BeaconBlockBody body = createBlockBody(randaoReveal, hashChainReveal, registrations);
         return new BeaconBlock(
                 spec.getGenesisSchemaDefinitions().getBeaconBlockSchema(),
                 slot,
@@ -350,7 +643,9 @@ class BlockProcessorEip8321Test {
     }
 
     private BeaconBlockBody createBlockBody(
-            final BLSSignature randaoReveal, final Bytes32 hashChainReveal) {
+            final BLSSignature randaoReveal,
+            final Bytes32 hashChainReveal,
+            final SignedRandaoCommitmentRegistration... registrations) {
         final BeaconBlockBodySchemaEip8321<?> schema =
                 (BeaconBlockBodySchemaEip8321<?>)
                         spec.getGenesisSchemaDefinitions().getBeaconBlockBodySchema();
@@ -368,7 +663,7 @@ class BlockProcessorEip8321Test {
                                                     dataStructureUtil.randomSszList(
                                                             schema.getAttestationsSchema(),
                                                             () -> dataStructureUtil.randomAttestation(UInt64.ZERO),
-                                                            1))
+                                                            0))
                                             .proposerSlashings(
                                                     dataStructureUtil.randomSszList(
                                                             schema.getProposerSlashingsSchema(),
@@ -391,26 +686,23 @@ class BlockProcessorEip8321Test {
                                                             0))
                                             .syncAggregate(dataStructureUtil.randomSyncAggregate())
                                             .blsToExecutionChanges(
-                                                    dataStructureUtil.randomSignedBlsToExecutionChangesList())
+                                                    schema.getBlsToExecutionChangesSchema().of())
                                             .signedExecutionPayloadBid(
                                                     dataStructureUtil.randomSignedExecutionPayloadBid())
                                             .payloadAttestations(
                                                     dataStructureUtil.randomSszList(
                                                             schema.getPayloadAttestationsSchema(),
                                                             dataStructureUtil::randomPayloadAttestation,
-                                                            1))
+                                                            0))
                                             .parentExecutionRequests(dataStructureUtil.randomExecutionRequests());
                                     eip8321Builder.hashChainReveal(hashChainReveal);
-                                    eip8321Builder.randaoCommitmentRegistrations(
-                                            dataStructureUtil.randomSszList(
-                                                    schema.getRandaoCommitmentRegistrationsSchema(),
-                                                    () ->
-                                                            new SignedRandaoCommitmentRegistration(
-                                                                    new RandaoCommitmentRegistration(
-                                                                            dataStructureUtil.randomValidatorIndex(),
-                                                                            dataStructureUtil.randomBytes32()),
-                                                                    dataStructureUtil.randomSignature()),
-                                                    0));
+                                    if (registrations.length > 0) {
+                                        eip8321Builder.randaoCommitmentRegistrations(
+                                                schema.getRandaoCommitmentRegistrationsSchema().of(registrations));
+                                    } else {
+                                        eip8321Builder.randaoCommitmentRegistrations(
+                                                schema.getRandaoCommitmentRegistrationsSchema().of());
+                                    }
                                     return SafeFuture.COMPLETE;
                                 })
                         .join();
