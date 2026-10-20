@@ -120,10 +120,15 @@ class EpochProcessorEip8321Test {
   }
 
   @Test
-  void processPendingRandaoCommitments_shouldHandleMultipleEntriesWithMixedActivation() {
-    final BeaconStateEip8321 baseState = createEip8321State(8, UInt64.valueOf(10 * spec.getGenesisSpecConfig().getSlotsPerEpoch()));
+  void processPendingRandaoCommitments_shouldActivateEligiblePrefixAndRetainSuffix() {
+    final BeaconStateEip8321 baseState = createEip8321State(
+            8,
+            UInt64.valueOf(10 * spec.getGenesisSpecConfig().getSlotsPerEpoch()));
     final UInt64 currentEpoch = spec.computeEpochAtSlot(baseState.getSlot()); // 10
     final UInt64 nextEpoch = currentEpoch.plus(1); // 11
+
+    assertThat(currentEpoch).isEqualTo(UInt64.valueOf(10));
+    assertThat(nextEpoch).isEqualTo(UInt64.valueOf(11));
 
     final Bytes32 commitment0 = dataStructureUtil.randomBytes32();
     final Bytes32 commitment1 = dataStructureUtil.randomBytes32();
@@ -131,13 +136,13 @@ class EpochProcessorEip8321Test {
     final Bytes32 commitment3 = dataStructureUtil.randomBytes32();
 
     final PendingRandaoCommitment pending0 =
-        new PendingRandaoCommitment(UInt64.ZERO, commitment0, nextEpoch); // due (11 == 11)
+        new PendingRandaoCommitment(UInt64.ZERO, commitment0, currentEpoch); // 10: due
     final PendingRandaoCommitment pending1 =
-        new PendingRandaoCommitment(UInt64.valueOf(1), commitment1, nextEpoch.plus(2)); // future (13 > 11)
+        new PendingRandaoCommitment(UInt64.ONE, commitment1, nextEpoch); // 11: duo
     final PendingRandaoCommitment pending2 =
-        new PendingRandaoCommitment(UInt64.valueOf(2), commitment2, currentEpoch); // due (10 < 11)
+        new PendingRandaoCommitment(UInt64.valueOf(2), commitment2, nextEpoch.plus(2)); // 13: future
     final PendingRandaoCommitment pending3 =
-        new PendingRandaoCommitment(UInt64.valueOf(3), commitment3, nextEpoch.plus(3)); // future (14 > 11)
+        new PendingRandaoCommitment(UInt64.valueOf(3), commitment3, nextEpoch.plus(3)); // 14: future
 
     final BeaconStateEip8321 preState =
         baseState.updatedEip8321(
@@ -148,18 +153,16 @@ class EpochProcessorEip8321Test {
     final BeaconStateEip8321 postState =
         preState.updatedEip8321(state -> epochProcessor.processPendingRandaoCommitments(state));
 
-    // Due commitments activated
+    // The eligible prefix was activated.
     assertThat(postState.getRandaoCommitments().get(0).get()).isEqualTo(commitment0);
-    assertThat(postState.getRandaoCommitments().get(2).get()).isEqualTo(commitment2);
+    assertThat(postState.getRandaoCommitments().get(1).get()).isEqualTo(commitment1);
 
-    // Future commitments remain zero in state
-    assertThat(postState.getRandaoCommitments().get(1).get()).isEqualTo(Bytes32.ZERO);
+    // Processing stopped at the first future entry.
+    assertThat(postState.getRandaoCommitments().get(2).get()).isEqualTo(Bytes32.ZERO);
     assertThat(postState.getRandaoCommitments().get(3).get()).isEqualTo(Bytes32.ZERO);
 
-    // Queue retains only future commitments in original relative order
-    assertThat(postState.getPendingRandaoCommitments().size()).isEqualTo(2);
-    assertThat(postState.getPendingRandaoCommitments().get(0)).isEqualTo(pending1);
-    assertThat(postState.getPendingRandaoCommitments().get(1)).isEqualTo(pending3);
+    // The unprocessed suffix remains in the same order.
+    assertThat(postState.getPendingRandaoCommitments()).containsExactly(pending2, pending3);
   }
 
   @Test

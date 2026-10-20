@@ -13,8 +13,6 @@
 
 package tech.pegasys.teku.spec.logic.versions.eip8321.statetransition.epoch;
 
-import java.util.ArrayList;
-import java.util.List;
 import tech.pegasys.teku.infrastructure.ssz.SszMutableList;
 import tech.pegasys.teku.infrastructure.ssz.primitive.SszBytes32;
 import tech.pegasys.teku.infrastructure.time.TimeProvider;
@@ -68,23 +66,29 @@ public class EpochProcessorEip8321 extends EpochProcessorGloas {
   public void processPendingRandaoCommitments(final MutableBeaconState state) {
     final MutableBeaconStateEip8321 stateEip8321 = MutableBeaconStateEip8321.required(state);
     final UInt64 nextEpoch = beaconStateAccessors.getCurrentEpoch(state).plus(1);
-    final List<PendingRandaoCommitment> remaining = new ArrayList<>();
     final SszMutableList<PendingRandaoCommitment> pendingList =
         stateEip8321.getPendingRandaoCommitments();
     final SszMutableList<SszBytes32> randaoCommitments = stateEip8321.getRandaoCommitments();
 
+    int nextPendingCommitment = 0;
     for (final PendingRandaoCommitment pending : pendingList) {
-      if (pending.getActivationEpoch().isLessThanOrEqualTo(nextEpoch)) {
-        randaoCommitments.set(
-            pending.getValidatorIndex().intValue(), SszBytes32.of(pending.getCommitment()));
-      } else {
-        remaining.add(pending);
+      if (pending.getActivationEpoch().isGreaterThan(nextEpoch)) {
+        break;
       }
+
+      randaoCommitments.set(
+            pending.getValidatorIndex().intValue(),
+            SszBytes32.of(pending.getCommitment()));
+
+      nextPendingCommitment++;
     }
 
     stateEip8321.setPendingRandaoCommitments(
         BeaconStateSchemaEip8321.required(stateEip8321.getBeaconStateSchema())
             .getPendingRandaoCommitmentsSchema()
-            .createFromElements(remaining));
+            .createFromElements(
+                    pendingList
+                            .asList()
+                            .subList(nextPendingCommitment, pendingList.size())));
   }
 }

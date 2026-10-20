@@ -32,7 +32,7 @@ public class HashChainRandaoUtilTest {
   @Test
   void domainConstant_shouldMatchExpectedValue() {
     assertThat(Domain.DOMAIN_RANDAO_COMMITMENT_REGISTRATION)
-        .isEqualTo(Bytes4.fromHexString("0x0F000000"));
+        .isEqualTo(Bytes4.fromHexString("0x11000000"));
   }
 
   @Test
