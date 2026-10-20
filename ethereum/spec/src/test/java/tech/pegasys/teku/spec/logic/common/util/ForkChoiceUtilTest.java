@@ -356,7 +356,7 @@ class ForkChoiceUtilTest {
     final AvailabilityChecker<?> availabilityChecker = util.createAvailabilityCheckerOnBlock(block);
 
     switch (milestone) {
-      case PHASE0, ALTAIR, BELLATRIX, CAPELLA, GLOAS, HEZE ->
+      case PHASE0, ALTAIR, BELLATRIX, CAPELLA, GLOAS, HEZE, EIP8321 ->
           assertThat(availabilityChecker).isSameAs(AvailabilityChecker.NOOP);
       case DENEB, ELECTRA ->
           verify(blobSidecarAvailabilityCheckerFactory).createAvailabilityChecker(block);
@@ -394,7 +394,7 @@ class ForkChoiceUtilTest {
     switch (milestone) {
       case PHASE0, ALTAIR, BELLATRIX, CAPELLA, DENEB, ELECTRA, FULU ->
           assertThat(availabilityChecker).isSameAs(AvailabilityChecker.NOOP);
-      case GLOAS, HEZE ->
+      case GLOAS, HEZE, EIP8321 ->
           verify(dataColumnSidecarAvailabilityCheckerFactory)
               .createAvailabilityChecker(block, signedEnvelope);
       default -> throw new IllegalStateException("Unexpected milestone " + milestone);

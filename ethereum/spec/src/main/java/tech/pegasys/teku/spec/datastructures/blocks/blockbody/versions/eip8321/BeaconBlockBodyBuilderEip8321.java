@@ -39,6 +39,11 @@ public class BeaconBlockBodyBuilderEip8321 extends BeaconBlockBodyBuilderGloas {
   public BeaconBlockBodyBuilderEip8321(
       final BeaconBlockBodySchema<? extends BeaconBlockBodyEip8321> schema) {
     super(schema);
+
+    this.randaoCommitmentRegistrations =
+            ((BeaconBlockBodySchemaEip8321<?>) schema)
+                    .getRandaoCommitmentRegistrationsSchema()
+                    .of();
   }
 
   @Override
