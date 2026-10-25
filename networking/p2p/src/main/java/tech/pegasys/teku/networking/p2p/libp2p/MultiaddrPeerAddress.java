@@ -1,5 +1,5 @@
 /*
- * Copyright Consensys Software Inc., 2026
+ * Copyright (c) 2026 Consensys Incorporated. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with
  * the License. You may obtain a copy of the License at
@@ -48,14 +48,19 @@ public class MultiaddrPeerAddress extends PeerAddress {
     return fromMultiaddr(multiaddr);
   }
 
-  public static MultiaddrPeerAddress fromDiscoveryPeer(
-      final DiscoveryPeer discoveryPeer, final boolean localNodeQuicEnabled) {
-    final Multiaddr multiaddr =
-        MultiaddrUtil.fromDiscoveryPeer(discoveryPeer, localNodeQuicEnabled);
-    final Multiaddr tcpMultiaddr = MultiaddrUtil.fromDiscoveryPeerAsTcp(discoveryPeer);
-    final Optional<Multiaddr> fallbackMultiaddr =
-        multiaddr.equals(tcpMultiaddr) ? Optional.empty() : Optional.of(tcpMultiaddr);
-    return fromMultiaddr(multiaddr, fallbackMultiaddr);
+  public static Optional<MultiaddrPeerAddress> fromDiscoveryPeer(
+      final DiscoveryPeer discoveryPeer,
+      final boolean localNodeTcpEnabled,
+      final boolean localNodeQuicEnabled) {
+    // The fallback is only ever TCP, which is pointless when this node has no TCP transport.
+    final Optional<Multiaddr> tcpMultiaddr =
+        localNodeTcpEnabled
+            ? MultiaddrUtil.fromDiscoveryPeerAsTcp(discoveryPeer)
+            : Optional.empty();
+    return MultiaddrUtil.fromDiscoveryPeer(discoveryPeer, localNodeTcpEnabled, localNodeQuicEnabled)
+        .map(
+            multiaddr ->
+                fromMultiaddr(multiaddr, tcpMultiaddr.filter(tcp -> !tcp.equals(multiaddr))));
   }
 
   private static MultiaddrPeerAddress fromMultiaddr(final Multiaddr multiaddr) {

@@ -1,5 +1,5 @@
 /*
- * Copyright Consensys Software Inc., 2026
+ * Copyright (c) 2026 Consensys Incorporated. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with
  * the License. You may obtain a copy of the License at
@@ -158,6 +158,7 @@ public class FuzzUtil {
               structuredInput.getState(),
               structuredInput.getSignedBlock(),
               signatureVerifier,
+              Optional.empty(),
               Optional.empty());
       Bytes output = postState.sszSerialize();
       return Optional.of(output.toArrayUnsafe());
@@ -316,7 +317,8 @@ public class FuzzUtil {
               .updated(
                   state ->
                       spec.getBlockProcessor(state.getSlot())
-                          .processExecutionPayload(state, beaconBlockBody, Optional.empty()));
+                          .processExecutionPayload(
+                              state, beaconBlockBody, Optional.empty(), Optional.empty()));
       Bytes output = postState.sszSerialize();
       return Optional.of(output.toArrayUnsafe());
     } catch (BlockProcessingException e) {

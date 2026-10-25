@@ -1,5 +1,5 @@
 /*
- * Copyright Consensys Software Inc., 2026
+ * Copyright (c) 2026 Consensys Incorporated. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with
  * the License. You may obtain a copy of the License at
@@ -27,6 +27,7 @@ import tech.pegasys.teku.infrastructure.ssz.collections.SszMutableUInt64List;
 import tech.pegasys.teku.infrastructure.ssz.collections.SszPrimitiveList;
 import tech.pegasys.teku.infrastructure.ssz.collections.SszPrimitiveVector;
 import tech.pegasys.teku.infrastructure.ssz.collections.SszUInt64List;
+import tech.pegasys.teku.infrastructure.ssz.collections.SszUInt64Vector;
 import tech.pegasys.teku.infrastructure.ssz.primitive.SszBytes32;
 import tech.pegasys.teku.infrastructure.ssz.primitive.SszUInt64;
 import tech.pegasys.teku.infrastructure.unsigned.UInt64;
@@ -68,6 +69,11 @@ public interface MutableBeaconState extends BeaconState, SszMutableRefContainer 
   default void setFork(final Fork fork) {
     final int fieldIndex = getSchema().getFieldIndex(BeaconStateFields.FORK);
     set(fieldIndex, fork);
+  }
+
+  default void setProposerLookahead(final SszUInt64Vector proposerLookahead) {
+    final int fieldIndex = getSchema().getFieldIndex(BeaconStateFields.PROPOSER_LOOKAHEAD);
+    set(fieldIndex, proposerLookahead);
   }
 
   // History

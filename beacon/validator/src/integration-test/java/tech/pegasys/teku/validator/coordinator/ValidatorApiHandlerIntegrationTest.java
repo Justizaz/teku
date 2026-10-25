@@ -1,5 +1,5 @@
 /*
- * Copyright Consensys Software Inc., 2026
+ * Copyright (c) 2026 Consensys Incorporated. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with
  * the License. You may obtain a copy of the License at
@@ -96,16 +96,15 @@ import tech.pegasys.teku.validator.api.SubmitDataError;
 import tech.pegasys.teku.validator.coordinator.performance.DefaultPerformanceTracker;
 import tech.pegasys.teku.validator.coordinator.publisher.ExecutionPayloadPublisher;
 import tech.pegasys.teku.validator.coordinator.publisher.MilestoneBasedBlockPublisher;
+import tech.pegasys.teku.validator.coordinator.publisher.SignedInclusionListPublisher;
 
 @TestSpecContext(milestone = {SpecMilestone.PHASE0, SpecMilestone.DENEB, SpecMilestone.GLOAS})
 public class ValidatorApiHandlerIntegrationTest {
   private final AsyncRunner asyncRunner = DelayedExecutorAsyncRunner.create();
 
   // Use full storage system
-  private final StorageSystem storageSystem =
-      InMemoryStorageSystemBuilder.buildDefault(StateStorageMode.ARCHIVE);
-  private final CombinedChainDataClient combinedChainDataClient =
-      storageSystem.combinedChainDataClient();
+  private StorageSystem storageSystem;
+  private CombinedChainDataClient combinedChainDataClient;
 
   // Other dependencies are mocked, but these can be updated as needed
   private final SyncStateProvider syncStateProvider = mock(SyncStateTracker.class);
@@ -140,7 +139,7 @@ public class ValidatorApiHandlerIntegrationTest {
       mock(ExecutionPayloadBidManager.class);
   private final ProposerPreferencesManager proposerPreferencesManager =
       mock(ProposerPreferencesManager.class);
-  private final ChainUpdater chainUpdater = storageSystem.chainUpdater();
+  private ChainUpdater chainUpdater;
   private final SyncCommitteeMessagePool syncCommitteeMessagePool =
       mock(SyncCommitteeMessagePool.class);
   private final SyncCommitteeContributionPool syncCommitteeContributionPool =
@@ -149,15 +148,24 @@ public class ValidatorApiHandlerIntegrationTest {
       mock(SyncCommitteeSubscriptionManager.class);
   private final PayloadAttestationPool payloadAttestationPool = mock(PayloadAttestationPool.class);
 
+  private final SignedInclusionListPublisher signedInclusionListPublisher =
+      mock(SignedInclusionListPublisher.class);
   private final DutyMetrics dutyMetrics = mock(DutyMetrics.class);
   private final StakedBuilderClientProvider stakedBuilderClientProvider =
       mock(StakedBuilderClientProvider.class);
   private final StakedBuilderClient stakedBuilderClient = mock(StakedBuilderClient.class);
 
+  private final InclusionListFactory inclusionListFactory = mock(InclusionListFactory.class);
+
   private ValidatorApiHandler handler;
 
   @BeforeEach
   public void setup(final SpecContext specContext) {
+    storageSystem =
+        InMemoryStorageSystemBuilder.buildDefault(StateStorageMode.ARCHIVE, specContext.getSpec());
+    combinedChainDataClient = storageSystem.combinedChainDataClient();
+    chainUpdater = storageSystem.chainUpdater();
+
     when(syncStateProvider.getCurrentSyncState()).thenReturn(SyncState.IN_SYNC);
     when(forkChoiceTrigger.prepareForAttestationProduction(any())).thenReturn(SafeFuture.COMPLETE);
     when(dutyMetrics.getValidatorDutyMetric())
@@ -250,6 +258,8 @@ public class ValidatorApiHandlerIntegrationTest {
             executionPayloadBidManager,
             proposerPreferencesManager,
             ExecutionProofManager.NOOP,
+            signedInclusionListPublisher,
+            inclusionListFactory,
             stakedBuilderClientProvider);
   }
 
@@ -266,7 +276,7 @@ public class ValidatorApiHandlerIntegrationTest {
     SignedBlockAndState latestBlock = null;
     SignedBlockAndState epochBoundaryBlock = null;
     while (chainUpdater.getHeadSlot().compareTo(targetSlot) < 0) {
-      latestBlock = chainUpdater.advanceChain();
+      latestBlock = chainUpdater.advanceChain(chainUpdater.getHeadSlot().increment());
       chainUpdater.updateBestBlock(latestBlock);
       if (latestBlock.getSlot().equals(targetEpochStartSlot)) {
         epochBoundaryBlock = latestBlock;
@@ -282,6 +292,8 @@ public class ValidatorApiHandlerIntegrationTest {
     assertThatSafeFuture(result).isCompletedWithNonEmptyOptional();
     final AttestationData attestation = safeJoin(result).orElseThrow();
     assertThat(attestation.getBeaconBlockRoot()).isEqualTo(latestBlock.getRoot());
+    // Gloas: the head is FULL but in the attestation slot, so the index is still 0
+    assertThat(attestation.getIndex()).isEqualTo(UInt64.ZERO);
     assertThat(attestation.getSource()).isEqualTo(genesisCheckpoint);
     assertThat(attestation.getTarget()).isEqualTo(expectedTarget);
   }
@@ -301,7 +313,7 @@ public class ValidatorApiHandlerIntegrationTest {
 
     SignedBlockAndState latestBlock = null;
     while (chainUpdater.getHeadSlot().compareTo(latestSlot) < 0) {
-      latestBlock = chainUpdater.advanceChain();
+      latestBlock = chainUpdater.advanceChain(chainUpdater.getHeadSlot().increment());
       chainUpdater.updateBestBlock(latestBlock);
     }
     chainUpdater.setCurrentSlot(targetSlot);
@@ -314,6 +326,11 @@ public class ValidatorApiHandlerIntegrationTest {
     assertThatSafeFuture(result).isCompletedWithNonEmptyOptional();
     final AttestationData attestation = safeJoin(result).orElseThrow();
     assertThat(attestation.getBeaconBlockRoot()).isEqualTo(latestBlock.getRoot());
+    assertThat(attestation.getIndex())
+        .isEqualTo(
+            specContext.getSpecMilestone().isGreaterThanOrEqualTo(SpecMilestone.GLOAS)
+                ? ONE
+                : UInt64.ZERO);
     assertThat(attestation.getSource()).isEqualTo(genesisCheckpoint);
     assertThat(attestation.getTarget()).isEqualTo(expectedTarget);
   }

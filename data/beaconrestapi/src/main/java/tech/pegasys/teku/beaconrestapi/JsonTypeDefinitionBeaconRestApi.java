@@ -1,5 +1,5 @@
 /*
- * Copyright Consensys Software Inc., 2026
+ * Copyright (c) 2026 Consensys Incorporated. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with
  * the License. You may obtain a copy of the License at
@@ -26,6 +26,7 @@ import tech.pegasys.teku.beaconrestapi.addon.CapellaRestApiBuilderAddon;
 import tech.pegasys.teku.beaconrestapi.addon.DenebRestApiBuilderAddon;
 import tech.pegasys.teku.beaconrestapi.addon.FuluRestApiBuilderAddon;
 import tech.pegasys.teku.beaconrestapi.addon.GloasRestApiBuilderAddon;
+import tech.pegasys.teku.beaconrestapi.addon.HezeRestApiBuilderAddon;
 import tech.pegasys.teku.beaconrestapi.addon.LightClientRestApiBuilderAddon;
 import tech.pegasys.teku.beaconrestapi.handlers.tekuv1.admin.AddPeer;
 import tech.pegasys.teku.beaconrestapi.handlers.tekuv1.admin.Liveness;
@@ -277,6 +278,7 @@ public class JsonTypeDefinitionBeaconRestApi implements BeaconRestApi {
             .endpoint(
                 new GetEvents(
                     spec,
+                    schemaCache,
                     dataProvider,
                     eventChannels,
                     asyncRunner,
@@ -363,6 +365,7 @@ public class JsonTypeDefinitionBeaconRestApi implements BeaconRestApi {
             new DenebRestApiBuilderAddon(spec, dataProvider, schemaCache),
             new FuluRestApiBuilderAddon(spec, dataProvider, schemaCache),
             new GloasRestApiBuilderAddon(spec, dataProvider, schemaCache),
+            new HezeRestApiBuilderAddon(spec, dataProvider, schemaCache),
             new LightClientRestApiBuilderAddon(config, dataProvider, schemaCache));
 
     RestApiBuilder builderUpdated = builder;

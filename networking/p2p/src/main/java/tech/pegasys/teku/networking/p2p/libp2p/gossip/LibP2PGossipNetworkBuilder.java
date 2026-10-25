@@ -1,5 +1,5 @@
 /*
- * Copyright Consensys Software Inc., 2026
+ * Copyright (c) 2026 Consensys Incorporated. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with
  * the License. You may obtain a copy of the License at
@@ -15,7 +15,7 @@ package tech.pegasys.teku.networking.p2p.libp2p.gossip;
 
 import static com.google.common.base.Preconditions.checkState;
 import static tech.pegasys.teku.networking.p2p.libp2p.LibP2PNetworkBuilder.DEFAULT_RECORD_MESSAGE_ARRIVAL;
-import static tech.pegasys.teku.networking.p2p.libp2p.config.LibP2PParamsFactory.MAX_SUBSCRIPTIONS_PER_MESSAGE;
+import static tech.pegasys.teku.networking.p2p.libp2p.config.LibP2PParamsFactory.MAX_INBOUND_SUBSCRIPTIONS_PER_RPC;
 import static tech.pegasys.teku.networking.p2p.libp2p.gossip.LibP2PGossipNetwork.NULL_SEQNO_GENERATOR;
 import static tech.pegasys.teku.networking.p2p.libp2p.gossip.LibP2PGossipNetwork.STRICT_FIELDS_VALIDATOR;
 
@@ -81,13 +81,11 @@ public class LibP2PGossipNetworkBuilder {
     final GossipTopicHandlers topicHandlers = new GossipTopicHandlers();
     final GossipRouter router =
         createGossipRouter(gossipConfig, networkingSpecConfig, gossipTopicFilter, topicHandlers);
-    final Optional<GossipMetricsListener> gossipMetricsListener =
-        GossipMetricsListener.attachTo(metricsSystem, router);
+    GossipMetricsListener.attachTo(metricsSystem, router);
     final Gossip gossip = createGossip(router, logWireGossip);
     final PubsubPublisherApi publisher = gossip.createPublisher(null, NULL_SEQNO_GENERATOR);
 
-    return new LibP2PGossipNetwork(
-        metricsSystem, gossip, publisher, topicHandlers, gossipMetricsListener);
+    return new LibP2PGossipNetwork(metricsSystem, gossip, publisher, topicHandlers);
   }
 
   private void validate() {
@@ -115,14 +113,14 @@ public class LibP2PGossipNetworkBuilder {
 
     final TopicSubscriptionFilter subscriptionFilter =
         new MaxCountTopicSubscriptionFilter(
-            MAX_SUBSCRIPTIONS_PER_MESSAGE,
+            MAX_INBOUND_SUBSCRIPTIONS_PER_RPC,
             MAX_SUBSCRIBED_TOPICS,
             gossipTopicFilter::isRelevantTopic);
 
     final GossipRouterBuilder builder = new GossipRouterBuilder();
     final SeenCache<Optional<ValidationResult>> seenCache =
         new TTLSeenCache<>(
-            new FastIdSeenCache<>(msg -> Bytes.wrap(msg.messageSha256())),
+            new FastIdSeenCache<>(FastMessageId::of),
             gossipParams.getSeenTTL(),
             builder.getCurrentTimeSupplier());
 

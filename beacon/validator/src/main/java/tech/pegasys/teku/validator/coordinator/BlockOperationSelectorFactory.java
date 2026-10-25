@@ -1,5 +1,5 @@
 /*
- * Copyright Consensys Software Inc., 2026
+ * Copyright (c) 2026 Consensys Incorporated. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with
  * the License. You may obtain a copy of the License at
@@ -203,8 +203,6 @@ public class BlockOperationSelectorFactory {
         setExecutionPayloadBid = COMPLETE;
       }
 
-      final Eth1Data eth1Data = eth1DataCache.getEth1Vote(blockSlotState);
-
       final BeaconState attestationRewardState =
           spec.getStateForAttestationRewardCalculation(
               blockSlotState,
@@ -292,12 +290,18 @@ public class BlockOperationSelectorFactory {
 
       bodyBuilder
           .randaoReveal(blockProductionContext.randaoReveal())
-          .eth1Data(eth1Data)
           .graffiti(graffitiBuilder.buildGraffiti(blockProductionContext.graffiti()))
           .attestations(attestations)
           .proposerSlashings(proposerSlashings)
-          .attesterSlashings(attesterSlashings)
-          .deposits(depositProvider.getDeposits(blockSlotState, eth1Data));
+          .attesterSlashings(attesterSlashings);
+
+      // Pre-Heze: Eth1 data vote and deposits (removed by EIP-8015)
+      if (bodyBuilder.supportsEth1DataAndDeposits()) {
+        final Eth1Data eth1Data = eth1DataCache.getEth1Vote(blockSlotState);
+        bodyBuilder
+            .eth1Data(eth1Data)
+            .deposits(depositProvider.getDeposits(blockSlotState, eth1Data));
+      }
 
       // Optional fields introduced in later forks
 

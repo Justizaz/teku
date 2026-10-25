@@ -1,5 +1,5 @@
 /*
- * Copyright Consensys Software Inc., 2026
+ * Copyright (c) 2026 Consensys Incorporated. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with
  * the License. You may obtain a copy of the License at
@@ -59,6 +59,9 @@ public enum ValidatorApiMethod {
   BEACON_COMMITTEE_SELECTIONS("/eth/v1/validator/beacon_committee_selections"),
   SYNC_COMMITTEE_SELECTIONS("/eth/v1/validator/sync_committee_selections"),
   SEND_SIGNED_EXECUTION_PAYLOAD_ENVELOPE("eth/v1/beacon/execution_payload_envelopes"),
+  GET_INCLUSION_LIST("/eth/v1/validator/inclusion_list"),
+  GET_INCLUSION_LIST_DUTIES("/eth/v1/validator/duties/inclusion_list/:epoch"),
+  SEND_SIGNED_INCLUSION_LIST("/eth/v1/validator/inclusion_list"),
   SEND_SIGNED_PROPOSER_PREFERENCES("eth/v1/validator/proposer_preferences"),
   SEND_BUILDER_PREFERENCES("eth/v1/validator/builder_preferences"),
   SEND_SIGNED_EXECUTION_PAYLOAD_BID("eth/v1/beacon/execution_payload_bids");

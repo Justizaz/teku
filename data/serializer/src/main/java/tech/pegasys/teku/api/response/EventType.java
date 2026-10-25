@@ -1,5 +1,5 @@
 /*
- * Copyright Consensys Software Inc., 2026
+ * Copyright (c) 2026 Consensys Incorporated. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with
  * the License. You may obtain a copy of the License at
@@ -43,7 +43,8 @@ public enum EventType {
   execution_payload_bid,
   payload_attestation_message,
   proposer_preferences,
-  fast_confirmation;
+  fast_confirmation,
+  inclusion_list;
 
   private static final Set<String> TOPIC_NAMES =
       Arrays.stream(values()).map(EventType::name).collect(Collectors.toUnmodifiableSet());

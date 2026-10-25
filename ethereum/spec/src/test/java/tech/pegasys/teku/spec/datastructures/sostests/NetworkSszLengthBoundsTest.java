@@ -1,5 +1,5 @@
 /*
- * Copyright Consensys Software Inc., 2026
+ * Copyright (c) 2026 Consensys Incorporated. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with
  * the License. You may obtain a copy of the License at
@@ -19,13 +19,13 @@ import org.junit.jupiter.api.Test;
 import tech.pegasys.teku.infrastructure.ssz.schema.SszType;
 import tech.pegasys.teku.spec.Spec;
 import tech.pegasys.teku.spec.TestSpecFactory;
-import tech.pegasys.teku.spec.schemas.SchemaDefinitionsGloas;
+import tech.pegasys.teku.spec.schemas.SchemaDefinitionsHeze;
 
 class NetworkSszLengthBoundsTest {
 
-  private final Spec spec = TestSpecFactory.createMinimalGloas();
-  private final SchemaDefinitionsGloas schemaDefinitions =
-      SchemaDefinitionsGloas.required(spec.getGenesisSchemaDefinitions());
+  private final Spec spec = TestSpecFactory.createMinimalHeze();
+  private final SchemaDefinitionsHeze schemaDefinitions =
+      SchemaDefinitionsHeze.required(spec.getGenesisSchemaDefinitions());
 
   @Test
   void dataColumnSidecarAppliesComputedNetworkBound() {
@@ -57,6 +57,11 @@ class NetworkSszLengthBoundsTest {
     assertThat(schema.getNetworkSszLengthBytesUpperBound()).isEmpty();
     assertThat(schema.getSszLengthBounds().isUnbounded()).isFalse();
     assertThat(schema.getNetworkSszLengthBounds()).isEqualTo(schema.getSszLengthBounds());
+  }
+
+  @Test
+  void signedInclusionListAppliesConfiguredNetworkBound() {
+    assertNetworkBound(schemaDefinitions.getSignedInclusionListSchema(), 41_112);
   }
 
   @Test

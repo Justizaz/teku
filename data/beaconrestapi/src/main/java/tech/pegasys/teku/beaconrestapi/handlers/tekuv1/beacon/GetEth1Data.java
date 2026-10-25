@@ -1,5 +1,5 @@
 /*
- * Copyright Consensys Software Inc., 2026
+ * Copyright (c) 2026 Consensys Incorporated. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with
  * the License. You may obtain a copy of the License at
@@ -13,6 +13,7 @@
 
 package tech.pegasys.teku.beaconrestapi.handlers.tekuv1.beacon;
 
+import static tech.pegasys.teku.infrastructure.http.HttpStatusCodes.SC_BAD_REQUEST;
 import static tech.pegasys.teku.infrastructure.http.HttpStatusCodes.SC_OK;
 import static tech.pegasys.teku.infrastructure.http.RestApiConstants.TAG_TEKU;
 
@@ -25,6 +26,7 @@ import tech.pegasys.teku.infrastructure.restapi.endpoints.AsyncApiResponse;
 import tech.pegasys.teku.infrastructure.restapi.endpoints.EndpointMetadata;
 import tech.pegasys.teku.infrastructure.restapi.endpoints.RestApiEndpoint;
 import tech.pegasys.teku.infrastructure.restapi.endpoints.RestApiRequest;
+import tech.pegasys.teku.spec.SpecMilestone;
 import tech.pegasys.teku.spec.datastructures.blocks.Eth1Data;
 import tech.pegasys.teku.validator.coordinator.Eth1DataProvider;
 
@@ -37,6 +39,8 @@ public class GetEth1Data extends RestApiEndpoint {
           .name("GetEth1DataResponse")
           .withField("data", Eth1Data.SSZ_SCHEMA.getJsonTypeDefinition(), Function.identity())
           .build();
+
+  static final String ETH1_DATA_REMOVED_MESSAGE = "Eth1 data was removed in Heze (EIP-8015)";
 
   private final ChainDataProvider chainDataProvider;
   private final Eth1DataProvider eth1DataProvider;
@@ -66,6 +70,12 @@ public class GetEth1Data extends RestApiEndpoint {
                 maybeStateAndMetadata -> {
                   if (maybeStateAndMetadata.isEmpty()) {
                     return AsyncApiResponse.respondNotFound();
+                  } else if (maybeStateAndMetadata
+                      .get()
+                      .getMilestone()
+                      .isGreaterThanOrEqualTo(SpecMilestone.HEZE)) {
+                    return AsyncApiResponse.respondWithError(
+                        SC_BAD_REQUEST, ETH1_DATA_REMOVED_MESSAGE);
                   } else {
                     return AsyncApiResponse.respondOk(
                         eth1DataProvider.getEth1Vote(maybeStateAndMetadata.get()));

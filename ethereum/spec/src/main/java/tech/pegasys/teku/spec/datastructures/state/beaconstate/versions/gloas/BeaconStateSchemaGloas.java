@@ -1,5 +1,5 @@
 /*
- * Copyright Consensys Software Inc., 2026
+ * Copyright (c) 2026 Consensys Incorporated. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with
  * the License. You may obtain a copy of the License at
@@ -90,8 +90,18 @@ public class BeaconStateSchemaGloas
 
   @VisibleForTesting
   BeaconStateSchemaGloas(final SpecConfig specConfig, final SchemaRegistry schemaRegistry) {
-    super(
-        "BeaconStateGloas", ACTIVE_FIELDS, getUniqueFields(specConfig, schemaRegistry), specConfig);
+    this("BeaconStateGloas", specConfig, schemaRegistry);
+  }
+
+  protected BeaconStateSchemaGloas(
+      final String schemaName, final SpecConfig specConfig, final SchemaRegistry schemaRegistry) {
+    super(schemaName, ACTIVE_FIELDS, getUniqueFields(specConfig, schemaRegistry), specConfig);
+  }
+
+  /** For later milestones that remove fields, leaving gaps in {@code activeFields}. */
+  protected BeaconStateSchemaGloas(
+      final String schemaName, final boolean[] activeFields, final List<SszField> allFields) {
+    super(schemaName, activeFields, allFields);
   }
 
   private static SszField toProgressiveListFieldIfListed(final SszField field) {
@@ -103,7 +113,7 @@ public class BeaconStateSchemaGloas
     return new SszField(field.getIndex(), field.getName(), () -> progressiveSchema);
   }
 
-  public static List<SszField> getUniqueFields(
+  protected static List<SszField> getUniqueFields(
       final SpecConfig specConfig, final SchemaRegistry schemaRegistry) {
     final List<SszField> newFields =
         List.of(

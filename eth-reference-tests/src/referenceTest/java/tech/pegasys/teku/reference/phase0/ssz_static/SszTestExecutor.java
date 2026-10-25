@@ -1,5 +1,5 @@
 /*
- * Copyright Consensys Software Inc., 2026
+ * Copyright (c) 2026 Consensys Incorporated. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with
  * the License. You may obtain a copy of the License at
@@ -51,6 +51,7 @@ import tech.pegasys.teku.spec.schemas.SchemaDefinitionsDeneb;
 import tech.pegasys.teku.spec.schemas.SchemaDefinitionsElectra;
 import tech.pegasys.teku.spec.schemas.SchemaDefinitionsFulu;
 import tech.pegasys.teku.spec.schemas.SchemaDefinitionsGloas;
+import tech.pegasys.teku.spec.schemas.SchemaDefinitionsHeze;
 
 public class SszTestExecutor<T extends SszData> implements TestExecutor {
 
@@ -323,6 +324,16 @@ public class SszTestExecutor<T extends SszData> implements TestExecutor {
                   schemas ->
                       SchemaDefinitionsGloas.required(schemas)
                           .getSignedExecutionPayloadBidSchema()))
+          // Heze
+          .put(
+              "ssz_static/InclusionList",
+              new SszTestExecutor<>(
+                  schemas -> SchemaDefinitionsHeze.required(schemas).getInclusionListSchema()))
+          .put(
+              "ssz_static/SignedInclusionList",
+              new SszTestExecutor<>(
+                  schemas ->
+                      SchemaDefinitionsHeze.required(schemas).getSignedInclusionListSchema()))
           .put(
               "ssz_static/ExecutionPayloadEnvelope",
               new SszTestExecutor<>(

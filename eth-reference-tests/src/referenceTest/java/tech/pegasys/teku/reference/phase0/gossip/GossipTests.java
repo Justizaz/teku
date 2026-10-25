@@ -1,5 +1,5 @@
 /*
- * Copyright Consensys Software Inc., 2026
+ * Copyright (c) 2026 Consensys Incorporated. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with
  * the License. You may obtain a copy of the License at
@@ -59,6 +59,7 @@ public class GossipTests {
                   "gossip_payload_attestation_message__reject_pre_fork_slot"))
           .put(
               "networking/gossip_proposer_preferences", new GossipProposerPreferencesTestExecutor())
+          .put("networking/gossip_inclusion_list", new GossipInclusionListTestExecutor())
           .put(
               "networking/gossip_execution_payload_envelope",
               new GossipExecutionPayloadEnvelopeTestExecutor())

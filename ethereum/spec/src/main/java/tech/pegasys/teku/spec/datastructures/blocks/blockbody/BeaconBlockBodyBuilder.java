@@ -1,5 +1,5 @@
 /*
- * Copyright Consensys Software Inc., 2026
+ * Copyright (c) 2026 Consensys Incorporated. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with
  * the License. You may obtain a copy of the License at
@@ -48,6 +48,11 @@ public interface BeaconBlockBodyBuilder {
   BeaconBlockBodyBuilder deposits(SszList<Deposit> deposits);
 
   BeaconBlockBodyBuilder voluntaryExits(SszList<SignedVoluntaryExit> voluntaryExits);
+
+  /** {@code eth1_data} and {@code deposits} were removed in Heze (EIP-8015). */
+  default boolean supportsEth1DataAndDeposits() {
+    return true;
+  }
 
   default Boolean supportsSyncAggregate() {
     return false;

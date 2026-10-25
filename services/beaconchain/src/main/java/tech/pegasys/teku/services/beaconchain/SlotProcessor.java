@@ -1,5 +1,5 @@
 /*
- * Copyright Consensys Software Inc., 2026
+ * Copyright (c) 2026 Consensys Incorporated. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with
  * the License. You may obtain a copy of the License at
@@ -29,6 +29,8 @@ import tech.pegasys.teku.infrastructure.logging.EventLogger.TargetChain;
 import tech.pegasys.teku.infrastructure.unsigned.UInt64;
 import tech.pegasys.teku.networking.eth2.Eth2P2PNetwork;
 import tech.pegasys.teku.spec.Spec;
+import tech.pegasys.teku.spec.SpecMilestone;
+import tech.pegasys.teku.spec.SpecVersion;
 import tech.pegasys.teku.spec.datastructures.blocks.NodeSlot;
 import tech.pegasys.teku.spec.datastructures.forkchoice.ForkChoicePayloadStatus;
 import tech.pegasys.teku.spec.datastructures.state.Checkpoint;
@@ -39,6 +41,7 @@ import tech.pegasys.teku.statetransition.forkchoice.ForkChoiceTrigger;
 import tech.pegasys.teku.statetransition.forkchoice.TickProcessingPerformance;
 import tech.pegasys.teku.storage.client.RecentChainData;
 import tech.pegasys.teku.validator.coordinator.FutureBlockProductionPreparationTrigger;
+import tech.pegasys.teku.validator.coordinator.InclusionListPayloadAttributesUpdater;
 
 public class SlotProcessor {
   private static final Logger LOG = LogManager.getLogger();
@@ -49,6 +52,7 @@ public class SlotProcessor {
   private final ForkChoiceTrigger forkChoiceTrigger;
   private final FutureBlockProductionPreparationTrigger futureBlockProductionPreparationTrigger;
   private final ForkChoiceNotifier forkChoiceNotifier;
+  private final InclusionListPayloadAttributesUpdater inclusionListPayloadAttributesUpdater;
   private final Eth2P2PNetwork p2pNetwork;
   private final SlotEventsChannel slotEventsChannelPublisher;
   private final NodeSlot nodeSlot = new NodeSlot(ZERO);
@@ -58,6 +62,7 @@ public class SlotProcessor {
   private volatile UInt64 onTickSlotStart;
   private volatile UInt64 onTickSlotAttestation;
   private volatile UInt64 onTickSlotPayloadAttestation;
+  private volatile UInt64 onTickSlotInclusionList;
   private volatile UInt64 onTickEpochPrecompute;
   private volatile UInt64 onTickFutureBlockProductionPreparation;
 
@@ -69,6 +74,7 @@ public class SlotProcessor {
       final ForkChoiceTrigger forkChoiceTrigger,
       final FutureBlockProductionPreparationTrigger futureBlockProductionPreparationTrigger,
       final ForkChoiceNotifier forkChoiceNotifier,
+      final InclusionListPayloadAttributesUpdater inclusionListPayloadAttributesUpdater,
       final Eth2P2PNetwork p2pNetwork,
       final SlotEventsChannel slotEventsChannelPublisher,
       final EpochCachePrimer epochCachePrimer,
@@ -79,6 +85,7 @@ public class SlotProcessor {
     this.forkChoiceTrigger = forkChoiceTrigger;
     this.futureBlockProductionPreparationTrigger = futureBlockProductionPreparationTrigger;
     this.forkChoiceNotifier = forkChoiceNotifier;
+    this.inclusionListPayloadAttributesUpdater = inclusionListPayloadAttributesUpdater;
     this.p2pNetwork = p2pNetwork;
     this.slotEventsChannelPublisher = slotEventsChannelPublisher;
     this.epochCachePrimer = epochCachePrimer;
@@ -92,6 +99,7 @@ public class SlotProcessor {
       final ForkChoiceTrigger forkChoiceTrigger,
       final FutureBlockProductionPreparationTrigger futureBlockProductionPreparationTrigger,
       final ForkChoiceNotifier forkChoiceNotifier,
+      final InclusionListPayloadAttributesUpdater inclusionListPayloadAttributesUpdater,
       final Eth2P2PNetwork p2pNetwork,
       final SlotEventsChannel slotEventsChannelPublisher,
       final EpochCachePrimer epochCachePrimer) {
@@ -102,6 +110,7 @@ public class SlotProcessor {
         forkChoiceTrigger,
         futureBlockProductionPreparationTrigger,
         forkChoiceNotifier,
+        inclusionListPayloadAttributesUpdater,
         p2pNetwork,
         slotEventsChannelPublisher,
         epochCachePrimer,
@@ -117,6 +126,9 @@ public class SlotProcessor {
     nodeSlot.setValue(slot);
   }
 
+  // onInclusionListDue refreshes payload attributes with inclusion lists and returns the updated
+  // payload id, but the caller does not need it
+  @SuppressWarnings({"FutureReturnValueIgnored"})
   public void onTick(
       final UInt64 currentTimeMillis, final Optional<TickProcessingPerformance> performanceRecord) {
 
@@ -151,10 +163,17 @@ public class SlotProcessor {
 
     if (isSlotAttestationDue(calculatedSlot, currentTimeMillis, nodeSlotStartTimeMillis)) {
       processSlotAttestation(performanceRecord);
-      if (miscHelpers.shouldIncrementNodeSlotWhenAttestationsAreDue()) {
+      if (miscHelpers.shouldIncrementNodeSlotWhenAttestationsAreDue()
+          && spec.atSlot(calculatedSlot).getMilestone().isLessThan(SpecMilestone.HEZE)) {
         nodeSlot.inc();
       }
       performanceRecord.ifPresent(TickProcessingPerformance::attestationsDueComplete);
+    }
+
+    // the node slot is incremented at the payload attestation deadline, not here
+    if (isSlotInclusionListDue(calculatedSlot, currentTimeMillis, genesisTimeMillis)) {
+      onTickSlotInclusionList = calculatedSlot;
+      inclusionListPayloadAttributesUpdater.onInclusionListDue(calculatedSlot);
     }
 
     if (isSlotPayloadAttestationDue(calculatedSlot, currentTimeMillis, nodeSlotStartTimeMillis)) {
@@ -245,7 +264,25 @@ public class SlotProcessor {
     return isProcessingDueForSlot(calculatedSlot, onTickSlotStart);
   }
 
-  // Attestations are due 1/3 (1/4 in Gloas) of the way through the slots time period
+  // Inclusion list payload attribute refreshes are due at the inclusion list deadline. The due
+  // time is measured from the start of the calculated slot rather than the node slot, so it is
+  // reached once per slot whether it falls before, at or after the payload attestation deadline
+  // where the node slot is incremented.
+  boolean isSlotInclusionListDue(
+      final UInt64 calculatedSlot, final UInt64 currentTimeMillis, final UInt64 genesisTimeMillis) {
+    final SpecVersion specVersion = spec.atSlot(calculatedSlot);
+    if (spec.getForkSchedule().getHighestSupportedMilestone().isLessThan(SpecMilestone.HEZE)
+        || specVersion.getMilestone().isLessThan(SpecMilestone.HEZE)
+        || !isProcessingDueForSlot(calculatedSlot, onTickSlotInclusionList)) {
+      return false;
+    }
+    final UInt64 earliestTimeInMillis =
+        spec.computeTimeMillisAtSlot(calculatedSlot, genesisTimeMillis)
+            .plus(spec.getInclusionListDueMillis(calculatedSlot).orElseThrow());
+    return spec.isTimeReached(currentTimeMillis, earliestTimeInMillis);
+  }
+
+  // Attestations are due 1/3 of the way through the slots time period
   boolean isSlotAttestationDue(
       final UInt64 calculatedSlot,
       final UInt64 currentTimeMillis,

@@ -1,5 +1,5 @@
 /*
- * Copyright Consensys Software Inc., 2026
+ * Copyright (c) 2026 Consensys Incorporated. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with
  * the License. You may obtain a copy of the License at
@@ -261,8 +261,7 @@ public class BeaconBlocksByRangeIntegrationTest extends AbstractRpcMethodIntegra
           .hasCauseInstanceOf(RpcException.class)
           .hasRootCauseInstanceOf(UnrecognizedContextBytesException.class)
           .hasMessageContaining("Must request blocks with compatible fork.");
-    } else if (milestoneToBeaconBlockBodyClass(baseMilestone)
-        .equals(milestoneToBeaconBlockBodyClass(nextMilestone))) {
+    } else if (milestonesUseCompatibleBeaconBlockBodySchema(baseMilestone, nextMilestone)) {
       // no changes in BeaconBlockBody, so we should receive a successful response
       assertThat(res).isCompleted();
       assertThat(blocks).containsExactly(block1.getBlock(), block2.getBlock());

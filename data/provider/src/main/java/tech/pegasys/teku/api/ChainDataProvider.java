@@ -1,5 +1,5 @@
 /*
- * Copyright Consensys Software Inc., 2026
+ * Copyright (c) 2026 Consensys Incorporated. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with
  * the License. You may obtain a copy of the License at
@@ -99,6 +99,7 @@ import tech.pegasys.teku.spec.logic.common.statetransition.exceptions.EpochProce
 import tech.pegasys.teku.spec.logic.common.statetransition.exceptions.SlotProcessingException;
 import tech.pegasys.teku.spec.logic.versions.gloas.helpers.PredicatesGloas;
 import tech.pegasys.teku.spec.schemas.api.StateValidatorBalanceData;
+import tech.pegasys.teku.statetransition.lightclient.LightClientBootstrapProvider;
 import tech.pegasys.teku.statetransition.lightclient.LightClientUpdateStore;
 import tech.pegasys.teku.storage.client.BlobReconstructionProvider;
 import tech.pegasys.teku.storage.client.BlobSidecarReconstructionProvider;
@@ -119,6 +120,7 @@ public class ChainDataProvider {
   private final RecentChainData recentChainData;
   private final RewardCalculator rewardCalculator;
   private final LightClientUpdateStore lightClientUpdateStore;
+  private final LightClientBootstrapProvider lightClientBootstrapProvider;
 
   public ChainDataProvider(
       final Spec spec,
@@ -167,6 +169,8 @@ public class ChainDataProvider {
     this.executionPayloadSelectorFactory = executionPayloadSelectorFactory;
     this.rewardCalculator = rewardCalculator;
     this.lightClientUpdateStore = lightClientUpdateStore;
+    this.lightClientBootstrapProvider =
+        new LightClientBootstrapProvider(spec, combinedChainDataClient);
   }
 
   public List<LightClientUpdateWithContext> getBestLightClientUpdates(
@@ -360,20 +364,39 @@ public class ChainDataProvider {
 
   private List<ForkChoiceNodeDataV2> getForkChoiceNodeDataV2(
       final ReadOnlyForkChoiceStrategy forkChoiceStrategy) {
-    return forkChoiceStrategy.getBlockData().stream()
+    return forkChoiceStrategy.getBlockDataWithParent().stream()
         .map(
-            node ->
-                new ForkChoiceNodeDataV2(
-                    getForkChoicePayloadStatusV2(node),
-                    node,
-                    forkChoiceStrategy.getPayloadAttesterCount(node.getRoot()),
-                    forkChoiceStrategy.getPayloadAvailabilityYesCount(node.getRoot()),
-                    forkChoiceStrategy.getPayloadDataAvailabilityYesCount(node.getRoot())))
+            nodeWithParent -> {
+              final ProtoNodeData node = nodeWithParent.node();
+              return new ForkChoiceNodeDataV2(
+                  getForkChoicePayloadStatusV2(node),
+                  node,
+                  getParentRootV2(node),
+                  nodeWithParent.parent().map(this::getForkChoicePayloadStatusV2),
+                  forkChoiceStrategy.getPayloadAttesterCount(node.getRoot()),
+                  forkChoiceStrategy.getPayloadAvailabilityYesCount(node.getRoot()),
+                  forkChoiceStrategy.getPayloadDataAvailabilityYesCount(node.getRoot()));
+            })
         .toList();
   }
 
+  /**
+   * From Gloas, a block's {@code EMPTY} and {@code FULL} nodes have the same block's {@code
+   * PENDING} node as parent, so their parent root is the block's own root.
+   */
+  private Bytes32 getParentRootV2(final ProtoNodeData node) {
+    final boolean isGloasEmptyOrFullNode =
+        isGloasOrLater(node.getSlot())
+            && node.getPayloadStatus() != ForkChoicePayloadStatus.PAYLOAD_STATUS_PENDING;
+    return isGloasEmptyOrFullNode ? node.getRoot() : node.getParentRoot();
+  }
+
+  private boolean isGloasOrLater(final UInt64 slot) {
+    return spec.atSlot(slot).getMilestone().isGreaterThanOrEqualTo(SpecMilestone.GLOAS);
+  }
+
   private ForkChoicePayloadStatus getForkChoicePayloadStatusV2(final ProtoNodeData node) {
-    return spec.atSlot(node.getSlot()).getMilestone().isGreaterThanOrEqualTo(SpecMilestone.GLOAS)
+    return isGloasOrLater(node.getSlot())
         ? node.getPayloadStatus()
         : ForkChoicePayloadStatus.PAYLOAD_STATUS_FULL;
   }
@@ -767,23 +790,19 @@ public class ChainDataProvider {
 
   public SafeFuture<Optional<ObjectAndMetaData<LightClientBootstrap>>> getLightClientBoostrap(
       final Bytes32 blockRootParam) {
-    return stateSelectorFactory
-        .blockRootSelector(blockRootParam)
-        .getState()
-        .thenCombine(
-            combinedChainDataClient.getBlockByBlockRoot(blockRootParam),
-            (maybeStateData, maybeBlock) ->
-                maybeStateData.flatMap(
-                    stateData ->
-                        maybeBlock.flatMap(block -> getLightClientBootstrap(stateData, block))));
-  }
-
-  private Optional<ObjectAndMetaData<LightClientBootstrap>> getLightClientBootstrap(
-      final StateAndMetaData stateAndMetaData, final SignedBeaconBlock block) {
-    return spec.getLightClientUtil(stateAndMetaData.getData().getSlot())
-        .map(
-            clientUtil ->
-                stateAndMetaData.map(state -> clientUtil.createLightClientBootstrap(state, block)));
+    return lightClientBootstrapProvider
+        .getLightClientBootstrap(blockRootParam)
+        .thenApply(
+            maybeBootstrap ->
+                maybeBootstrap.map(
+                    bootstrap ->
+                        new ObjectAndMetaData<>(
+                            bootstrap,
+                            spec.atSlot(bootstrap.getLightClientHeader().getBeacon().getSlot())
+                                .getMilestone(),
+                            combinedChainDataClient.isOptimisticBlock(blockRootParam),
+                            true,
+                            true)));
   }
 
   public SafeFuture<Optional<ObjectAndMetaData<StateSyncCommitteesData>>> getStateSyncCommittees(

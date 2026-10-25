@@ -1,5 +1,5 @@
 /*
- * Copyright Consensys Software Inc., 2026
+ * Copyright (c) 2026 Consensys Incorporated. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with
  * the License. You may obtain a copy of the License at
@@ -27,6 +27,7 @@ import tech.pegasys.teku.spec.datastructures.epbs.versions.gloas.ExecutionPayloa
 import tech.pegasys.teku.spec.datastructures.epbs.versions.gloas.ExecutionPayloadEnvelope;
 import tech.pegasys.teku.spec.datastructures.epbs.versions.gloas.PayloadAttestationData;
 import tech.pegasys.teku.spec.datastructures.epbs.versions.gloas.ProposerPreferences;
+import tech.pegasys.teku.spec.datastructures.execution.versions.heze.InclusionList;
 import tech.pegasys.teku.spec.datastructures.operations.AggregateAndProof;
 import tech.pegasys.teku.spec.datastructures.operations.AttestationData;
 import tech.pegasys.teku.spec.datastructures.operations.VoluntaryExit;
@@ -170,5 +171,17 @@ public class SigningRootUtil {
     final MiscHelpers miscHelpers = spec.getGenesisSpec().miscHelpers();
     final Bytes32 domain = miscHelpers.computeDomain(Domain.BUILDER_REQUEST_AUTH);
     return miscHelpers.computeSigningRoot(builderRequestAuth, domain);
+  }
+
+  public Bytes signingRootForSignInclusionList(
+      final InclusionList inclusionList, final ForkInfo forkInfo) {
+    final UInt64 slot = inclusionList.getSlot();
+    final Bytes32 domain =
+        spec.getDomain(
+            Domain.INCLUSION_LIST_COMMITTEE,
+            spec.computeEpochAtSlot(slot),
+            forkInfo.getFork(),
+            forkInfo.getGenesisValidatorsRoot());
+    return spec.atSlot(slot).miscHelpers().computeSigningRoot(inclusionList, domain);
   }
 }

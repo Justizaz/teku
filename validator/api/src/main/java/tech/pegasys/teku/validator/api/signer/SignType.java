@@ -1,5 +1,5 @@
 /*
- * Copyright Consensys Software Inc., 2026
+ * Copyright (c) 2026 Consensys Incorporated. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with
  * the License. You may obtain a copy of the License at
@@ -29,6 +29,7 @@ public enum SignType {
   CONTRIBUTION_AND_PROOF("contribution_and_proof"),
   BEACON_BLOCK("beacon_block"),
   BLOB_SIDECAR("blob_sidecar"),
+  INCLUSION_LIST("inclusion_list"),
   EXECUTION_PAYLOAD_BID("execution_payload_bid"),
   EXECUTION_PAYLOAD_ENVELOPE("execution_payload_envelope"),
   PAYLOAD_ATTESTATION_MESSAGE("payload_attestation_message"),
