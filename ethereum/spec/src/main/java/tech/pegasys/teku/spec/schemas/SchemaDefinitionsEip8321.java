@@ -13,6 +13,9 @@
 
 package tech.pegasys.teku.spec.schemas;
 
+import tech.pegasys.teku.spec.datastructures.blocks.blockbody.BeaconBlockBodyBuilder;
+import tech.pegasys.teku.spec.datastructures.blocks.blockbody.versions.eip8321.BeaconBlockBodyBuilderEip8321;
+import tech.pegasys.teku.spec.datastructures.blocks.blockbody.versions.eip8321.BeaconBlockBodySchemaEip8321Impl;
 import tech.pegasys.teku.spec.schemas.registry.SchemaRegistry;
 
 import java.util.Optional;
@@ -32,6 +35,12 @@ public class SchemaDefinitionsEip8321 extends SchemaDefinitionsHeze {
         SchemaDefinitionsEip8321.class,
         schemaDefinitions.getClass());
     return (SchemaDefinitionsEip8321) schemaDefinitions;
+  }
+
+  @Override
+  public BeaconBlockBodyBuilder createBeaconBlockBodyBuilder() {
+    return new BeaconBlockBodyBuilderEip8321(
+            (BeaconBlockBodySchemaEip8321Impl) getBeaconBlockBodySchema());
   }
 
   @Override

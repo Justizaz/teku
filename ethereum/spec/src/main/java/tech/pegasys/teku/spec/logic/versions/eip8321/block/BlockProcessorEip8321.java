@@ -52,7 +52,6 @@ import tech.pegasys.teku.spec.logic.common.util.BeaconStateUtil;
 import tech.pegasys.teku.spec.logic.common.util.HashChainRandaoUtil;
 import tech.pegasys.teku.spec.logic.common.util.SyncCommitteeUtil;
 import tech.pegasys.teku.spec.logic.common.util.ValidatorsUtil;
-import tech.pegasys.teku.spec.logic.versions.gloas.block.BlockProcessorGloas;
 import tech.pegasys.teku.spec.logic.versions.gloas.execution.ExecutionRequestsProcessorGloas;
 import tech.pegasys.teku.spec.logic.versions.gloas.helpers.BeaconStateAccessorsGloas;
 import tech.pegasys.teku.spec.logic.versions.gloas.helpers.BeaconStateMutatorsGloas;
@@ -60,9 +59,10 @@ import tech.pegasys.teku.spec.logic.versions.gloas.helpers.MiscHelpersGloas;
 import tech.pegasys.teku.spec.logic.versions.gloas.helpers.PredicatesGloas;
 import tech.pegasys.teku.spec.logic.versions.gloas.util.AttestationUtilGloas;
 import tech.pegasys.teku.spec.logic.versions.gloas.withdrawals.WithdrawalsHelpersGloas;
+import tech.pegasys.teku.spec.logic.versions.heze.block.BlockProcessorHeze;
 import tech.pegasys.teku.spec.schemas.SchemaDefinitionsEip8321;
 
-public class BlockProcessorEip8321 extends BlockProcessorGloas {
+public class BlockProcessorEip8321 extends BlockProcessorHeze {
 
     private final SpecConfigEip8321 specConfigEip8321;
 
@@ -119,16 +119,8 @@ public class BlockProcessorEip8321 extends BlockProcessorGloas {
             final SszList<SignedRandaoCommitmentRegistration> registrations =
                     eip8321Body.getRandaoCommitmentRegistrations();
             if (!registrations.isEmpty()) {
-                final SszList<Deposit> deposits = blockBody.getDeposits();
-                BeaconState validationState = preState;
-                if (!deposits.isEmpty()) {
-                    final MutableBeaconStateEip8321 mutableBeaconState =
-                            BeaconStateEip8321.required(preState).createWritableCopy();
-                    processDeposits(mutableBeaconState, deposits);
-                    validationState = mutableBeaconState.commitChanges();
-                }
                 return verifyRandaoCommitmentRegistrationsPreProcessing(
-                        validationState, registrations, signatureVerifier);
+                        preState, registrations, signatureVerifier);
             }
         }
 

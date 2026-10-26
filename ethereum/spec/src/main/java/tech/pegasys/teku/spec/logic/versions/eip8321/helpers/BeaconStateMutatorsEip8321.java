@@ -25,7 +25,7 @@ import tech.pegasys.teku.spec.datastructures.state.beaconstate.versions.eip8321.
 import tech.pegasys.teku.spec.logic.common.helpers.BeaconStateMutators;
 import tech.pegasys.teku.spec.logic.versions.gloas.helpers.BeaconStateAccessorsGloas;
 import tech.pegasys.teku.spec.logic.versions.gloas.helpers.BeaconStateMutatorsGloas;
-import tech.pegasys.teku.spec.logic.versions.gloas.helpers.MiscHelpersGloas;
+import tech.pegasys.teku.spec.logic.versions.heze.helpers.MiscHelpersHeze;
 import tech.pegasys.teku.spec.schemas.SchemaDefinitionsGloas;
 
 public class BeaconStateMutatorsEip8321 extends BeaconStateMutatorsGloas {
@@ -41,7 +41,7 @@ public class BeaconStateMutatorsEip8321 extends BeaconStateMutatorsGloas {
 
   public BeaconStateMutatorsEip8321(
       final SpecConfigGloas specConfig,
-      final MiscHelpersGloas miscHelpers,
+      final MiscHelpersHeze miscHelpers,
       final BeaconStateAccessorsGloas beaconStateAccessors,
       final SchemaDefinitionsGloas schemaDefinitions) {
     super(specConfig, miscHelpers, beaconStateAccessors, schemaDefinitions);

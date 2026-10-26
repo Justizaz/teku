@@ -17,20 +17,21 @@ import org.apache.tuweni.bytes.Bytes32;
 import tech.pegasys.teku.infrastructure.ssz.primitive.SszBytes32;
 import tech.pegasys.teku.infrastructure.unsigned.UInt64;
 import tech.pegasys.teku.spec.config.SpecConfigEip8321;
-import tech.pegasys.teku.spec.config.SpecConfigHeze;
 import tech.pegasys.teku.spec.datastructures.state.Fork;
 import tech.pegasys.teku.spec.datastructures.state.beaconstate.BeaconState;
 import tech.pegasys.teku.spec.datastructures.state.beaconstate.common.BeaconStateFields;
 import tech.pegasys.teku.spec.datastructures.state.beaconstate.versions.eip8321.BeaconStateEip8321;
 import tech.pegasys.teku.spec.datastructures.state.beaconstate.versions.eip8321.BeaconStateSchemaEip8321;
 import tech.pegasys.teku.spec.datastructures.state.beaconstate.versions.gloas.BeaconStateGloas;
+import tech.pegasys.teku.spec.datastructures.state.beaconstate.versions.heze.BeaconStateHeze;
 import tech.pegasys.teku.spec.logic.common.forktransition.StateUpgrade;
 import tech.pegasys.teku.spec.logic.versions.gloas.helpers.BeaconStateAccessorsGloas;
 import tech.pegasys.teku.spec.schemas.SchemaDefinitionsEip8321;
-import tech.pegasys.teku.spec.schemas.SchemaDefinitionsHeze;
 
 import java.util.List;
 import java.util.stream.IntStream;
+
+import static com.google.common.base.Preconditions.checkArgument;
 
 public class Eip8321StateUpgrade implements StateUpgrade<BeaconStateEip8321> {
 
@@ -50,7 +51,11 @@ public class Eip8321StateUpgrade implements StateUpgrade<BeaconStateEip8321> {
   @Override
   public BeaconStateEip8321 upgrade(final BeaconState preState) {
     final UInt64 epoch = beaconStateAccessors.getCurrentEpoch(preState);
-    final BeaconStateGloas preStateGloas = BeaconStateGloas.required(preState);
+    checkArgument(
+            preState instanceof BeaconStateHeze,
+            "Expected a Heze state before EIP-8321 but got %s",
+            preState.getClass().getSimpleName());
+    final BeaconStateHeze preStateHeze = (BeaconStateHeze) preState;
     final BeaconStateSchemaEip8321 targetStateSchema =
             BeaconStateSchemaEip8321.required(schemaDefinitions.getBeaconStateSchema());
 
@@ -70,37 +75,36 @@ public class Eip8321StateUpgrade implements StateUpgrade<BeaconStateEip8321> {
                       specConfig.getEip8321ForkVersion(),
                       epoch));
 
-              state.setPreviousEpochParticipation(preStateGloas.getPreviousEpochParticipation());
-              state.setCurrentEpochParticipation(preStateGloas.getCurrentEpochParticipation());
-              state.setInactivityScores(preStateGloas.getInactivityScores());
-              state.setCurrentSyncCommittee(preStateGloas.getCurrentSyncCommittee());
-              state.setNextSyncCommittee(preStateGloas.getNextSyncCommittee());
+              state.setPreviousEpochParticipation(preStateHeze.getPreviousEpochParticipation());
+              state.setCurrentEpochParticipation(preStateHeze.getCurrentEpochParticipation());
+              state.setInactivityScores(preStateHeze.getInactivityScores());
+              state.setCurrentSyncCommittee(preStateHeze.getCurrentSyncCommittee());
+              state.setNextSyncCommittee(preStateHeze.getNextSyncCommittee());
 
-              state.setLatestBlockHash(preStateGloas.getLatestBlockHash());
-              state.setNextWithdrawalIndex(preStateGloas.getNextWithdrawalIndex());
+              state.setLatestBlockHash(preStateHeze.getLatestBlockHash());
+              state.setNextWithdrawalIndex(preStateHeze.getNextWithdrawalIndex());
               state.setNextWithdrawalValidatorIndex(
-                  preStateGloas.getNextWithdrawalValidatorIndex());
-              state.setHistoricalSummaries(preStateGloas.getHistoricalSummaries());
-              state.setDepositRequestsStartIndex(preStateGloas.getDepositRequestsStartIndex());
-              state.setDepositBalanceToConsume(preStateGloas.getDepositBalanceToConsume());
-              state.setExitBalanceToConsume(preStateGloas.getExitBalanceToConsume());
-              state.setEarliestExitEpoch(preStateGloas.getEarliestExitEpoch());
+                  preStateHeze.getNextWithdrawalValidatorIndex());
+              state.setHistoricalSummaries(preStateHeze.getHistoricalSummaries());
+              state.setDepositBalanceToConsume(preStateHeze.getDepositBalanceToConsume());
+              state.setExitBalanceToConsume(preStateHeze.getExitBalanceToConsume());
+              state.setEarliestExitEpoch(preStateHeze.getEarliestExitEpoch());
               state.setConsolidationBalanceToConsume(
-                  preStateGloas.getConsolidationBalanceToConsume());
-              state.setEarliestConsolidationEpoch(preStateGloas.getEarliestConsolidationEpoch());
-              state.setPendingDeposits(preStateGloas.getPendingDeposits());
-              state.setPendingPartialWithdrawals(preStateGloas.getPendingPartialWithdrawals());
-              state.setPendingConsolidations(preStateGloas.getPendingConsolidations());
-              state.setProposerLookahead(preStateGloas.getProposerLookahead());
-              state.setBuilders(preStateGloas.getBuilders());
-              state.setNextWithdrawalBuilderIndex(preStateGloas.getNextWithdrawalBuilderIndex());
+                  preStateHeze.getConsolidationBalanceToConsume());
+              state.setEarliestConsolidationEpoch(preStateHeze.getEarliestConsolidationEpoch());
+              state.setPendingDeposits(preStateHeze.getPendingDeposits());
+              state.setPendingPartialWithdrawals(preStateHeze.getPendingPartialWithdrawals());
+              state.setPendingConsolidations(preStateHeze.getPendingConsolidations());
+              state.setProposerLookahead(preStateHeze.getProposerLookahead());
+              state.setBuilders(preStateHeze.getBuilders());
+              state.setNextWithdrawalBuilderIndex(preStateHeze.getNextWithdrawalBuilderIndex());
               state.setExecutionPayloadAvailability(
-                  preStateGloas.getExecutionPayloadAvailability());
-              state.setBuilderPendingPayments(preStateGloas.getBuilderPendingPayments());
-              state.setBuilderPendingWithdrawals(preStateGloas.getBuilderPendingWithdrawals());
-              state.setLatestExecutionPayloadBid(preStateGloas.getLatestExecutionPayloadBid());
-              state.setPayloadExpectedWithdrawals(preStateGloas.getPayloadExpectedWithdrawals());
-              state.setPtcWindow(preStateGloas.getPtcWindow());
+                  preStateHeze.getExecutionPayloadAvailability());
+              state.setBuilderPendingPayments(preStateHeze.getBuilderPendingPayments());
+              state.setBuilderPendingWithdrawals(preStateHeze.getBuilderPendingWithdrawals());
+              state.setLatestExecutionPayloadBid(preStateHeze.getLatestExecutionPayloadBid());
+              state.setPayloadExpectedWithdrawals(preStateHeze.getPayloadExpectedWithdrawals());
+              state.setPtcWindow(preStateHeze.getPtcWindow());
               state.setRandaoCommitments(
                       targetStateSchema
                               .getRandaoCommitmentsSchema()

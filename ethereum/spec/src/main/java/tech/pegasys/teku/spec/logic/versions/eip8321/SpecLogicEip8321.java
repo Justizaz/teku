@@ -33,6 +33,7 @@ import tech.pegasys.teku.spec.logic.common.util.ValidatorsUtil;
 import tech.pegasys.teku.spec.logic.common.withdrawals.WithdrawalsHelpers;
 import tech.pegasys.teku.spec.logic.versions.altair.statetransition.epoch.ValidatorStatusFactoryAltair;
 import tech.pegasys.teku.spec.logic.versions.bellatrix.helpers.BellatrixTransitionHelpers;
+import tech.pegasys.teku.spec.logic.versions.capella.operations.validation.OperationValidatorCapella;
 import tech.pegasys.teku.spec.logic.versions.eip8321.block.BlockProcessorEip8321;
 import tech.pegasys.teku.spec.logic.versions.eip8321.forktransition.Eip8321StateUpgrade;
 import tech.pegasys.teku.spec.logic.versions.eip8321.helpers.BeaconStateMutatorsEip8321;
@@ -53,11 +54,14 @@ import tech.pegasys.teku.spec.logic.versions.gloas.operations.validation.Attesta
 import tech.pegasys.teku.spec.logic.versions.gloas.statetransition.epoch.EpochProcessorGloas;
 import tech.pegasys.teku.spec.logic.versions.gloas.util.AttestationUtilGloas;
 import tech.pegasys.teku.spec.logic.versions.gloas.util.DataColumnSidecarUtilGloas;
-import tech.pegasys.teku.spec.logic.versions.gloas.util.ForkChoiceUtilGloas;
 import tech.pegasys.teku.spec.logic.versions.gloas.util.ProposerPreferencesUtilGloas;
 import tech.pegasys.teku.spec.logic.versions.gloas.util.ValidatorsUtilGloas;
 import tech.pegasys.teku.spec.logic.versions.gloas.weaksubjectivity.WeakSubjectivityCalculatorGloas;
 import tech.pegasys.teku.spec.logic.versions.gloas.withdrawals.WithdrawalsHelpersGloas;
+import tech.pegasys.teku.spec.logic.versions.heze.helpers.BeaconStateAccessorsHeze;
+import tech.pegasys.teku.spec.logic.versions.heze.helpers.MiscHelpersHeze;
+import tech.pegasys.teku.spec.logic.versions.heze.util.ForkChoiceUtilHeze;
+import tech.pegasys.teku.spec.logic.versions.heze.util.InclusionListUtil;
 import tech.pegasys.teku.spec.schemas.SchemaDefinitionsEip8321;
 
 import java.util.Optional;
@@ -72,6 +76,7 @@ public class SpecLogicEip8321 extends AbstractSpecLogic {
     private final Optional<ExecutionPayloadProposalUtil> executionPayloadProposalUtil;
     private final Optional<DataColumnSidecarUtil> dataColumnSidecarUtil;
     private final ProposerPreferencesUtil proposerPreferencesUtil;
+    private final Optional<InclusionListUtil> inclusionListUtil;
 
     private SpecLogicEip8321(
             final PredicatesGloas predicates,
@@ -99,7 +104,8 @@ public class SpecLogicEip8321 extends AbstractSpecLogic {
             final ExecutionPayloadProposalUtil executionPayloadProposalUtil,
             final Eip8321StateUpgrade stateUpgrade,
             final DataColumnSidecarUtil dataColumnSidecarUtil,
-            final ProposerPreferencesUtil proposerPreferencesUtil) {
+            final ProposerPreferencesUtil proposerPreferencesUtil,
+            final InclusionListUtil inclusionListUtil) {
         super(
                 predicates,
                 miscHelpers,
@@ -127,6 +133,7 @@ public class SpecLogicEip8321 extends AbstractSpecLogic {
         this.executionPayloadProposalUtil = Optional.of(executionPayloadProposalUtil);
         this.dataColumnSidecarUtil = Optional.of(dataColumnSidecarUtil);
         this.proposerPreferencesUtil = proposerPreferencesUtil;
+        this.inclusionListUtil = Optional.of(inclusionListUtil);
     }
 
     public static SpecLogicEip8321 create(
@@ -135,10 +142,9 @@ public class SpecLogicEip8321 extends AbstractSpecLogic {
             final TimeProvider timeProvider) {
         // Helpers
         final PredicatesGloas predicates = new PredicatesGloas(config);
-        final MiscHelpersGloas miscHelpers =
-                new MiscHelpersGloas(config, predicates, schemaDefinitions);
-        final BeaconStateAccessorsGloas beaconStateAccessors =
-                new BeaconStateAccessorsGloas(config, schemaDefinitions, predicates, miscHelpers);
+        final MiscHelpersHeze miscHelpers = new MiscHelpersHeze(config, predicates, schemaDefinitions);
+        final BeaconStateAccessorsHeze beaconStateAccessors =
+                new BeaconStateAccessorsHeze(config, schemaDefinitions, predicates, miscHelpers);
         final BeaconStateMutatorsEip8321 beaconStateMutators =
                 new BeaconStateMutatorsEip8321(config, miscHelpers, beaconStateAccessors, schemaDefinitions);
 
@@ -228,7 +234,7 @@ public class SpecLogicEip8321 extends AbstractSpecLogic {
                 new ExecutionPayloadVerifierGloas(
                         miscHelpers, beaconStateAccessors, executionRequestsDataCodec);
         final ForkChoiceUtil forkChoiceUtil =
-                new ForkChoiceUtilGloas(
+                new ForkChoiceUtilHeze(
                         config,
                         beaconStateAccessors,
                         beaconStateMutators,
@@ -256,6 +262,10 @@ public class SpecLogicEip8321 extends AbstractSpecLogic {
         final ProposerPreferencesUtil proposerPreferencesUtil =
                 new ProposerPreferencesUtilGloas(schemaDefinitions);
 
+        // Inclusion list util
+        final InclusionListUtil inclusionListUtil =
+                new InclusionListUtil(config, beaconStateAccessors, miscHelpers);
+
         return new SpecLogicEip8321(
                 predicates,
                 miscHelpers,
@@ -282,7 +292,8 @@ public class SpecLogicEip8321 extends AbstractSpecLogic {
                 executionPayloadProposalUtil,
                 stateUpgrade,
                 dataColumnSidecarUtil,
-                proposerPreferencesUtil);
+                proposerPreferencesUtil,
+                inclusionListUtil);
     }
 
     @Override
@@ -333,5 +344,10 @@ public class SpecLogicEip8321 extends AbstractSpecLogic {
     @Override
     public ProposerPreferencesUtil getProposerPreferencesUtil() {
         return proposerPreferencesUtil;
+    }
+
+    @Override
+    public Optional<InclusionListUtil> getInclusionListUtil() {
+        return inclusionListUtil;
     }
 }

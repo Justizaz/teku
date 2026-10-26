@@ -18,13 +18,11 @@ import tech.pegasys.teku.infrastructure.ssz.SszMutableList;
 import tech.pegasys.teku.infrastructure.ssz.primitive.SszBytes32;
 import tech.pegasys.teku.spec.datastructures.operations.PendingRandaoCommitment;
 import tech.pegasys.teku.spec.datastructures.state.beaconstate.MutableBeaconState;
-import tech.pegasys.teku.spec.datastructures.state.beaconstate.common.BeaconStateFields;
-import tech.pegasys.teku.spec.datastructures.state.beaconstate.versions.gloas.MutableBeaconStateGloas;
-import tech.pegasys.teku.spec.datastructures.state.versions.gloas.Builder;
+import tech.pegasys.teku.spec.datastructures.state.beaconstate.versions.heze.MutableBeaconStateHeze;
 
 import java.util.Optional;
 
-public interface MutableBeaconStateEip8321 extends MutableBeaconStateGloas, BeaconStateEip8321 {
+public interface MutableBeaconStateEip8321 extends MutableBeaconStateHeze, BeaconStateEip8321 {
   static MutableBeaconStateEip8321 required(final MutableBeaconState state) {
     return state
         .toMutableVersionEip8321()

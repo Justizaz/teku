@@ -27,7 +27,7 @@ public class SpecConfigEip8321Impl extends SpecConfigHezeImpl implements SpecCon
           final SpecConfigHeze specConfig,
           final int commitmentRegistrationDelay,
           final int maxRandaoCommitmentRegistrations) {
-    super(specConfig, specConfig.getInclusionListDueBps(), specConfig.getMaxRequestInclusionList(), specConfig.getMaxTransactionsBytesPerInclusionList(), specConfig.getInclusionListCommitteeSize());
+    super(specConfig, specConfig.getInclusionListDueBps(), specConfig.getMaxRequestInclusionList(), specConfig.getMinSlotsForInclusionListsRequests(), specConfig.getMaxTransactionsBytesPerInclusionList(), specConfig.getMaxSignedInclusionListSize(), specConfig.getInclusionListCommitteeSize(), specConfig.getMinBlobDataRetentionMs());
     this.commitmentRegistrationDelay = commitmentRegistrationDelay;
     this.maxRandaoCommitmentRegistrations = maxRandaoCommitmentRegistrations;
   }

@@ -18,7 +18,7 @@ import tech.pegasys.teku.bls.BLSSignature;
 import tech.pegasys.teku.infrastructure.async.SafeFuture;
 import tech.pegasys.teku.infrastructure.ssz.SszData;
 import tech.pegasys.teku.infrastructure.ssz.SszList;
-import tech.pegasys.teku.infrastructure.ssz.containers.ContainerSchema15;
+import tech.pegasys.teku.infrastructure.ssz.containers.ContainerSchema13;
 import tech.pegasys.teku.infrastructure.ssz.primitive.SszBytes32;
 import tech.pegasys.teku.infrastructure.ssz.schema.ProgressiveSchemaUtils;
 import tech.pegasys.teku.infrastructure.ssz.schema.SszListSchema;
@@ -27,7 +27,6 @@ import tech.pegasys.teku.infrastructure.ssz.schema.SszProgressiveListSchema;
 import tech.pegasys.teku.infrastructure.ssz.schema.SszSchema;
 import tech.pegasys.teku.infrastructure.ssz.tree.TreeNode;
 import tech.pegasys.teku.spec.config.SpecConfigEip8321;
-import tech.pegasys.teku.spec.datastructures.blocks.Eth1Data;
 import tech.pegasys.teku.spec.datastructures.blocks.blockbody.BeaconBlockBody;
 import tech.pegasys.teku.spec.datastructures.blocks.blockbody.BeaconBlockBodyBuilder;
 import tech.pegasys.teku.spec.datastructures.blocks.blockbody.common.BlockBodyFields;
@@ -49,10 +48,10 @@ import tech.pegasys.teku.spec.datastructures.operations.SignedRandaoCommitmentRe
 import tech.pegasys.teku.spec.datastructures.operations.SignedVoluntaryExit;
 import tech.pegasys.teku.spec.datastructures.state.beaconstate.BeaconState;
 import tech.pegasys.teku.spec.datastructures.state.beaconstate.versions.eip8321.BeaconStateEip8321;
-import tech.pegasys.teku.spec.datastructures.state.beaconstate.versions.gloas.BeaconStateGloas;
 import tech.pegasys.teku.spec.datastructures.type.SszKZGCommitment;
 import tech.pegasys.teku.spec.datastructures.type.SszSignature;
 import tech.pegasys.teku.spec.datastructures.type.SszSignatureSchema;
+import tech.pegasys.teku.spec.datastructures.util.Eip8015RemovedFields;
 import tech.pegasys.teku.spec.schemas.registry.SchemaRegistry;
 import tech.pegasys.teku.spec.schemas.registry.SchemaTypes;
 
@@ -67,15 +66,13 @@ import static tech.pegasys.teku.spec.schemas.registry.SchemaTypes.SIGNED_BLS_TO_
 import static tech.pegasys.teku.spec.schemas.registry.SchemaTypes.SIGNED_EXECUTION_PAYLOAD_BID_SCHEMA;
 
 public class BeaconBlockBodySchemaEip8321Impl
-    extends ContainerSchema15<
+    extends ContainerSchema13<
         BeaconBlockBodyEip8321Impl,
         SszSignature,
-        Eth1Data,
         SszBytes32,
         SszList<ProposerSlashing>,
         SszList<AttesterSlashing>,
         SszList<Attestation>,
-        SszList<Deposit>,
         SszList<SignedVoluntaryExit>,
         SyncAggregate,
         SszList<SignedBlsToExecutionChange>,
@@ -86,7 +83,9 @@ public class BeaconBlockBodySchemaEip8321Impl
         SszList<SignedRandaoCommitmentRegistration>>
     implements BeaconBlockBodySchemaEip8321<BeaconBlockBodyEip8321Impl> {
 
-  private static final boolean[] ACTIVE_FIELDS = ProgressiveSchemaUtils.allActive(15);
+  private static final boolean[] ACTIVE_FIELDS = {
+          true, false, true, true, true, true, false, true,
+          true, true, true, true, true, true, true};
 
   public static final String HASH_CHAIN_REVEAL = "hash_chain_reveal";
   public static final String RANDAO_COMMITMENT_REGISTRATIONS = "randao_commitment_registrations";
@@ -94,12 +93,10 @@ public class BeaconBlockBodySchemaEip8321Impl
   protected BeaconBlockBodySchemaEip8321Impl(
       final String containerName,
       final NamedSchema<SszSignature> randaoRevealSchema,
-      final NamedSchema<Eth1Data> eth1DataSchema,
       final NamedSchema<SszBytes32> graffitiSchema,
       final NamedSchema<SszList<ProposerSlashing>> proposerSlashingsSchema,
       final NamedSchema<SszList<AttesterSlashing>> attesterSlashingsSchema,
       final NamedSchema<SszList<Attestation>> attestationsSchema,
-      final NamedSchema<SszList<Deposit>> depositsSchema,
       final NamedSchema<SszList<SignedVoluntaryExit>> voluntaryExitsSchema,
       final NamedSchema<SyncAggregate> syncAggregateSchema,
       final NamedSchema<SszList<SignedBlsToExecutionChange>> blsToExecutionChange,
@@ -112,12 +109,10 @@ public class BeaconBlockBodySchemaEip8321Impl
         containerName,
         ACTIVE_FIELDS,
         randaoRevealSchema,
-        eth1DataSchema,
         graffitiSchema,
         proposerSlashingsSchema,
         attesterSlashingsSchema,
         attestationsSchema,
-        depositsSchema,
         voluntaryExitsSchema,
         syncAggregateSchema,
         blsToExecutionChange,
@@ -135,7 +130,6 @@ public class BeaconBlockBodySchemaEip8321Impl
     return new BeaconBlockBodySchemaEip8321Impl(
         containerName,
         namedSchema(BlockBodyFields.RANDAO_REVEAL, SszSignatureSchema.INSTANCE),
-        namedSchema(BlockBodyFields.ETH1_DATA, Eth1Data.SSZ_SCHEMA),
         namedSchema(BlockBodyFields.GRAFFITI, SszPrimitiveSchemas.BYTES32_SCHEMA),
         namedSchema(
             BlockBodyFields.PROPOSER_SLASHINGS,
@@ -150,10 +144,6 @@ public class BeaconBlockBodySchemaEip8321Impl
             BlockBodyFields.ATTESTATIONS,
             SszProgressiveListSchema.create(
                 schemaRegistry.get(ATTESTATION_SCHEMA), specConfig.getMaxAttestationsElectra())),
-        namedSchema(
-            BlockBodyFields.DEPOSITS,
-            // Gloas blocks must not contain deposits (spec `Deposits.LIMIT = 0`)
-            SszProgressiveListSchema.create(Deposit.SSZ_SCHEMA, 0)),
         namedSchema(
             BlockBodyFields.VOLUNTARY_EXITS,
             SszProgressiveListSchema.create(
@@ -253,7 +243,7 @@ public class BeaconBlockBodySchemaEip8321Impl
   @SuppressWarnings("unchecked")
   @Override
   public SszListSchema<Deposit, ?> getDepositsSchema() {
-    return (SszListSchema<Deposit, ?>) getChildSchema(getFieldIndex(BlockBodyFields.DEPOSITS));
+    return Eip8015RemovedFields.EMPTY_DEPOSITS.getSchema();
   }
 
   @SuppressWarnings("unchecked")

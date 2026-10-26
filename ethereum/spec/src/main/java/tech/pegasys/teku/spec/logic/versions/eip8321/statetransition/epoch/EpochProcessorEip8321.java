@@ -28,10 +28,10 @@ import tech.pegasys.teku.spec.logic.common.util.ValidatorsUtil;
 import tech.pegasys.teku.spec.logic.versions.gloas.helpers.BeaconStateAccessorsGloas;
 import tech.pegasys.teku.spec.logic.versions.gloas.helpers.BeaconStateMutatorsGloas;
 import tech.pegasys.teku.spec.logic.versions.gloas.helpers.MiscHelpersGloas;
-import tech.pegasys.teku.spec.logic.versions.gloas.statetransition.epoch.EpochProcessorGloas;
+import tech.pegasys.teku.spec.logic.versions.heze.statetransition.epoch.EpochProcessorHeze;
 import tech.pegasys.teku.spec.schemas.SchemaDefinitionsEip8321;
 
-public class EpochProcessorEip8321 extends EpochProcessorGloas {
+public class EpochProcessorEip8321 extends EpochProcessorHeze {
 
   public EpochProcessorEip8321(
       final SpecConfigEip8321 specConfig,

@@ -56,7 +56,7 @@ public class BeaconStateSchemaHeze extends BeaconStateSchemaGloas {
     return new BeaconStateSchemaHeze(getFields(specConfig, schemaRegistry));
   }
 
-  private static List<SszField> getFields(
+  public static List<SszField> getFields(
       final SpecConfigHeze specConfig, final SchemaRegistry schemaRegistry) {
     return Stream.concat(
             BeaconStateFields.getCommonFields(specConfig).stream(),

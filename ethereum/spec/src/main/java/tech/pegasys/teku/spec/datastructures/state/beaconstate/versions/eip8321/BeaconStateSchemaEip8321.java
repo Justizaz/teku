@@ -26,6 +26,7 @@ import tech.pegasys.teku.infrastructure.ssz.schema.collections.SszUInt64VectorSc
 import tech.pegasys.teku.infrastructure.ssz.sos.SszField;
 import tech.pegasys.teku.infrastructure.ssz.tree.TreeNode;
 import tech.pegasys.teku.spec.config.SpecConfig;
+import tech.pegasys.teku.spec.config.SpecConfigHeze;
 import tech.pegasys.teku.spec.datastructures.operations.PendingRandaoCommitment;
 import tech.pegasys.teku.spec.datastructures.state.beaconstate.BeaconState;
 import tech.pegasys.teku.spec.datastructures.state.beaconstate.BeaconStateCache;
@@ -33,11 +34,12 @@ import tech.pegasys.teku.spec.datastructures.state.beaconstate.BeaconStateSchema
 import tech.pegasys.teku.spec.datastructures.state.beaconstate.common.AbstractBeaconStateSchema;
 import tech.pegasys.teku.spec.datastructures.state.beaconstate.common.BeaconStateFields;
 import tech.pegasys.teku.spec.datastructures.state.beaconstate.common.SlotCaches;
-import tech.pegasys.teku.spec.datastructures.state.beaconstate.versions.gloas.BeaconStateSchemaGloas;
+import tech.pegasys.teku.spec.datastructures.state.beaconstate.versions.heze.BeaconStateSchemaHeze;
 import tech.pegasys.teku.spec.datastructures.state.versions.electra.PendingDeposit;
 import tech.pegasys.teku.spec.datastructures.state.versions.gloas.Builder;
 import tech.pegasys.teku.spec.schemas.registry.SchemaRegistry;
 
+import java.util.Comparator;
 import java.util.List;
 import java.util.stream.Stream;
 
@@ -49,8 +51,7 @@ public class BeaconStateSchemaEip8321
   public static final int RANDAO_COMMITMENTS_FIELD_INDEX = 46;
   public static final int PENDING_RANDAO_COMMITMENTS_FIELD_INDEX = 47;
 
-  private static final boolean[] ACTIVE_FIELDS =
-      ProgressiveSchemaUtils.allActive(PENDING_RANDAO_COMMITMENTS_FIELD_INDEX + 1);
+  private static final boolean[] ACTIVE_FIELDS = createActiveFields();
 
   @VisibleForTesting
   BeaconStateSchemaEip8321(final SpecConfig specConfig, final SchemaRegistry schemaRegistry) {
@@ -58,10 +59,21 @@ public class BeaconStateSchemaEip8321
         "BeaconStateEip8321", ACTIVE_FIELDS, getUniqueFields(specConfig, schemaRegistry), specConfig);
   }
 
+  private static boolean[] createActiveFields() {
+    final boolean[] activeFields = ProgressiveSchemaUtils.allActive(PENDING_RANDAO_COMMITMENTS_FIELD_INDEX + 1);
+
+    activeFields[8] = false;
+    activeFields[9] = false;
+    activeFields[10] = false;
+    activeFields[28] = false;
+
+    return activeFields;
+  }
+
   private static List<SszField> getUniqueFields(
       final SpecConfig specConfig, final SchemaRegistry schemaRegistry) {
     return Stream.concat(
-            BeaconStateSchemaGloas.getUniqueFields(specConfig, schemaRegistry).stream(),
+            BeaconStateSchemaHeze.getFields(SpecConfigHeze.required(specConfig), schemaRegistry).stream(),
             Stream.of(
                 new SszField(
                     RANDAO_COMMITMENTS_FIELD_INDEX,
@@ -74,6 +86,7 @@ public class BeaconStateSchemaEip8321
                     PENDING_RANDAO_COMMITMENTS_FIELD_INDEX,
                     "pending_randao_commitments",
                     () -> SszProgressiveListSchema.create(PendingRandaoCommitment.SSZ_SCHEMA))))
+            .sorted(Comparator.comparingInt(SszField::getIndex))
             .toList();
   }
 

@@ -16,13 +16,12 @@ package tech.pegasys.teku.spec.datastructures.blocks.blockbody.versions.eip8321;
 import org.apache.tuweni.bytes.Bytes32;
 import tech.pegasys.teku.bls.BLSSignature;
 import tech.pegasys.teku.infrastructure.ssz.SszList;
-import tech.pegasys.teku.infrastructure.ssz.containers.Container15;
+import tech.pegasys.teku.infrastructure.ssz.containers.Container13;
 import tech.pegasys.teku.infrastructure.ssz.primitive.SszBytes32;
 import tech.pegasys.teku.infrastructure.ssz.tree.TreeNode;
 import tech.pegasys.teku.spec.datastructures.blocks.Eth1Data;
 import tech.pegasys.teku.spec.datastructures.blocks.blockbody.BeaconBlockBody;
 import tech.pegasys.teku.spec.datastructures.blocks.blockbody.versions.altair.SyncAggregate;
-import tech.pegasys.teku.spec.datastructures.blocks.blockbody.versions.gloas.BeaconBlockBodySchemaGloasImpl;
 import tech.pegasys.teku.spec.datastructures.epbs.versions.gloas.PayloadAttestation;
 import tech.pegasys.teku.spec.datastructures.epbs.versions.gloas.SignedExecutionPayloadBid;
 import tech.pegasys.teku.spec.datastructures.execution.ExecutionRequests;
@@ -34,19 +33,18 @@ import tech.pegasys.teku.spec.datastructures.operations.SignedBlsToExecutionChan
 import tech.pegasys.teku.spec.datastructures.operations.SignedRandaoCommitmentRegistration;
 import tech.pegasys.teku.spec.datastructures.operations.SignedVoluntaryExit;
 import tech.pegasys.teku.spec.datastructures.type.SszSignature;
+import tech.pegasys.teku.spec.datastructures.util.Eip8015RemovedFields;
 
 import static com.google.common.base.Preconditions.checkArgument;
 
 public class BeaconBlockBodyEip8321Impl
-    extends Container15<
+    extends Container13<
         BeaconBlockBodyEip8321Impl,
         SszSignature,
-        Eth1Data,
         SszBytes32,
         SszList<ProposerSlashing>,
         SszList<AttesterSlashing>,
         SszList<Attestation>,
-        SszList<Deposit>,
         SszList<SignedVoluntaryExit>,
         SyncAggregate,
         SszList<SignedBlsToExecutionChange>,
@@ -60,12 +58,10 @@ public class BeaconBlockBodyEip8321Impl
   BeaconBlockBodyEip8321Impl(
       final BeaconBlockBodySchemaEip8321Impl type,
       final SszSignature randaoReveal,
-      final Eth1Data eth1Data,
       final SszBytes32 graffiti,
       final SszList<ProposerSlashing> proposerSlashings,
       final SszList<AttesterSlashing> attesterSlashings,
       final SszList<Attestation> attestations,
-      final SszList<Deposit> deposits,
       final SszList<SignedVoluntaryExit> voluntaryExits,
       final SyncAggregate syncAggregate,
       final SszList<SignedBlsToExecutionChange> blsToExecutionChanges,
@@ -77,20 +73,18 @@ public class BeaconBlockBodyEip8321Impl
     super(
         type,
         randaoReveal,
-        eth1Data,
         graffiti,
         proposerSlashings,
         attesterSlashings,
         attestations,
-        deposits,
         voluntaryExits,
         syncAggregate,
         blsToExecutionChanges,
         signedExecutionPayloadBid,
         payloadAttestations,
         parentExecutionRequests,
-            hashChainReveal,
-            randaoCommitmentRegistrations);
+        hashChainReveal,
+        randaoCommitmentRegistrations);
   }
 
   BeaconBlockBodyEip8321Impl(final BeaconBlockBodySchemaEip8321Impl type) {
@@ -104,7 +98,7 @@ public class BeaconBlockBodyEip8321Impl
   public static BeaconBlockBodyEip8321Impl required(final BeaconBlockBody body) {
     checkArgument(
         body instanceof BeaconBlockBodyEip8321Impl,
-        "Expected Gloas block body but got %s",
+        "Expected EIP-8321 block body but got %s",
         body.getClass());
     return (BeaconBlockBodyEip8321Impl) body;
   }
@@ -121,82 +115,82 @@ public class BeaconBlockBodyEip8321Impl
 
   @Override
   public Eth1Data getEth1Data() {
-    return getField1();
+    return Eip8015RemovedFields.EMPTY_ETH1_DATA;
   }
 
   @Override
   public Bytes32 getGraffiti() {
-    return getField2().get();
+    return getField1().get();
   }
 
   @Override
   public SszBytes32 getGraffitiSsz() {
-    return getField2();
+    return getField1();
   }
 
   @Override
   public SszList<ProposerSlashing> getProposerSlashings() {
-    return getField3();
+    return getField2();
   }
 
   @Override
   public SszList<AttesterSlashing> getAttesterSlashings() {
-    return getField4();
+    return getField3();
   }
 
   @Override
   public SszList<Attestation> getAttestations() {
-    return getField5();
+    return getField4();
   }
 
   @Override
   public SszList<Deposit> getDeposits() {
-    return getField6();
+    return Eip8015RemovedFields.EMPTY_DEPOSITS;
   }
 
   @Override
   public SszList<SignedVoluntaryExit> getVoluntaryExits() {
-    return getField7();
+    return getField5();
   }
 
   @Override
   public SyncAggregate getSyncAggregate() {
-    return getField8();
+    return getField6();
   }
 
   @Override
   public SszList<SignedBlsToExecutionChange> getBlsToExecutionChanges() {
-    return getField9();
+    return getField7();
   }
 
   @Override
   public SignedExecutionPayloadBid getSignedExecutionPayloadBid() {
-    return getField10();
+    return getField8();
   }
 
   @Override
   public SszList<PayloadAttestation> getPayloadAttestations() {
-    return getField11();
+    return getField9();
   }
 
   @Override
   public ExecutionRequests getParentExecutionRequests() {
-    return getField12();
+    return getField10();
   }
 
   @Override
   public Bytes32 getHashChainReveal() {
-    return getField13().get();
+    return getField11().get();
   }
 
   @Override
   public SszBytes32 getHashChainRevealSsz() {
-    return getField13();
+    return getField11();
   }
 
   @Override
   public SszList<SignedRandaoCommitmentRegistration> getRandaoCommitmentRegistrations() {
-    return getField14();
+    return getField12();
   }
 
   @Override

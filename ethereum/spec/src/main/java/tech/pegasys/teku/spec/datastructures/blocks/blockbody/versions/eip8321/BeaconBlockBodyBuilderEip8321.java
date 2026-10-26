@@ -29,10 +29,6 @@ import tech.pegasys.teku.spec.datastructures.type.SszSignature;
 import static com.google.common.base.Preconditions.checkNotNull;
 
 public class BeaconBlockBodyBuilderEip8321 extends BeaconBlockBodyBuilderGloas {
-
-  private SignedExecutionPayloadBid signedExecutionPayloadBid;
-  private SszList<PayloadAttestation> payloadAttestations;
-  private ExecutionRequests parentExecutionRequests;
   private Bytes32 hashChainReveal = Bytes32.ZERO;
   private SszList<SignedRandaoCommitmentRegistration> randaoCommitmentRegistrations;
 
@@ -48,6 +44,11 @@ public class BeaconBlockBodyBuilderEip8321 extends BeaconBlockBodyBuilderGloas {
 
   @Override
   public Boolean supportsExecutionPayload() {
+    return false;
+  }
+
+  @Override
+  public boolean supportsEth1DataAndDeposits() {
     return false;
   }
 
@@ -112,12 +113,10 @@ public class BeaconBlockBodyBuilderEip8321 extends BeaconBlockBodyBuilderGloas {
     // skipping super.validate() because fields were removed
     // old fields
     checkNotNull(randaoReveal, "randaoReveal must be specified");
-    checkNotNull(eth1Data, "eth1Data must be specified");
     checkNotNull(graffiti, "graffiti must be specified");
     checkNotNull(attestations, "attestations must be specified");
     checkNotNull(proposerSlashings, "proposerSlashings must be specified");
     checkNotNull(attesterSlashings, "attesterSlashings must be specified");
-    checkNotNull(deposits, "deposits must be specified");
     checkNotNull(voluntaryExits, "voluntaryExits must be specified");
     checkNotNull(syncAggregate, "syncAggregate must be specified");
     checkNotNull(blsToExecutionChanges, "blsToExecutionChanges must be specified");
@@ -125,6 +124,7 @@ public class BeaconBlockBodyBuilderEip8321 extends BeaconBlockBodyBuilderGloas {
     checkNotNull(signedExecutionPayloadBid, "signedExecutionPayloadBid must be specified");
     checkNotNull(payloadAttestations, "payloadAttestations must be specified");
     checkNotNull(parentExecutionRequests, "parentExecutionRequests must be specified");
+    checkNotNull(hashChainReveal, "hashChainReveal must be specified");
     checkNotNull(randaoCommitmentRegistrations, "randaoCommitmentRegistrations must be specified");
   }
 
@@ -141,12 +141,10 @@ public class BeaconBlockBodyBuilderEip8321 extends BeaconBlockBodyBuilderGloas {
     return new BeaconBlockBodyEip8321Impl(
         schema,
         new SszSignature(randaoReveal),
-        eth1Data,
         SszBytes32.of(graffiti),
         proposerSlashings,
         attesterSlashings,
         attestations,
-        deposits,
         voluntaryExits,
         syncAggregate,
         getBlsToExecutionChanges(),

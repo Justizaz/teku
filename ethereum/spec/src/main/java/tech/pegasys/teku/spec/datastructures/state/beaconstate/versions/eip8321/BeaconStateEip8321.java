@@ -21,10 +21,11 @@ import tech.pegasys.teku.infrastructure.ssz.primitive.SszBytes32;
 import tech.pegasys.teku.spec.datastructures.operations.PendingRandaoCommitment;
 import tech.pegasys.teku.spec.datastructures.state.beaconstate.BeaconState;
 import tech.pegasys.teku.spec.datastructures.state.beaconstate.versions.gloas.BeaconStateGloas;
+import tech.pegasys.teku.spec.datastructures.state.beaconstate.versions.heze.BeaconStateHeze;
 
 import java.util.Optional;
 
-public interface BeaconStateEip8321 extends BeaconStateGloas {
+public interface BeaconStateEip8321 extends BeaconStateHeze {
   static BeaconStateEip8321 required(final BeaconState state) {
     return state
         .toVersionEip8321()
