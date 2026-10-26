@@ -33,6 +33,7 @@ import tech.pegasys.teku.spec.datastructures.operations.AttesterSlashing;
 import tech.pegasys.teku.spec.datastructures.operations.Deposit;
 import tech.pegasys.teku.spec.datastructures.operations.ProposerSlashing;
 import tech.pegasys.teku.spec.datastructures.operations.SignedBlsToExecutionChange;
+import tech.pegasys.teku.spec.datastructures.operations.SignedRandaoCommitmentRegistration;
 import tech.pegasys.teku.spec.datastructures.operations.SignedVoluntaryExit;
 import tech.pegasys.teku.spec.datastructures.state.beaconstate.MutableBeaconState;
 import tech.pegasys.teku.spec.logic.common.statetransition.exceptions.BlockProcessingException;
@@ -97,4 +98,12 @@ public interface OperationProcessor {
       MutableBeaconState state, List<BuilderDepositRequest> depositRequest);
 
   void processBuilderExitRequest(MutableBeaconState state, List<BuilderExitRequest> depositRequest);
+
+  void processRandaoCommitmentRegistration(
+      MutableBeaconState state, SignedRandaoCommitmentRegistration registration)
+      throws BlockProcessingException;
+
+  void processRandao(
+      MutableBeaconState state, BeaconBlock block)
+      throws BlockProcessingException;
 }

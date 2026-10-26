@@ -109,6 +109,9 @@ public class EpochProcessingTestExecutor implements TestExecutor {
               "epoch_processing/pending_deposits_churn",
               new EpochProcessingTestExecutor(EpochOperation.PENDING_DEPOSITS))
           .put(
+              "epoch_processing/pending_randao_commitments",
+              new EpochProcessingTestExecutor(EpochOperation.PROCESS_PENDING_RANDAO_COMMITMENTS))
+          .put(
               "epoch_processing/proposer_lookahead",
               new EpochProcessingTestExecutor(EpochOperation.PROPOSER_LOOKAHEAD))
           .put(

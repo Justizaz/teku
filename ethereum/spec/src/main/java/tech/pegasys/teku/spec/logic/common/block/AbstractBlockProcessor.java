@@ -430,6 +430,19 @@ public abstract class AbstractBlockProcessor implements BlockProcessor {
     return BlockValidationResult.SUCCESSFUL;
   }
 
+  @Override
+  public void processRandao(
+      final MutableBeaconState state,
+      final BeaconBlock block,
+      final BLSSignatureVerifier signatureVerifier)
+      throws BlockProcessingException {
+    final BlockValidationResult validationResult = verifyRandao(state, block, signatureVerifier);
+    if(!validationResult.isValid()) {
+      throw new BlockProcessingException(validationResult.getFailureReason());
+    }
+    processRandaoNoValidation(state, block.getBody());
+  }
+
   protected void processEth1Data(final MutableBeaconState state, final BeaconBlockBody body) {
     state.getEth1DataVotes().append(body.getEth1Data());
     final long voteCount = getVoteCount(state, body.getEth1Data());

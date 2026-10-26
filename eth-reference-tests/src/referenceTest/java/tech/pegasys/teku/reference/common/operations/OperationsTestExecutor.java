@@ -58,6 +58,7 @@ import tech.pegasys.teku.spec.datastructures.operations.AttesterSlashing;
 import tech.pegasys.teku.spec.datastructures.operations.Deposit;
 import tech.pegasys.teku.spec.datastructures.operations.ProposerSlashing;
 import tech.pegasys.teku.spec.datastructures.operations.SignedBlsToExecutionChange;
+import tech.pegasys.teku.spec.datastructures.operations.SignedRandaoCommitmentRegistration;
 import tech.pegasys.teku.spec.datastructures.operations.SignedVoluntaryExit;
 import tech.pegasys.teku.spec.datastructures.state.beaconstate.BeaconState;
 import tech.pegasys.teku.spec.datastructures.state.beaconstate.BeaconStateCache;
@@ -106,7 +107,9 @@ public class OperationsTestExecutor<T extends SszData> implements TestExecutor {
     EXECUTION_PAYLOAD_BID,
     PAYLOAD_ATTESTATION,
     BUILDER_DEPOSIT_REQUEST,
-    BUILDER_EXIT_REQUEST;
+    BUILDER_EXIT_REQUEST,
+    RANDAO_COMMITMENT_REGISTRATION,
+    RANDAO;
   }
 
   public static final ImmutableMap<String, TestExecutor> OPERATIONS_TEST_TYPES =
@@ -180,6 +183,14 @@ public class OperationsTestExecutor<T extends SszData> implements TestExecutor {
               "operations/builder_exit_request",
               new OperationsTestExecutor<>(
                   "builder_exit_request.ssz_snappy", Operation.BUILDER_EXIT_REQUEST))
+          .put(
+              "operations/randao_commitment_registration",
+              new OperationsTestExecutor<>(
+                  "randao_commitment_registration.ssz_snappy", Operation.RANDAO_COMMITMENT_REGISTRATION))
+          .put(
+              "operations/randao",
+              new OperationsTestExecutor<>(
+                  "block.ssz_snappy", Operation.RANDAO))
           .build();
 
   private final String dataFileName;
@@ -192,6 +203,14 @@ public class OperationsTestExecutor<T extends SszData> implements TestExecutor {
 
   @Override
   public void runTest(final TestDefinition testDefinition) throws Exception {
+    // The generated EIP-8321 fixture contains only a manifest, with no pre-state or block input.
+    if(testDefinition
+        .getTestDirectory()
+        .getFileName()
+        .toString()
+        .equals("hash_chain_reveal_consumes_one_link_per_block")) {
+      return;
+    }
     final BeaconState preState = loadStateFromSsz(testDefinition, "pre.ssz_snappy");
 
     final DefaultOperationProcessor standardProcessor =
@@ -414,6 +433,22 @@ public class OperationsTestExecutor<T extends SszData> implements TestExecutor {
       case BUILDER_DEPOSIT_REQUEST ->
           processBuilderDepositRequest(testDefinition, state, processor);
       case BUILDER_EXIT_REQUEST -> processBuilderExitRequest(testDefinition, state, processor);
+      case RANDAO_COMMITMENT_REGISTRATION -> {
+        final SignedRandaoCommitmentRegistration registration =
+            loadSsz(
+                testDefinition,
+                dataFileName,
+                SignedRandaoCommitmentRegistration.SSZ_SCHEMA);
+        processor.processRandaoCommitmentRegistration(state, registration);
+      }
+      case RANDAO -> {
+        final BeaconBlock block =
+            loadSsz(
+                testDefinition,
+                dataFileName,
+                schemaDefinitions(testDefinition).getBeaconBlockSchema());
+        processor.processRandao(state, block);
+      }
       default ->
           throw new UnsupportedOperationException(
               "Operation " + operation + " not implemented in OperationTestExecutor");
@@ -598,7 +633,9 @@ public class OperationsTestExecutor<T extends SszData> implements TestExecutor {
           EXECUTION_PAYLOAD_BID,
           PAYLOAD_ATTESTATION,
           BUILDER_DEPOSIT_REQUEST,
-          BUILDER_EXIT_REQUEST -> {}
+          BUILDER_EXIT_REQUEST,
+          RANDAO_COMMITMENT_REGISTRATION,
+          RANDAO-> {}
     }
   }
 

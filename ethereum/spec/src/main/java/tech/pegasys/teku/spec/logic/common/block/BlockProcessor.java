@@ -191,6 +191,12 @@ public interface BlockProcessor {
       MutableBeaconState state, SszList<PayloadAttestation> payloadAttestations)
       throws BlockProcessingException;
 
+  void processRandao(
+      MutableBeaconState state,
+      BeaconBlock block,
+      BLSSignatureVerifier signatureVerifier)
+      throws BlockProcessingException;
+
   default Optional<BlockProcessorAltair> toVersionAltair() {
     return Optional.empty();
   }
