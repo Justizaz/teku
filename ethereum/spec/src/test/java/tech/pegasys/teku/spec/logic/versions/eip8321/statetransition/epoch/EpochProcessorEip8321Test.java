@@ -209,16 +209,16 @@ class EpochProcessorEip8321Test {
   }
 
   private BeaconStateEip8321 createEip8321State(final int validatorCount, final UInt64 slot) {
-    final Spec specGloas = TestSpecFactory.createMinimalGloas();
-    final DataStructureUtil gloasUtil = new DataStructureUtil(specGloas);
+    final Spec spec = TestSpecFactory.createMinimalHeze();
+    final DataStructureUtil hezeUtil = new DataStructureUtil(spec);
     final BeaconState rawState =
-        gloasUtil.randomBeaconStateWithActiveValidators(validatorCount, slot);
+        hezeUtil.randomBeaconStateWithActiveValidators(validatorCount, slot);
     final SszPrimitiveVector<UInt64, SszUInt64> noSlashings =
-        gloasUtil.randomSszPrimitiveVector(
+        hezeUtil.randomSszPrimitiveVector(
             rawState.getBeaconStateSchema().getSlashingsSchema(), () -> UInt64.ZERO);
     final BeaconState baseState = rawState.updated(state -> state.setSlashings(noSlashings));
     return (BeaconStateEip8321)
-        spec.getGenesisSpec().getStateUpgrade().orElseThrow().upgrade(baseState);
+        this.spec.getGenesisSpec().getStateUpgrade().orElseThrow().upgrade(baseState);
   }
 
   private SszListSchema<PendingRandaoCommitment, ?> getPendingSchema(

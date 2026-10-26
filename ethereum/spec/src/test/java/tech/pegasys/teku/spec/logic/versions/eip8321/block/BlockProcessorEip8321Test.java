@@ -16,8 +16,6 @@ package tech.pegasys.teku.spec.logic.versions.eip8321.block;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import java.util.Optional;
-
 import org.apache.tuweni.bytes.Bytes;
 import org.apache.tuweni.bytes.Bytes32;
 import org.junit.jupiter.api.Test;
@@ -587,11 +585,11 @@ class BlockProcessorEip8321Test {
 
     private BeaconStateEip8321 createStateWithProposer(
             final BLSKeyPair proposerKeyPair, final Bytes32 proposerCommitment) {
-        final Spec specGloas = TestSpecFactory.createMinimalGloas();
-        final DataStructureUtil gloasUtil = new DataStructureUtil(specGloas);
+        final Spec spec = TestSpecFactory.createMinimalHeze();
+        final DataStructureUtil hezeUtil = new DataStructureUtil(spec);
         final BeaconState baseState =
-                gloasUtil.randomBeaconStateWithActiveValidators(16, UInt64.ZERO);
-        final int proposerIndex = specGloas.getBeaconProposerIndex(baseState, UInt64.ZERO);
+                hezeUtil.randomBeaconStateWithActiveValidators(16, UInt64.ZERO);
+        final int proposerIndex = spec.getBeaconProposerIndex(baseState, UInt64.ZERO);
 
         final BeaconState updatedBaseState =
                 baseState.updated(
@@ -612,7 +610,7 @@ class BlockProcessorEip8321Test {
 
         final BeaconStateEip8321 upgradedState =
                 (BeaconStateEip8321)
-                        spec.getGenesisSpec().getStateUpgrade().orElseThrow().upgrade(updatedBaseState);
+                        this.spec.getGenesisSpec().getStateUpgrade().orElseThrow().upgrade(updatedBaseState);
 
         if (proposerCommitment.isZero()) {
             return upgradedState;

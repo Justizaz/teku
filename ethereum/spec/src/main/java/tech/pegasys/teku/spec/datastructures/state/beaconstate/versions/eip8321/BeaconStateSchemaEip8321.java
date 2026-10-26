@@ -56,7 +56,9 @@ public class BeaconStateSchemaEip8321
   @VisibleForTesting
   BeaconStateSchemaEip8321(final SpecConfig specConfig, final SchemaRegistry schemaRegistry) {
     super(
-        "BeaconStateEip8321", ACTIVE_FIELDS, getUniqueFields(specConfig, schemaRegistry), specConfig);
+        "BeaconStateEip8321",
+            ACTIVE_FIELDS,
+            getAllFields(specConfig, schemaRegistry));
   }
 
   private static boolean[] createActiveFields() {
@@ -70,7 +72,7 @@ public class BeaconStateSchemaEip8321
     return activeFields;
   }
 
-  private static List<SszField> getUniqueFields(
+  private static List<SszField> getAllFields(
       final SpecConfig specConfig, final SchemaRegistry schemaRegistry) {
     return Stream.concat(
             BeaconStateSchemaHeze.getFields(SpecConfigHeze.required(specConfig), schemaRegistry).stream(),

@@ -9,7 +9,7 @@ import tech.pegasys.teku.spec.SpecVersion;
 import tech.pegasys.teku.spec.TestSpecFactory;
 import tech.pegasys.teku.spec.config.SpecConfigEip8321;
 import tech.pegasys.teku.spec.datastructures.state.beaconstate.versions.eip8321.BeaconStateEip8321;
-import tech.pegasys.teku.spec.datastructures.state.beaconstate.versions.gloas.BeaconStateGloas;
+import tech.pegasys.teku.spec.datastructures.state.beaconstate.versions.heze.BeaconStateHeze;
 import tech.pegasys.teku.spec.logic.versions.gloas.helpers.BeaconStateAccessorsGloas;
 import tech.pegasys.teku.spec.schemas.SchemaDefinitionsEip8321;
 import tech.pegasys.teku.spec.util.DataStructureUtil;
@@ -24,12 +24,12 @@ class Eip8321StateUpgradeTest {
 
     @Test
     void shouldInitializeRandaoCommitmentsForExistingValidators() {
-        final BeaconStateGloas preState =
-            BeaconStateGloas.required(
+        final BeaconStateHeze preState =
+            (BeaconStateHeze)
                 dataStructureUtil
                     .stateBuilder(SpecMilestone.EIP8321, 3, 0)
                     .setSlotToStartOfEpoch(EIP8321_EPOCH)
-                    .build());
+                    .build();
         final BeaconStateEip8321 postState = createStateUpgrade().upgrade(preState);
 
         assertThat(postState.getFork().getPreviousVersion())

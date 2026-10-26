@@ -24,7 +24,6 @@ import tech.pegasys.teku.spec.Spec;
 import tech.pegasys.teku.spec.TestSpecFactory;
 import tech.pegasys.teku.spec.datastructures.state.beaconstate.BeaconState;
 import tech.pegasys.teku.spec.datastructures.state.beaconstate.versions.eip8321.BeaconStateEip8321;
-import tech.pegasys.teku.spec.datastructures.state.beaconstate.versions.eip8321.MutableBeaconStateEip8321;
 import tech.pegasys.teku.spec.util.DataStructureUtil;
 
 class BeaconStateMutatorsEip8321Test {
@@ -43,13 +42,13 @@ class BeaconStateMutatorsEip8321Test {
 
   @Test
   void addValidatorToRegistry_shouldAppendZeroCommitment() {
-    final Spec specGloas = TestSpecFactory.createMinimalGloas();
-    final DataStructureUtil gloasUtil = new DataStructureUtil(specGloas);
-    final BeaconState baseState = gloasUtil.randomBeaconStateWithActiveValidators(16, UInt64.ZERO);
+    final Spec spec = TestSpecFactory.createMinimalHeze();
+    final DataStructureUtil hezeUtil = new DataStructureUtil(spec);
+    final BeaconState baseState = hezeUtil.randomBeaconStateWithActiveValidators(16, UInt64.ZERO);
 
     final BeaconStateEip8321 preState =
         (BeaconStateEip8321)
-            spec.getGenesisSpec().getStateUpgrade().orElseThrow().upgrade(baseState);
+            this.spec.getGenesisSpec().getStateUpgrade().orElseThrow().upgrade(baseState);
 
     final int initialValidatorCount = preState.getValidators().size();
     final int initialCommitmentCount = preState.getRandaoCommitments().size();
@@ -76,13 +75,13 @@ class BeaconStateMutatorsEip8321Test {
 
   @Test
   void addMultipleValidatorsToRegistry_shouldAppendZeroCommitmentsConsistently() {
-    final Spec specGloas = TestSpecFactory.createMinimalGloas();
-    final DataStructureUtil gloasUtil = new DataStructureUtil(specGloas);
-    final BeaconState baseState = gloasUtil.randomBeaconStateWithActiveValidators(8, UInt64.ZERO);
+    final Spec spec = TestSpecFactory.createMinimalHeze();
+    final DataStructureUtil hezeUtil = new DataStructureUtil(spec);
+    final BeaconState baseState = hezeUtil.randomBeaconStateWithActiveValidators(8, UInt64.ZERO);
 
     final BeaconStateEip8321 preState =
         (BeaconStateEip8321)
-            spec.getGenesisSpec().getStateUpgrade().orElseThrow().upgrade(baseState);
+            this.spec.getGenesisSpec().getStateUpgrade().orElseThrow().upgrade(baseState);
 
     final int initialValidatorCount = preState.getValidators().size();
 
