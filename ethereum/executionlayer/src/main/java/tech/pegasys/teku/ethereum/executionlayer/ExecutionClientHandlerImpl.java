@@ -1,5 +1,5 @@
 /*
- * Copyright Consensys Software Inc., 2026
+ * Copyright (c) 2026 Consensys Incorporated. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with
  * the License. You may obtain a copy of the License at
@@ -24,6 +24,7 @@ import tech.pegasys.teku.ethereum.executionclient.schema.ClientVersionV1;
 import tech.pegasys.teku.ethereum.executionclient.schema.ExecutionPayloadBodyV2;
 import tech.pegasys.teku.ethereum.executionclient.schema.WithdrawalV1;
 import tech.pegasys.teku.infrastructure.async.SafeFuture;
+import tech.pegasys.teku.infrastructure.ssz.collections.impl.SszByteListImpl;
 import tech.pegasys.teku.infrastructure.unsigned.UInt64;
 import tech.pegasys.teku.spec.Spec;
 import tech.pegasys.teku.spec.datastructures.blobs.versions.deneb.BlobSchema;
@@ -36,6 +37,7 @@ import tech.pegasys.teku.spec.datastructures.execution.ExecutionPayloadContext;
 import tech.pegasys.teku.spec.datastructures.execution.GetPayloadResponse;
 import tech.pegasys.teku.spec.datastructures.execution.NewPayloadRequest;
 import tech.pegasys.teku.spec.datastructures.execution.PowBlock;
+import tech.pegasys.teku.spec.datastructures.execution.Transaction;
 import tech.pegasys.teku.spec.executionlayer.ForkChoiceState;
 import tech.pegasys.teku.spec.executionlayer.ForkChoiceUpdatedResult;
 import tech.pegasys.teku.spec.executionlayer.PayloadBuildingAttributes;
@@ -45,6 +47,10 @@ import tech.pegasys.teku.spec.schemas.SchemaDefinitions;
 import tech.pegasys.teku.spec.schemas.SchemaDefinitionsDeneb;
 
 public class ExecutionClientHandlerImpl implements ExecutionClientHandler {
+
+  @SuppressWarnings("unchecked")
+  private static final Class<List<Transaction>> TRANSACTION_LIST_TYPE =
+      (Class<List<Transaction>>) (Class<?>) List.class;
 
   private final Spec spec;
   private final ExecutionEngineClient executionEngineClient;
@@ -117,7 +123,13 @@ public class ExecutionClientHandlerImpl implements ExecutionClientHandler {
             .add(executionPayload)
             .addOptional(newPayloadRequest.getVersionedHashes())
             .addOptional(newPayloadRequest.getParentBeaconBlockRoot())
-            .addOptional(newPayloadRequest.getExecutionRequests());
+            .addOptional(newPayloadRequest.getExecutionRequests())
+            .addOptional(
+                newPayloadRequest
+                    .getInclusionList()
+                    .map(
+                        transactions ->
+                            transactions.stream().map(SszByteListImpl::getBytes).toList()));
 
     return engineMethodsResolver
         .getMethod(
@@ -208,5 +220,21 @@ public class ExecutionClientHandlerImpl implements ExecutionClientHandler {
                               : blobAndProofV2.asInternalBlobAndProofs(blobSchema))
                   .toList();
             });
+  }
+
+  @Override
+  public SafeFuture<List<Transaction>> engineGetInclusionList(
+      final Bytes32 parentHash, final UInt64 slot) {
+    final JsonRpcRequestParams params =
+        new JsonRpcRequestParams.Builder().add(parentHash).add(slot).build();
+
+    return SafeFuture.of(
+        () ->
+            engineMethodsResolver
+                .getMethod(
+                    EngineApiMethod.ENGINE_GET_INCLUSION_LIST,
+                    () -> spec.atSlot(slot).getMilestone(),
+                    TRANSACTION_LIST_TYPE)
+                .execute(params));
   }
 }

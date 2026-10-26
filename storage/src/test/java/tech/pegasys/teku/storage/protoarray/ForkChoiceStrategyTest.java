@@ -1,5 +1,5 @@
 /*
- * Copyright Consensys Software Inc., 2026
+ * Copyright (c) 2026 Consensys Incorporated. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with
  * the License. You may obtain a copy of the License at
@@ -33,6 +33,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.stream.Collectors;
 import org.apache.tuweni.bytes.Bytes32;
 import org.junit.jupiter.api.Test;
 import tech.pegasys.teku.infrastructure.async.SafeFuture;
@@ -51,6 +52,7 @@ import tech.pegasys.teku.spec.datastructures.blocks.StateAndBlockSummary;
 import tech.pegasys.teku.spec.datastructures.forkchoice.ForkChoiceNode;
 import tech.pegasys.teku.spec.datastructures.forkchoice.ForkChoicePayloadStatus;
 import tech.pegasys.teku.spec.datastructures.forkchoice.ProtoNodeData;
+import tech.pegasys.teku.spec.datastructures.forkchoice.ProtoNodeDataWithParent;
 import tech.pegasys.teku.spec.datastructures.forkchoice.ProtoNodeValidationStatus;
 import tech.pegasys.teku.spec.datastructures.forkchoice.ReadOnlyForkChoiceStrategy;
 import tech.pegasys.teku.spec.datastructures.forkchoice.ReadOnlyStore;
@@ -478,6 +480,88 @@ public class ForkChoiceStrategyTest extends AbstractBlockMetadataStoreTest {
   }
 
   @Test
+  void getAncestorNodeData_returnsExactGloasEmptyVariantAndOptimism() {
+    final Spec gloasSpec = TestSpecFactory.createMinimalGloas();
+    final ChainBuilder chainBuilder = ChainBuilder.create(gloasSpec);
+    final SignedBlockAndState genesis = chainBuilder.generateGenesis();
+    final SignedBlockAndState ancestor = chainBuilder.generateBlockAtSlot(ONE);
+    final SignedBlockAndState head = chainBuilder.generateBlockAtSlot(2);
+    final ForkChoiceNode emptyAncestor = ForkChoiceNode.createEmpty(ancestor.getRoot());
+    final ForkChoiceNode baseHead = ForkChoiceNode.createBase(head.getRoot());
+    final ProtoArray protoArray = createProtoArray(gloasSpec, head.getState());
+    addBlockToProtoArray(gloasSpec, protoArray, genesis);
+    addBlockToProtoArray(gloasSpec, protoArray, ancestor);
+    addProjectedNodeToProtoArray(
+        gloasSpec,
+        protoArray,
+        ancestor,
+        emptyAncestor,
+        ForkChoiceNode.createBase(ancestor.getRoot()),
+        ZERO,
+        dataStructureUtil.randomBytes32(),
+        false);
+    addProjectedNodeToProtoArray(
+        gloasSpec,
+        protoArray,
+        head,
+        baseHead,
+        emptyAncestor,
+        ZERO,
+        dataStructureUtil.randomBytes32(),
+        false);
+    final ForkChoiceStrategy strategy = ForkChoiceStrategy.initialize(gloasSpec, protoArray);
+
+    final ProtoNodeData ancestorData =
+        strategy.getAncestorNodeData(baseHead, ancestor.getSlot()).orElseThrow();
+
+    assertThat(ancestorData.getRoot()).isEqualTo(ancestor.getRoot());
+    assertThat(ancestorData.getPayloadStatus())
+        .isEqualTo(ForkChoicePayloadStatus.PAYLOAD_STATUS_EMPTY);
+    assertThat(ancestorData.isOptimistic()).isFalse();
+  }
+
+  @Test
+  void getAncestorNodeData_returnsExactGloasFullVariantAndOptimism() {
+    final Spec gloasSpec = TestSpecFactory.createMinimalGloas();
+    final ChainBuilder chainBuilder = ChainBuilder.create(gloasSpec);
+    final SignedBlockAndState genesis = chainBuilder.generateGenesis();
+    final SignedBlockAndState ancestor = chainBuilder.generateBlockAtSlot(ONE);
+    final SignedBlockAndState head = chainBuilder.generateBlockAtSlot(2);
+    final ForkChoiceNode fullAncestor = ForkChoiceNode.createFull(ancestor.getRoot());
+    final ForkChoiceNode baseHead = ForkChoiceNode.createBase(head.getRoot());
+    final ProtoArray protoArray = createProtoArray(gloasSpec, head.getState());
+    addBlockToProtoArray(gloasSpec, protoArray, genesis);
+    addBlockToProtoArray(gloasSpec, protoArray, ancestor);
+    addProjectedNodeToProtoArray(
+        gloasSpec,
+        protoArray,
+        ancestor,
+        fullAncestor,
+        ForkChoiceNode.createBase(ancestor.getRoot()),
+        ONE,
+        dataStructureUtil.randomBytes32(),
+        true);
+    addProjectedNodeToProtoArray(
+        gloasSpec,
+        protoArray,
+        head,
+        baseHead,
+        fullAncestor,
+        ONE,
+        dataStructureUtil.randomBytes32(),
+        true);
+    final ForkChoiceStrategy strategy = ForkChoiceStrategy.initialize(gloasSpec, protoArray);
+
+    final ProtoNodeData ancestorData =
+        strategy.getAncestorNodeData(baseHead, ancestor.getSlot()).orElseThrow();
+
+    assertThat(ancestorData.getRoot()).isEqualTo(ancestor.getRoot());
+    assertThat(ancestorData.getPayloadStatus())
+        .isEqualTo(ForkChoicePayloadStatus.PAYLOAD_STATUS_FULL);
+    assertThat(ancestorData.isOptimistic()).isTrue();
+  }
+
+  @Test
   void getChainHeads() {
     final StorageSystem storageSystem = initStorageSystem();
     final SignedBlockAndState head = storageSystem.chainUpdater().advanceChain(5);
@@ -564,6 +648,8 @@ public class ForkChoiceStrategyTest extends AbstractBlockMetadataStoreTest {
     final ForkChoiceStrategy strategy = getProtoArray(storageSystem);
     // Genesis = 0, block1 = 1, block2 = 2, block3 = 3, block4 = 4
     strategy.setPruneThreshold(3);
+    strategy.onUnsatisfiedInclusionList(block1.getRoot());
+    strategy.onUnsatisfiedInclusionList(block4.getRoot());
 
     // Not pruned because threshold isn't reached.
     strategy.applyUpdate(
@@ -572,6 +658,8 @@ public class ForkChoiceStrategyTest extends AbstractBlockMetadataStoreTest {
     assertThat(strategy.contains(block2.getRoot())).isTrue();
     assertThat(strategy.contains(block3.getRoot())).isTrue();
     assertThat(strategy.contains(block4.getRoot())).isTrue();
+    assertThat(strategy.satisfiesInclusionList(block1.getRoot())).isFalse();
+    assertThat(strategy.satisfiesInclusionList(block4.getRoot())).isFalse();
 
     // Prune when threshold is exceeded
     strategy.applyUpdate(
@@ -580,6 +668,8 @@ public class ForkChoiceStrategyTest extends AbstractBlockMetadataStoreTest {
     assertThat(strategy.contains(block2.getRoot())).isFalse();
     assertThat(strategy.contains(block3.getRoot())).isTrue();
     assertThat(strategy.contains(block4.getRoot())).isTrue();
+    assertThat(strategy.satisfiesInclusionList(block1.getRoot())).isTrue();
+    assertThat(strategy.satisfiesInclusionList(block4.getRoot())).isFalse();
   }
 
   @Test
@@ -643,6 +733,90 @@ public class ForkChoiceStrategyTest extends AbstractBlockMetadataStoreTest {
     assertThat(boundaryFullNodeIndex).isPresent();
     assertThat(boundaryBaseNode(fixture).getParentIndex()).isEmpty();
     assertThat(childBaseNode(fixture).getParentIndex()).isEqualTo(boundaryFullNodeIndex);
+  }
+
+  @Test
+  void getBlockDataWithParent_shouldPairGloasNodesWithTheirParentNodes() {
+    final GloasBoundaryFixture fixture = createGloasBoundaryFixture();
+    fixture
+        .strategy()
+        .applyUpdate(
+            List.of(
+                BlockAndCheckpoints.fromBlockAndState(fixture.spec(), fixture.boundary()),
+                BlockAndCheckpoints.fromBlockAndState(fixture.spec(), fixture.child())),
+            Map.of(fixture.boundary().getRoot(), fixture.boundaryExecutionPayload()),
+            emptySet(),
+            emptyMap(),
+            fixture.finalizedCheckpoint(),
+            Optional.of(fixture.boundaryBlockAndCheckpoints()));
+    final Bytes32 boundaryRoot = fixture.boundary().getRoot();
+    final Bytes32 childRoot = fixture.child().getRoot();
+
+    final Map<ForkChoiceNode, Optional<ForkChoiceNode>> parentByNode =
+        fixture.strategy().getBlockDataWithParent().stream()
+            .collect(
+                Collectors.toMap(
+                    nodeWithParent -> toForkChoiceNode(nodeWithParent.node()),
+                    nodeWithParent -> nodeWithParent.parent().map(this::toForkChoiceNode)));
+
+    // the finalized boundary block is the anchor, so its PENDING node has no retained parent
+    assertThat(parentByNode.get(ForkChoiceNode.createBase(boundaryRoot))).isEmpty();
+    // a block's EMPTY and FULL nodes have the same block's PENDING node as parent
+    assertThat(parentByNode.get(ForkChoiceNode.createEmpty(boundaryRoot)))
+        .contains(ForkChoiceNode.createBase(boundaryRoot));
+    assertThat(parentByNode.get(ForkChoiceNode.createFull(boundaryRoot)))
+        .contains(ForkChoiceNode.createBase(boundaryRoot));
+    assertThat(parentByNode.get(ForkChoiceNode.createEmpty(childRoot)))
+        .contains(ForkChoiceNode.createBase(childRoot));
+    // a block's PENDING node has the parent block's node it builds on, here the FULL one
+    assertThat(parentByNode.get(ForkChoiceNode.createBase(childRoot)))
+        .contains(ForkChoiceNode.createFull(boundaryRoot));
+  }
+
+  @Test
+  void getBlockDataWithParent_shouldUseBidParentBlockHashForGloasPendingAndEmptyNodes() {
+    final GloasBoundaryFixture fixture = createGloasBoundaryFixture();
+    fixture
+        .strategy()
+        .applyUpdate(
+            List.of(
+                BlockAndCheckpoints.fromBlockAndState(fixture.spec(), fixture.boundary()),
+                BlockAndCheckpoints.fromBlockAndState(fixture.spec(), fixture.child())),
+            Map.of(fixture.boundary().getRoot(), fixture.boundaryExecutionPayload()),
+            emptySet(),
+            emptyMap(),
+            fixture.finalizedCheckpoint(),
+            Optional.of(fixture.boundaryBlockAndCheckpoints()));
+    final Bytes32 childRoot = fixture.child().getRoot();
+    final Bytes32 bidParentBlockHash =
+        fixture
+            .child()
+            .getBlock()
+            .getMessage()
+            .getBody()
+            .getOptionalSignedExecutionPayloadBid()
+            .orElseThrow()
+            .getMessage()
+            .getParentBlockHash();
+
+    final Map<ForkChoiceNode, Bytes32> executionBlockHashByNode =
+        fixture.strategy().getBlockDataWithParent().stream()
+            .map(ProtoNodeDataWithParent::node)
+            .collect(
+                Collectors.toMap(this::toForkChoiceNode, ProtoNodeData::getExecutionBlockHash));
+
+    assertThat(executionBlockHashByNode.get(ForkChoiceNode.createBase(childRoot)))
+        .isEqualTo(bidParentBlockHash);
+    assertThat(executionBlockHashByNode.get(ForkChoiceNode.createEmpty(childRoot)))
+        .isEqualTo(bidParentBlockHash);
+  }
+
+  private ForkChoiceNode toForkChoiceNode(final ProtoNodeData node) {
+    return switch (node.getPayloadStatus()) {
+      case PAYLOAD_STATUS_PENDING -> ForkChoiceNode.createBase(node.getRoot());
+      case PAYLOAD_STATUS_EMPTY -> ForkChoiceNode.createEmpty(node.getRoot());
+      case PAYLOAD_STATUS_FULL -> ForkChoiceNode.createFull(node.getRoot());
+    };
   }
 
   @Test
@@ -1188,6 +1362,82 @@ public class ForkChoiceStrategyTest extends AbstractBlockMetadataStoreTest {
   }
 
   @Test
+  void getAncestorNode_gloasShouldNotResolveFromAnInvalidatedFullNode() {
+    // After FULL(B) is invalidated the finalized ancestry walk (see ForkChoiceUtilGloas
+    // .blockDescendsFromLatestFinalizedBlock) must fail from FULL(B) but still resolve from
+    // EMPTY(B) and from the block root, and FULL(B) is no longer contained while B still is
+    final Spec gloasSpec = TestSpecFactory.createMinimalGloas();
+    final ChainBuilder chainBuilder = ChainBuilder.create(gloasSpec);
+    final SignedBlockAndState genesis = chainBuilder.generateGenesis();
+    final SignedBlockAndState blockB = chainBuilder.generateBlockAtSlot(ONE);
+    final Bytes32 genesisPayloadHash =
+        genesis.getExecutionBlockHash().orElse(ProtoNode.NO_EXECUTION_BLOCK_HASH);
+    final Bytes32 payloadHashB = dataStructureUtil.randomBytes32();
+    final ForkChoiceNode baseB = ForkChoiceNode.createBase(blockB.getRoot());
+    final ForkChoiceNode fullB = ForkChoiceNode.createFull(blockB.getRoot());
+
+    final Checkpoint genesisCheckpoint = new Checkpoint(ZERO, genesis.getRoot());
+    final ProtoArray protoArray =
+        ProtoArray.builder()
+            .spec(gloasSpec)
+            .currentEpoch(ZERO)
+            .justifiedCheckpoint(genesisCheckpoint)
+            .finalizedCheckpoint(genesisCheckpoint)
+            .build();
+    addBlockToProtoArray(gloasSpec, protoArray, genesis);
+    addProjectedNodeToProtoArray(
+        gloasSpec,
+        protoArray,
+        genesis,
+        ForkChoiceNode.createEmpty(genesis.getRoot()),
+        ForkChoiceNode.createBase(genesis.getRoot()),
+        ZERO,
+        genesisPayloadHash,
+        false);
+    addProjectedNodeToProtoArray(
+        gloasSpec,
+        protoArray,
+        blockB,
+        baseB,
+        ForkChoiceNode.createEmpty(genesis.getRoot()),
+        ZERO,
+        genesisPayloadHash,
+        false);
+    addProjectedNodeToProtoArray(
+        gloasSpec,
+        protoArray,
+        blockB,
+        ForkChoiceNode.createEmpty(blockB.getRoot()),
+        baseB,
+        ZERO,
+        genesisPayloadHash,
+        false);
+    // B's payload is imported optimistically
+    addProjectedNodeToProtoArray(
+        gloasSpec, protoArray, blockB, fullB, baseB, ONE, payloadHashB, true);
+    final ForkChoiceStrategy strategy = ForkChoiceStrategy.initialize(gloasSpec, protoArray);
+    assertThat(strategy.getAncestorNode(fullB, ZERO).map(ForkChoiceNode::blockRoot))
+        .contains(genesis.getRoot());
+    assertThat(strategy.contains(fullB)).isTrue();
+
+    strategy.onForkChoiceUpdatedResult(
+        new SlotAndForkChoiceNode(ONE, fullB),
+        PayloadStatus.invalid(Optional.empty(), Optional.of("bad payload")),
+        true);
+
+    assertThat(strategy.getAncestorNode(fullB, ZERO)).isEmpty();
+    assertThat(strategy.contains(fullB)).isFalse();
+    assertThat(strategy.contains(ForkChoiceNode.createEmpty(blockB.getRoot()))).isTrue();
+    assertThat(
+            strategy
+                .getAncestorNode(ForkChoiceNode.createEmpty(blockB.getRoot()), ZERO)
+                .map(ForkChoiceNode::blockRoot))
+        .contains(genesis.getRoot());
+    assertThat(strategy.getAncestor(blockB.getRoot(), ZERO)).contains(genesis.getRoot());
+    assertThat(strategy.contains(blockB.getRoot())).isTrue();
+  }
+
+  @Test
   void onForkChoiceUpdatedResult_gloasInvalidWithoutLatestValidHashShouldInvalidatePayloadOwner() {
     // An INVALID forkchoiceUpdated verdict is about a payload, and in Gloas only FULL nodes own
     // one: BASE and EMPTY nodes inherit the execution hash of the nearest FULL ancestor. When the
@@ -1261,6 +1511,8 @@ public class ForkChoiceStrategyTest extends AbstractBlockMetadataStoreTest {
     addProjectedNodeToProtoArray(
         gloasSpec, protoArray, blockC, emptyC, baseC, ONE, payloadHashB, true);
     final ForkChoiceStrategy strategy = ForkChoiceStrategy.initialize(gloasSpec, protoArray);
+    strategy.onUnsatisfiedInclusionList(blockC.getRoot());
+    assertThat(strategy.satisfiesInclusionList(blockC.getRoot())).isFalse();
 
     final SlotAndForkChoiceNode headSentToEl =
         strategy.findHead(ZERO, genesisCheckpoint, genesisCheckpoint);
@@ -1291,6 +1543,7 @@ public class ForkChoiceStrategyTest extends AbstractBlockMetadataStoreTest {
             strategy.getBlockData(blockC.getRoot(), ForkChoicePayloadStatus.PAYLOAD_STATUS_EMPTY))
         .describedAs("EMPTY(C)")
         .isEmpty();
+    assertThat(strategy.satisfiesInclusionList(blockC.getRoot())).isTrue();
     // B's block and EMPTY variant are untouched
     assertThat(
             strategy

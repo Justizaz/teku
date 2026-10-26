@@ -1,5 +1,5 @@
 /*
- * Copyright Consensys Software Inc., 2026
+ * Copyright (c) 2026 Consensys Incorporated. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with
  * the License. You may obtain a copy of the License at
@@ -36,13 +36,17 @@ import org.apache.tuweni.bytes.Bytes32;
 import tech.pegasys.teku.infrastructure.async.SafeFuture;
 import tech.pegasys.teku.infrastructure.collections.LimitedMap;
 import tech.pegasys.teku.infrastructure.ssz.SszList;
+import tech.pegasys.teku.infrastructure.ssz.collections.SszBitvector;
 import tech.pegasys.teku.infrastructure.unsigned.UInt64;
 import tech.pegasys.teku.spec.Spec;
+import tech.pegasys.teku.spec.datastructures.blocks.SlotAndBlockRoot;
 import tech.pegasys.teku.spec.datastructures.epbs.versions.gloas.ExecutionPayloadBid;
 import tech.pegasys.teku.spec.datastructures.epbs.versions.gloas.ProposerPreferences;
 import tech.pegasys.teku.spec.datastructures.epbs.versions.gloas.SignedExecutionPayloadBid;
 import tech.pegasys.teku.spec.datastructures.epbs.versions.gloas.SignedExecutionPayloadEnvelope;
+import tech.pegasys.teku.spec.datastructures.epbs.versions.heze.ExecutionPayloadBidHeze;
 import tech.pegasys.teku.spec.datastructures.execution.versions.gloas.ExecutionRequestsGloas;
+import tech.pegasys.teku.spec.datastructures.forkchoice.InclusionListStore;
 import tech.pegasys.teku.spec.datastructures.state.beaconstate.BeaconState;
 import tech.pegasys.teku.spec.datastructures.state.beaconstate.versions.gloas.BeaconStateGloas;
 import tech.pegasys.teku.spec.datastructures.state.versions.gloas.Builder;
@@ -63,16 +67,19 @@ public class ExecutionPayloadBidGossipValidator {
       LimitedMap.createSynchronizedLRU(HIGHEST_BID_SET_SIZE);
 
   private final ProposerPreferencesManager proposerPreferencesManager;
+  private final InclusionListStore inclusionListStore;
 
   public ExecutionPayloadBidGossipValidator(
       final Spec spec,
       final GossipValidationHelper gossipValidationHelper,
       final ProposerPreferencesManager proposerPreferencesManager,
-      final int minBidIncrementPercentage) {
+      final int minBidIncrementPercentage,
+      final InclusionListStore inclusionListStore) {
     this.spec = spec;
     this.gossipValidationHelper = gossipValidationHelper;
     this.proposerPreferencesManager = proposerPreferencesManager;
     this.minBidIncrementPercentage = minBidIncrementPercentage;
+    this.inclusionListStore = inclusionListStore;
     signingRootUtil = new SigningRootUtil(spec);
   }
 
@@ -371,6 +378,28 @@ public class ExecutionPayloadBidGossipValidator {
                     return ignoreBid(
                         bid, "parent payload may exit builder %s", bid.getBuilderIndex());
                   }
+                }
+              }
+
+              /*
+               * [IGNORE] The bid's inclusion list bits is inclusive
+               */
+              if (bid instanceof ExecutionPayloadBidHeze hezeBid) {
+                final SlotAndBlockRoot inclusionListKey =
+                    gossipValidationHelper.getInclusionListKey(
+                        bid.getParentBlockRoot(), state, bid.getSlot());
+                final SszBitvector inclusionListBits =
+                    inclusionListStore.getInclusionListBits(
+                        spec.atSlot(bid.getSlot())
+                            .getInclusionListUtil()
+                            .orElseThrow()
+                            .getInclusionListCommittee(state, inclusionListKey.getSlot()),
+                        inclusionListKey,
+                        true);
+                if (!inclusionListBits
+                    .streamAllSetBits()
+                    .allMatch(hezeBid.getInclusionListBits()::getBit)) {
+                  return ignoreBid(bid, "inclusion list bits are not inclusive");
                 }
               }
 

@@ -1,5 +1,5 @@
 /*
- * Copyright Consensys Software Inc., 2026
+ * Copyright (c) 2026 Consensys Incorporated. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with
  * the License. You may obtain a copy of the License at
@@ -48,6 +48,7 @@ import tech.pegasys.teku.spec.config.builder.AltairBuilder;
 import tech.pegasys.teku.spec.config.builder.BellatrixBuilder;
 import tech.pegasys.teku.spec.config.builder.CapellaBuilder;
 import tech.pegasys.teku.spec.config.builder.DenebBuilder;
+import tech.pegasys.teku.spec.config.builder.Eip8321Builder;
 import tech.pegasys.teku.spec.config.builder.ElectraBuilder;
 import tech.pegasys.teku.spec.config.builder.FuluBuilder;
 import tech.pegasys.teku.spec.config.builder.GloasBuilder;
@@ -247,6 +248,16 @@ public class SpecConfigReader {
               final String constantKey = camelToSnakeCase(setter.getName());
               final Object rawValue = unprocessedConfig.get(constantKey);
               invokeSetter(setter, configBuilder::hezeBuilder, constantKey, rawValue);
+              unprocessedConfig.remove(constantKey);
+            });
+
+    // Process eip8321 config
+    streamConfigSetters(Eip8321Builder.class)
+        .forEach(
+            setter -> {
+              final String constantKey = camelToSnakeCase(setter.getName());
+              final Object rawValue = unprocessedConfig.get(constantKey);
+              invokeSetter(setter, configBuilder::eip8321Builder, constantKey, rawValue);
               unprocessedConfig.remove(constantKey);
             });
 

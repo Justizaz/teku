@@ -1,5 +1,5 @@
 /*
- * Copyright Consensys Software Inc., 2026
+ * Copyright (c) 2026 Consensys Incorporated. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with
  * the License. You may obtain a copy of the License at
@@ -17,7 +17,8 @@ public enum DutyType {
   ATTESTATION_AGGREGATION("attestation_aggregation"),
   ATTESTATION_PRODUCTION("attestation_production"),
   BLOCK_PRODUCTION("block_production"),
-  PAYLOAD_ATTESTATION_PRODUCTION("payload_attestation_production");
+  PAYLOAD_ATTESTATION_PRODUCTION("payload_attestation_production"),
+  INCLUSION_LIST_PRODUCTION("inclusion_list_production");
 
   private final String name;
 

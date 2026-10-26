@@ -1,5 +1,5 @@
 /*
- * Copyright Consensys Software Inc., 2026
+ * Copyright (c) 2026 Consensys Incorporated. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with
  * the License. You may obtain a copy of the License at
@@ -14,6 +14,7 @@
 package tech.pegasys.teku.spec.logic.common.operations;
 
 import java.util.Optional;
+
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.apache.tuweni.bytes.Bytes;
@@ -28,7 +29,9 @@ import tech.pegasys.teku.spec.datastructures.epbs.versions.gloas.ExecutionPayloa
 import tech.pegasys.teku.spec.datastructures.epbs.versions.gloas.SignedExecutionPayloadBid;
 import tech.pegasys.teku.spec.datastructures.operations.BlsToExecutionChange;
 import tech.pegasys.teku.spec.datastructures.operations.ProposerSlashing;
+import tech.pegasys.teku.spec.datastructures.operations.RandaoCommitmentRegistration;
 import tech.pegasys.teku.spec.datastructures.operations.SignedBlsToExecutionChange;
+import tech.pegasys.teku.spec.datastructures.operations.SignedRandaoCommitmentRegistration;
 import tech.pegasys.teku.spec.datastructures.operations.SignedVoluntaryExit;
 import tech.pegasys.teku.spec.datastructures.operations.VoluntaryExit;
 import tech.pegasys.teku.spec.datastructures.state.Fork;
@@ -40,135 +43,175 @@ import tech.pegasys.teku.spec.logic.common.util.AsyncBLSSignatureVerifier;
 
 public class OperationSignatureVerifier {
 
-  private static final Logger LOG = LogManager.getLogger();
+    private static final Logger LOG = LogManager.getLogger();
 
-  private final MiscHelpers miscHelpers;
-  protected final BeaconStateAccessors beaconStateAccessors;
+    private final MiscHelpers miscHelpers;
+    protected final BeaconStateAccessors beaconStateAccessors;
 
-  public OperationSignatureVerifier(
-      final MiscHelpers miscHelpers, final BeaconStateAccessors beaconStateAccessors) {
-    this.miscHelpers = miscHelpers;
-    this.beaconStateAccessors = beaconStateAccessors;
-  }
-
-  public boolean verifyProposerSlashingSignature(
-      final Fork fork,
-      final BeaconState state,
-      final ProposerSlashing proposerSlashing,
-      final BLSSignatureVerifier signatureVerifier) {
-
-    final BeaconBlockHeader header1 = proposerSlashing.getHeader1().getMessage();
-    final BeaconBlockHeader header2 = proposerSlashing.getHeader2().getMessage();
-
-    Optional<BLSPublicKey> maybePublicKey =
-        beaconStateAccessors.getValidatorPubKey(state, header1.getProposerIndex());
-    if (maybePublicKey.isEmpty()) {
-      return false;
-    }
-    BLSPublicKey publicKey = maybePublicKey.get();
-
-    if (!signatureVerifier.verify(
-        publicKey,
-        miscHelpers.computeSigningRoot(
-            header1,
-            beaconStateAccessors.getDomain(
-                Domain.BEACON_PROPOSER,
-                miscHelpers.computeEpochAtSlot(header1.getSlot()),
-                fork,
-                state.getGenesisValidatorsRoot())),
-        proposerSlashing.getHeader1().getSignature())) {
-      LOG.trace("Header1 signature is invalid {}", header1);
-      return false;
+    public OperationSignatureVerifier(
+            final MiscHelpers miscHelpers, final BeaconStateAccessors beaconStateAccessors) {
+        this.miscHelpers = miscHelpers;
+        this.beaconStateAccessors = beaconStateAccessors;
     }
 
-    if (!signatureVerifier.verify(
-        publicKey,
-        miscHelpers.computeSigningRoot(
-            header2,
-            beaconStateAccessors.getDomain(
-                Domain.BEACON_PROPOSER,
-                miscHelpers.computeEpochAtSlot(header2.getSlot()),
-                fork,
-                state.getGenesisValidatorsRoot())),
-        proposerSlashing.getHeader2().getSignature())) {
-      LOG.trace("Header2 signature is invalid {}", header1);
-      return false;
+    public boolean verifyProposerSlashingSignature(
+            final Fork fork,
+            final BeaconState state,
+            final ProposerSlashing proposerSlashing,
+            final BLSSignatureVerifier signatureVerifier) {
+
+        final BeaconBlockHeader header1 = proposerSlashing.getHeader1().getMessage();
+        final BeaconBlockHeader header2 = proposerSlashing.getHeader2().getMessage();
+
+        Optional<BLSPublicKey> maybePublicKey =
+                beaconStateAccessors.getValidatorPubKey(state, header1.getProposerIndex());
+        if (maybePublicKey.isEmpty()) {
+            return false;
+        }
+        BLSPublicKey publicKey = maybePublicKey.get();
+
+        if (!signatureVerifier.verify(
+                publicKey,
+                miscHelpers.computeSigningRoot(
+                        header1,
+                        beaconStateAccessors.getDomain(
+                                Domain.BEACON_PROPOSER,
+                                miscHelpers.computeEpochAtSlot(header1.getSlot()),
+                                fork,
+                                state.getGenesisValidatorsRoot())),
+                proposerSlashing.getHeader1().getSignature())) {
+            LOG.trace("Header1 signature is invalid {}", header1);
+            return false;
+        }
+
+        if (!signatureVerifier.verify(
+                publicKey,
+                miscHelpers.computeSigningRoot(
+                        header2,
+                        beaconStateAccessors.getDomain(
+                                Domain.BEACON_PROPOSER,
+                                miscHelpers.computeEpochAtSlot(header2.getSlot()),
+                                fork,
+                                state.getGenesisValidatorsRoot())),
+                proposerSlashing.getHeader2().getSignature())) {
+            LOG.trace("Header2 signature is invalid {}", header1);
+            return false;
+        }
+        return true;
     }
-    return true;
-  }
 
-  public boolean verifyVoluntaryExitSignature(
-      final BeaconState state,
-      final SignedVoluntaryExit signedExit,
-      final BLSSignatureVerifier signatureVerifier) {
-    final VoluntaryExit exit = signedExit.getMessage();
+    public boolean verifyVoluntaryExitSignature(
+            final BeaconState state,
+            final SignedVoluntaryExit signedExit,
+            final BLSSignatureVerifier signatureVerifier) {
+        final VoluntaryExit exit = signedExit.getMessage();
 
-    final Optional<BLSPublicKey> maybePublicKey =
-        beaconStateAccessors.getValidatorPubKey(state, exit.getValidatorIndex());
-    if (maybePublicKey.isEmpty()) {
-      return false;
+        final Optional<BLSPublicKey> maybePublicKey =
+                beaconStateAccessors.getValidatorPubKey(state, exit.getValidatorIndex());
+        if (maybePublicKey.isEmpty()) {
+            return false;
+        }
+
+        final Bytes32 domain =
+                beaconStateAccessors.getVoluntaryExitDomain(
+                        exit.getEpoch(), state.getFork(), state.getGenesisValidatorsRoot());
+
+        final Bytes signingRoot = miscHelpers.computeSigningRoot(exit, domain);
+        return signatureVerifier.verify(maybePublicKey.get(), signingRoot, signedExit.getSignature());
     }
 
-    final Bytes32 domain =
-        beaconStateAccessors.getVoluntaryExitDomain(
-            exit.getEpoch(), state.getFork(), state.getGenesisValidatorsRoot());
+    public boolean verifyBlsToExecutionChangeSignature(
+            final BeaconState state,
+            final SignedBlsToExecutionChange signedBlsToExecutionChange,
+            final BLSSignatureVerifier signatureVerifier) {
+        final BlsToExecutionChange addressChange = signedBlsToExecutionChange.getMessage();
+        final BLSPublicKey publicKey = addressChange.getFromBlsPubkey();
+        final Bytes signingRoot = calculateBlsToExecutionChangeSigningRoot(state, addressChange);
+        final BLSSignature signature = signedBlsToExecutionChange.getSignature();
 
-    final Bytes signingRoot = miscHelpers.computeSigningRoot(exit, domain);
-    return signatureVerifier.verify(maybePublicKey.get(), signingRoot, signedExit.getSignature());
-  }
+        return signatureVerifier.verify(publicKey, signingRoot, signature);
+    }
 
-  public boolean verifyBlsToExecutionChangeSignature(
-      final BeaconState state,
-      final SignedBlsToExecutionChange signedBlsToExecutionChange,
-      final BLSSignatureVerifier signatureVerifier) {
-    final BlsToExecutionChange addressChange = signedBlsToExecutionChange.getMessage();
-    final BLSPublicKey publicKey = addressChange.getFromBlsPubkey();
-    final Bytes signingRoot = calculateBlsToExecutionChangeSigningRoot(state, addressChange);
-    final BLSSignature signature = signedBlsToExecutionChange.getSignature();
+    public SafeFuture<Boolean> verifyBlsToExecutionChangeSignatureAsync(
+            final BeaconState state,
+            final SignedBlsToExecutionChange signedBlsToExecutionChange,
+            final AsyncBLSSignatureVerifier signatureVerifier) {
+        final BlsToExecutionChange addressChange = signedBlsToExecutionChange.getMessage();
+        final BLSPublicKey publicKey = addressChange.getFromBlsPubkey();
+        final Bytes signingRoot = calculateBlsToExecutionChangeSigningRoot(state, addressChange);
+        final BLSSignature signature = signedBlsToExecutionChange.getSignature();
 
-    return signatureVerifier.verify(publicKey, signingRoot, signature);
-  }
+        return signatureVerifier.verify(publicKey, signingRoot, signature);
+    }
 
-  public SafeFuture<Boolean> verifyBlsToExecutionChangeSignatureAsync(
-      final BeaconState state,
-      final SignedBlsToExecutionChange signedBlsToExecutionChange,
-      final AsyncBLSSignatureVerifier signatureVerifier) {
-    final BlsToExecutionChange addressChange = signedBlsToExecutionChange.getMessage();
-    final BLSPublicKey publicKey = addressChange.getFromBlsPubkey();
-    final Bytes signingRoot = calculateBlsToExecutionChangeSigningRoot(state, addressChange);
-    final BLSSignature signature = signedBlsToExecutionChange.getSignature();
+    private Bytes calculateBlsToExecutionChangeSigningRoot(
+            final BeaconState state, final BlsToExecutionChange addressChange) {
+        final Bytes32 domain =
+                miscHelpers.computeDomain(Domain.BLS_TO_EXECUTION_CHANGE, state.getGenesisValidatorsRoot());
+        return miscHelpers.computeSigningRoot(addressChange, domain);
+    }
 
-    return signatureVerifier.verify(publicKey, signingRoot, signature);
-  }
+    public boolean verifyRandaoCommitmentRegistrationSignature(
+            final BeaconState state,
+            final SignedRandaoCommitmentRegistration signedRegistration,
+            final BLSSignatureVerifier signatureVerifier) {
+        final RandaoCommitmentRegistration registration = signedRegistration.getMessage();
+        final Optional<BLSPublicKey> validatorPubKey =
+                beaconStateAccessors.getValidatorPubKey(state, registration.getValidatorIndex());
+        if (validatorPubKey.isEmpty()) {
+            return false;
+        }
+        final Bytes signingRoot =
+                calculateRandaoCommitmentRegistrationSigningRoot(state, registration);
+        return signatureVerifier.verify(
+                validatorPubKey.get(), signingRoot, signedRegistration.getSignature());
+    }
 
-  private Bytes calculateBlsToExecutionChangeSigningRoot(
-      final BeaconState state, final BlsToExecutionChange addressChange) {
-    final Bytes32 domain =
-        miscHelpers.computeDomain(Domain.BLS_TO_EXECUTION_CHANGE, state.getGenesisValidatorsRoot());
-    return miscHelpers.computeSigningRoot(addressChange, domain);
-  }
+    public SafeFuture<Boolean> verifyRandaoCommitmentRegistrationSignature(
+            final BeaconState state,
+            final SignedRandaoCommitmentRegistration signedRegistration,
+            final AsyncBLSSignatureVerifier signatureVerifier) {
+        final RandaoCommitmentRegistration registration = signedRegistration.getMessage();
+        final Optional<BLSPublicKey> validatorPubKey =
+                beaconStateAccessors.getValidatorPubKey(state, registration.getValidatorIndex());
+        if (validatorPubKey.isEmpty()) {
+            return SafeFuture.completedFuture(false);
+        }
+        final Bytes signingRoot =
+                calculateRandaoCommitmentRegistrationSigningRoot(state, registration);
+        return signatureVerifier.verify(
+                validatorPubKey.get(), signingRoot, signedRegistration.getSignature());
+    }
 
-  public boolean verifyExecutionPayloadBidSignature(
-      final BeaconState state,
-      final SignedExecutionPayloadBid signedBid,
-      final BLSSignatureVerifier signatureVerifier) {
-    final BLSPublicKey builderPubkey =
-        BeaconStateGloas.required(state)
-            .getBuilders()
-            .get(signedBid.getMessage().getBuilderIndex().intValue())
-            .getPublicKey();
-    final Bytes signingRoot =
-        calculateExecutionPayloadBidSigningRoot(state, signedBid.getMessage());
-    return signatureVerifier.verify(builderPubkey, signingRoot, signedBid.getSignature());
-  }
+    private Bytes calculateRandaoCommitmentRegistrationSigningRoot(
+            final BeaconState state, final RandaoCommitmentRegistration registration) {
+        final Bytes32 domain =
+                miscHelpers.computeDomain(
+                        Domain.DOMAIN_RANDAO_COMMITMENT_REGISTRATION, state.getGenesisValidatorsRoot());
+        return miscHelpers.computeSigningRoot(registration, domain);
+    }
 
-  private Bytes calculateExecutionPayloadBidSigningRoot(
-      final BeaconState state, final ExecutionPayloadBid bid) {
-    final Bytes32 domain =
-        beaconStateAccessors.getDomain(
-            state.getForkInfo(),
-            Domain.BEACON_BUILDER,
-            miscHelpers.computeEpochAtSlot(state.getSlot()));
-    return miscHelpers.computeSigningRoot(bid, domain);
-  }
+    public boolean verifyExecutionPayloadBidSignature(
+            final BeaconState state,
+            final SignedExecutionPayloadBid signedBid,
+            final BLSSignatureVerifier signatureVerifier) {
+        final BLSPublicKey builderPubkey =
+                BeaconStateGloas.required(state)
+                        .getBuilders()
+                        .get(signedBid.getMessage().getBuilderIndex().intValue())
+                        .getPublicKey();
+        final Bytes signingRoot =
+                calculateExecutionPayloadBidSigningRoot(state, signedBid.getMessage());
+        return signatureVerifier.verify(builderPubkey, signingRoot, signedBid.getSignature());
+    }
+
+    private Bytes calculateExecutionPayloadBidSigningRoot(
+            final BeaconState state, final ExecutionPayloadBid bid) {
+        final Bytes32 domain =
+                beaconStateAccessors.getDomain(
+                        state.getForkInfo(),
+                        Domain.BEACON_BUILDER,
+                        miscHelpers.computeEpochAtSlot(state.getSlot()));
+        return miscHelpers.computeSigningRoot(bid, domain);
+    }
 }

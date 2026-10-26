@@ -1,5 +1,5 @@
 /*
- * Copyright Consensys Software Inc., 2026
+ * Copyright (c) 2026 Consensys Incorporated. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with
  * the License. You may obtain a copy of the License at
@@ -327,7 +327,7 @@ public abstract class AttestationUtil {
     final UInt64 startSlot = miscHelpers.computeStartSlotAtEpoch(epoch);
     final Bytes32 epochBoundaryBlockRoot =
         startSlot.compareTo(slot) == 0 || state.getSlot().compareTo(startSlot) <= 0
-            ? block.getRoot()
+            ? beaconBlockRoot
             : beaconStateAccessors.getBlockRootAtSlot(state, startSlot);
     final Checkpoint source = state.getCurrentJustifiedCheckpoint();
     final Checkpoint target = new Checkpoint(epoch, epochBoundaryBlockRoot);

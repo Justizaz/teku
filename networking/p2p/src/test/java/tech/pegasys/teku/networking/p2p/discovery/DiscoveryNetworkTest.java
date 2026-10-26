@@ -1,5 +1,5 @@
 /*
- * Copyright Consensys Software Inc., 2026
+ * Copyright (c) 2026 Consensys Incorporated. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with
  * the License. You may obtain a copy of the License at
@@ -438,7 +438,7 @@ class DiscoveryNetworkTest {
     return new DiscoveryPeer(
         BLSPublicKey.empty().toSSZBytes(),
         Bytes32.ZERO,
-        InetSocketAddress.createUnresolved("yo", 9999),
+        Optional.of(InetSocketAddress.createUnresolved("yo", 9999)),
         Optional.empty(),
         maybeForkId,
         SszBitvectorSchema.create(spec.getNetworkingConfig().getAttestationSubnetCount())

@@ -1,5 +1,5 @@
 /*
- * Copyright Consensys Software Inc., 2026
+ * Copyright (c) 2026 Consensys Incorporated. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with
  * the License. You may obtain a copy of the License at
@@ -56,6 +56,7 @@ import tech.pegasys.teku.spec.TestSpecFactory;
 import tech.pegasys.teku.spec.datastructures.attestation.ValidatableAttestation;
 import tech.pegasys.teku.spec.datastructures.blocks.SignedBeaconBlock;
 import tech.pegasys.teku.spec.datastructures.epbs.versions.gloas.PayloadAttestationMessage;
+import tech.pegasys.teku.spec.datastructures.forkchoice.InclusionListStore;
 import tech.pegasys.teku.spec.executionlayer.ExecutionLayerChannelStub;
 import tech.pegasys.teku.spec.generator.ChainBuilder;
 import tech.pegasys.teku.spec.logic.common.statetransition.results.BlockImportResult;
@@ -65,6 +66,7 @@ import tech.pegasys.teku.statetransition.blobs.BlockEventsListenerRouter;
 import tech.pegasys.teku.statetransition.block.BlockImportChannel;
 import tech.pegasys.teku.statetransition.block.BlockImporter;
 import tech.pegasys.teku.statetransition.block.BlockManager;
+import tech.pegasys.teku.statetransition.block.FutureBlockPool;
 import tech.pegasys.teku.statetransition.block.ReceivedBlockEventsChannel;
 import tech.pegasys.teku.statetransition.datacolumns.DasSamplerBasic;
 import tech.pegasys.teku.statetransition.datacolumns.DataAvailabilitySampler;
@@ -73,7 +75,6 @@ import tech.pegasys.teku.statetransition.execution.ReceivedExecutionPayloadEvent
 import tech.pegasys.teku.statetransition.forkchoice.ForkChoice;
 import tech.pegasys.teku.statetransition.forkchoice.MergeTransitionBlockValidator;
 import tech.pegasys.teku.statetransition.forkchoice.NoopForkChoiceNotifier;
-import tech.pegasys.teku.statetransition.util.FutureItems;
 import tech.pegasys.teku.statetransition.util.PendingAttestationPool;
 import tech.pegasys.teku.statetransition.util.PendingBlockPool;
 import tech.pegasys.teku.statetransition.util.PendingPool;
@@ -85,6 +86,7 @@ import tech.pegasys.teku.storage.api.FinalizedCheckpointChannel;
 import tech.pegasys.teku.storage.client.ChainUpdater;
 import tech.pegasys.teku.storage.client.MemoryOnlyRecentChainData;
 import tech.pegasys.teku.storage.client.RecentChainData;
+import tech.pegasys.teku.storage.store.StoreConfig;
 import tech.pegasys.teku.weaksubjectivity.WeakSubjectivityFactory;
 
 public class SyncingNodeManager {
@@ -140,6 +142,7 @@ public class SyncingNodeManager {
             spec,
             new InlineEventThread(),
             recentChainData,
+            new InclusionListStore(StoreConfig.DEFAULT_INCLUSION_LIST_CACHE_SIZE),
             new NoopForkChoiceNotifier(),
             transitionBlockValidator,
             metricsSystem);
@@ -164,8 +167,8 @@ public class SyncingNodeManager {
         pendingAttestationPool.getAttestationsWaitingForBlock();
     final PendingPool<PayloadAttestationMessage> pendingPayloadAttestations =
         poolFactory.createPendingPoolForPayloadAttestations(spec, 100);
-    final FutureItems<SignedBeaconBlock> futureBlocks =
-        FutureItems.create(SignedBeaconBlock::getSlot, mock(SettableLabelledGauge.class), "blocks");
+    final FutureBlockPool futureBlocks =
+        poolFactory.createFutureBlockPool(spec, mock(SettableLabelledGauge.class));
     final Map<Bytes32, BlockImportResult> invalidBlockRoots = LimitedMap.createSynchronizedLRU(500);
 
     final BlockImporter blockImporter =

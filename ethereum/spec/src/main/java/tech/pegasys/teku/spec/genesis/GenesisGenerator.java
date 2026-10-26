@@ -1,5 +1,5 @@
 /*
- * Copyright Consensys Software Inc., 2026
+ * Copyright (c) 2026 Consensys Incorporated. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with
  * the License. You may obtain a copy of the License at
@@ -45,6 +45,7 @@ import tech.pegasys.teku.spec.datastructures.state.Fork;
 import tech.pegasys.teku.spec.datastructures.state.Validator;
 import tech.pegasys.teku.spec.datastructures.state.beaconstate.BeaconState;
 import tech.pegasys.teku.spec.datastructures.state.beaconstate.MutableBeaconState;
+import tech.pegasys.teku.spec.datastructures.state.beaconstate.common.BeaconStateFields;
 import tech.pegasys.teku.spec.datastructures.state.beaconstate.versions.electra.BeaconStateElectra;
 import tech.pegasys.teku.spec.datastructures.state.beaconstate.versions.electra.MutableBeaconStateElectra;
 import tech.pegasys.teku.spec.datastructures.state.beaconstate.versions.fulu.MutableBeaconStateFulu;
@@ -72,6 +73,7 @@ public class GenesisGenerator {
   private final SszMutableList<DepositData> depositDataList;
 
   private int activeValidatorCount = 0;
+  private Bytes32 eth1BlockHash = Bytes32.ZERO;
 
   public GenesisGenerator(final SpecVersion genesisSpec, final Fork genesisFork) {
     this.genesisSpec = genesisSpec;
@@ -101,13 +103,21 @@ public class GenesisGenerator {
   public void updateCandidateState(
       final Bytes32 eth1BlockHash, final UInt64 eth1Timestamp, final List<Deposit> deposits) {
     updateGenesisTime(eth1Timestamp);
+    this.eth1BlockHash = eth1BlockHash;
 
-    state.setEth1Data(
-        new Eth1Data(
-            Bytes32.ZERO, UInt64.valueOf(depositDataList.size() + deposits.size()), eth1BlockHash));
-    if (genesisSpec.getMilestone().isGreaterThanOrEqualTo(SpecMilestone.ELECTRA)) {
-      MutableBeaconStateElectra.required(state)
-          .setDepositRequestsStartIndex(UNSET_DEPOSIT_REQUESTS_START_INDEX);
+    // The Eth1 fields were removed in Heze (EIP-8015)
+    if (hasEth1Fields()) {
+      final UInt64 depositCount = UInt64.valueOf(depositDataList.size() + deposits.size());
+      state.setEth1Data(new Eth1Data(Bytes32.ZERO, depositCount, eth1BlockHash));
+      if (genesisSpec.getMilestone().isGreaterThanOrEqualTo(SpecMilestone.FULU)) {
+        // Fulu removed the Eth1 deposit bridge (consensus-specs #4704), so genesis starts deposit
+        // requests right after the genesis deposits
+        MutableBeaconStateElectra.required(state).setDepositRequestsStartIndex(depositCount);
+      } else if (genesisSpec.getMilestone() == SpecMilestone.ELECTRA) {
+        // Electra genesis leaves the index unset until the first deposit request sets it (EIP-6110)
+        MutableBeaconStateElectra.required(state)
+            .setDepositRequestsStartIndex(UNSET_DEPOSIT_REQUESTS_START_INDEX);
+      }
     }
 
     // Process deposits
@@ -185,16 +195,20 @@ public class GenesisGenerator {
 
       final MutableBeaconStateGloas stateGloas = MutableBeaconStateGloas.required(state);
 
+      // The genesis bid names the EL genesis block as its parent and commits to no payload of its
+      // own (empty block hash), as the consensus-specs genesis helper and eth-beacon-genesis do.
+      // Since latest_block_hash != latest_execution_payload_bid.block_hash, the genesis block is
+      // EMPTY: the slot-1 block builds on EMPTY(genesis), whose execution hash is the EL genesis
+      // hash, and no execution payload is ever required for genesis.
       stateGloas.setLatestBlockHash(eth1BlockHash);
-      final Bytes32 parentBlockHash = eth1BlockHash;
 
       stateGloas.setLatestExecutionPayloadBid(
           schemaDefinitionsGloas
               .getExecutionPayloadBidSchema()
               .create(
-                  parentBlockHash,
+                  eth1BlockHash,
                   Bytes32.ZERO,
-                  parentBlockHash,
+                  Bytes32.ZERO,
                   Bytes32.ZERO,
                   Bytes20.ZERO,
                   UInt64.ZERO,
@@ -314,13 +328,20 @@ public class GenesisGenerator {
         .ifPresent(syncCommitteeUtil -> syncCommitteeUtil.setGenesisStateSyncCommittees(state));
   }
 
+  private boolean hasEth1Fields() {
+    return state.getSchema().getFieldIndex(BeaconStateFields.ETH1_DATA) >= 0;
+  }
+
   private void calculateRandaoMixes() {
     for (int i = 0; i < state.getRandaoMixes().size(); i++) {
-      state.getRandaoMixes().setElement(i, state.getEth1Data().getBlockHash());
+      state.getRandaoMixes().setElement(i, eth1BlockHash);
     }
   }
 
   private void calculateDepositRoot() {
+    if (!hasEth1Fields()) {
+      return;
+    }
     final Eth1Data eth1Data = state.getEth1Data();
     state.setEth1Data(
         new Eth1Data(

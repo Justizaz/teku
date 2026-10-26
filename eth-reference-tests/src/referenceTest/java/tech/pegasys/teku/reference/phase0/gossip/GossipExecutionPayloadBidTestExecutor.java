@@ -1,5 +1,5 @@
 /*
- * Copyright Consensys Software Inc., 2026
+ * Copyright (c) 2026 Consensys Incorporated. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with
  * the License. You may obtain a copy of the License at
@@ -31,6 +31,7 @@ import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import org.apache.tuweni.bytes.Bytes32;
 import org.opentest4j.TestAbortedException;
+import tech.pegasys.teku.bls.BLSSignatureVerifier;
 import tech.pegasys.teku.ethtests.finder.TestDefinition;
 import tech.pegasys.teku.infrastructure.async.SafeFuture;
 import tech.pegasys.teku.infrastructure.unsigned.UInt64;
@@ -46,11 +47,14 @@ import tech.pegasys.teku.spec.datastructures.epbs.versions.gloas.SignedExecution
 import tech.pegasys.teku.spec.datastructures.epbs.versions.gloas.SignedProposerPreferences;
 import tech.pegasys.teku.spec.datastructures.epbs.versions.gloas.SignedProposerPreferencesSchema;
 import tech.pegasys.teku.spec.datastructures.execution.ExecutionPayload;
+import tech.pegasys.teku.spec.datastructures.execution.versions.heze.SignedInclusionList;
 import tech.pegasys.teku.spec.datastructures.state.Checkpoint;
 import tech.pegasys.teku.spec.datastructures.state.beaconstate.BeaconState;
 import tech.pegasys.teku.spec.executionlayer.PayloadStatus;
 import tech.pegasys.teku.spec.logic.common.statetransition.results.BlockImportResult;
+import tech.pegasys.teku.spec.logic.common.util.AsyncBLSSignatureVerifier;
 import tech.pegasys.teku.spec.schemas.SchemaDefinitionsGloas;
+import tech.pegasys.teku.spec.schemas.SchemaDefinitionsHeze;
 import tech.pegasys.teku.statetransition.OperationAddedSubscriber;
 import tech.pegasys.teku.statetransition.block.ReceivedBlockEventsChannel;
 import tech.pegasys.teku.statetransition.execution.ProposerPreferencesManager;
@@ -62,6 +66,7 @@ import tech.pegasys.teku.statetransition.validation.ExecutionPayloadGossipValida
 import tech.pegasys.teku.statetransition.validation.GossipValidationHelper;
 import tech.pegasys.teku.statetransition.validation.InternalValidationResult;
 import tech.pegasys.teku.statetransition.validation.ProposerPreferencesGossipValidator;
+import tech.pegasys.teku.statetransition.validation.SignedInclusionListValidator;
 import tech.pegasys.teku.storage.client.RecentChainData;
 import tech.pegasys.teku.storage.store.UpdatableStore;
 
@@ -175,7 +180,7 @@ public class GossipExecutionPayloadBidTestExecutor implements TestExecutor {
     // when that time is earlier than the store's time (which only moves forward). This is necessary
     // for the disparity-boundary tests, where blocks must be imported after their slot starts but
     // messages are validated at a time before that slot starts.
-    final UInt64[] validationTimeMs = {UInt64.valueOf(metaData.getCurrentTimeMs())};
+    final UInt64[] validationTimeMs = {UInt64.ZERO};
 
     // Models the spec's seen.execution_payloads: a gossip level cache of payloads that passed
     // gossip validation, keyed by execution block hash. It is deliberately not the fork choice
@@ -290,7 +295,21 @@ public class GossipExecutionPayloadBidTestExecutor implements TestExecutor {
             spec, gossipValidationHelper, blockGossipValidator, invalidBlockRoots);
     final ExecutionPayloadBidGossipValidator bidValidator =
         new ExecutionPayloadBidGossipValidator(
-            spec, gossipValidationHelper, proposerPreferencesManager, MIN_BID_INCREMENT_PERCENTAGE);
+            spec,
+            gossipValidationHelper,
+            proposerPreferencesManager,
+            MIN_BID_INCREMENT_PERCENTAGE,
+            ctx.inclusionListStore);
+
+    final SignedInclusionListValidator inclusionListValidator =
+        new SignedInclusionListValidator(
+            spec,
+            ctx.recentChainData,
+            gossipValidationHelper,
+            AsyncBLSSignatureVerifier.wrap(
+                signatureVerificationDisabled
+                    ? BLSSignatureVerifier.NOOP
+                    : BLSSignatureVerifier.SIMPLE));
 
     for (final GossipExecutionPayloadBidMetaData.Message message : metaData.getMessages()) {
       validationTimeMs[0] = UInt64.valueOf(message.getCurrentTimeMs());
@@ -319,6 +338,18 @@ public class GossipExecutionPayloadBidTestExecutor implements TestExecutor {
           final ExecutionPayload payload = signedEnvelope.getMessage().getPayload();
           seenExecutionPayloadGasLimits.put(payload.getBlockHash(), payload.getGasLimit());
           applyExecutionPayloadToStore(spec, ctx.recentChainData, ctx.forkChoice, signedEnvelope);
+        }
+      } else if (messageName.startsWith("inclusion_list_")) {
+        final SignedInclusionList signedInclusionList =
+            loadSsz(
+                testDefinition,
+                messageName + ".ssz_snappy",
+                SchemaDefinitionsHeze.required(schemaDefinitions).getSignedInclusionListSchema()
+                    ::sszDeserialize);
+        result = safeJoin(inclusionListValidator.validate(signedInclusionList));
+        // As InclusionListManager does, record accepted lists for the bid's inclusivity check
+        if (result.isAccept()) {
+          safeJoin(ctx.forkChoice.onInclusionList(signedInclusionList));
         }
       } else if (messageName.startsWith("execution_payload_bid_")) {
         final SignedExecutionPayloadBid signedBid =
@@ -373,9 +404,6 @@ public class GossipExecutionPayloadBidTestExecutor implements TestExecutor {
     @JsonProperty(value = "messages", required = true)
     private List<Message> messages;
 
-    @JsonProperty(value = "current_time_ms", required = true)
-    private long currentTimeMs;
-
     @JsonProperty(value = "bls_setting", defaultValue = "0")
     private int blsSetting;
 
@@ -388,10 +416,6 @@ public class GossipExecutionPayloadBidTestExecutor implements TestExecutor {
 
     public List<Message> getMessages() {
       return messages;
-    }
-
-    public long getCurrentTimeMs() {
-      return currentTimeMs;
     }
 
     public BlsSetting getBlsSetting() {

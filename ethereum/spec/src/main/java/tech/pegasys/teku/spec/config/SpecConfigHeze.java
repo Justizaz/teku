@@ -1,5 +1,5 @@
 /*
- * Copyright Consensys Software Inc., 2026
+ * Copyright (c) 2026 Consensys Incorporated. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with
  * the License. You may obtain a copy of the License at
@@ -19,11 +19,11 @@ public interface SpecConfigHeze extends SpecConfigGloas, NetworkingSpecConfigHez
 
   static SpecConfigHeze required(final SpecConfig specConfig) {
     return specConfig
-        .toVersionHeze()
-        .orElseThrow(
-            () ->
-                new IllegalArgumentException(
-                    "Expected Heze spec config but got: " + specConfig.getClass().getSimpleName()));
+            .toVersionHeze()
+            .orElseThrow(
+                    () ->
+                            new IllegalArgumentException(
+                                    "Expected Heze spec config but got: " + specConfig.getClass().getSimpleName()));
   }
 
   int getInclusionListDueBps();

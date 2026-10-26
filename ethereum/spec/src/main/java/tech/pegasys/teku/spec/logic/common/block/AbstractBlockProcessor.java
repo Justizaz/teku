@@ -1,5 +1,5 @@
 /*
- * Copyright Consensys Software Inc., 2026
+ * Copyright (c) 2026 Consensys Incorporated. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with
  * the License. You may obtain a copy of the License at
@@ -46,6 +46,7 @@ import tech.pegasys.teku.spec.datastructures.blocks.BeaconBlockSummary;
 import tech.pegasys.teku.spec.datastructures.blocks.Eth1Data;
 import tech.pegasys.teku.spec.datastructures.blocks.SignedBeaconBlock;
 import tech.pegasys.teku.spec.datastructures.blocks.blockbody.BeaconBlockBody;
+import tech.pegasys.teku.spec.datastructures.execution.versions.heze.InclusionList;
 import tech.pegasys.teku.spec.datastructures.operations.Attestation;
 import tech.pegasys.teku.spec.datastructures.operations.AttestationData;
 import tech.pegasys.teku.spec.datastructures.operations.AttesterSlashing;
@@ -132,7 +133,8 @@ public abstract class AbstractBlockProcessor implements BlockProcessor {
       final SignedBeaconBlock signedBlock,
       final BeaconState blockSlotState,
       final IndexedAttestationCache indexedAttestationCache,
-      final Optional<? extends OptimisticExecutionPayloadExecutor> payloadExecutor)
+      final Optional<? extends OptimisticExecutionPayloadExecutor> payloadExecutor,
+      final Optional<List<InclusionList>> inclusionList)
       throws StateTransitionException {
     final BatchSignatureVerifier signatureVerifier = specConfig.createBatchSignatureVerifier();
     final BeaconState result =
@@ -141,7 +143,8 @@ public abstract class AbstractBlockProcessor implements BlockProcessor {
             blockSlotState,
             indexedAttestationCache,
             signatureVerifier,
-            payloadExecutor);
+            payloadExecutor,
+            inclusionList);
     if (!signatureVerifier.batchVerify()) {
       throw new StateTransitionException(
           "Batch signature verification failed for block " + signedBlock.toLogString());
@@ -155,7 +158,8 @@ public abstract class AbstractBlockProcessor implements BlockProcessor {
       final BeaconState blockSlotState,
       final IndexedAttestationCache indexedAttestationCache,
       final BLSSignatureVerifier signatureVerifier,
-      final Optional<? extends OptimisticExecutionPayloadExecutor> payloadExecutor)
+      final Optional<? extends OptimisticExecutionPayloadExecutor> payloadExecutor,
+      final Optional<List<InclusionList>> inclusionList)
       throws StateTransitionException {
     try {
       final BlockValidationResult preValidationResult =
@@ -171,7 +175,8 @@ public abstract class AbstractBlockProcessor implements BlockProcessor {
               signedBlock.getMessage(),
               indexedAttestationCache,
               signatureVerifier,
-              payloadExecutor);
+              payloadExecutor,
+              inclusionList);
 
       final BlockValidationResult blockValidationResult =
           validateBlockPostProcessing(
@@ -318,11 +323,18 @@ public abstract class AbstractBlockProcessor implements BlockProcessor {
       final BeaconBlock block,
       final IndexedAttestationCache indexedAttestationCache,
       final BLSSignatureVerifier signatureVerifier,
-      final Optional<? extends OptimisticExecutionPayloadExecutor> payloadExecutor)
+      final Optional<? extends OptimisticExecutionPayloadExecutor> payloadExecutor,
+      final Optional<List<InclusionList>> inclusionLists)
       throws BlockProcessingException {
     return preState.updated(
         state -> {
-          processBlock(state, block, indexedAttestationCache, signatureVerifier, payloadExecutor);
+          processBlock(
+              state,
+              block,
+              indexedAttestationCache,
+              signatureVerifier,
+              payloadExecutor,
+              inclusionLists);
           BeaconStateCache.getSlotCaches(state).onBlockProcessed();
         });
   }
@@ -332,7 +344,8 @@ public abstract class AbstractBlockProcessor implements BlockProcessor {
       final BeaconBlock block,
       final IndexedAttestationCache indexedAttestationCache,
       final BLSSignatureVerifier signatureVerifier,
-      final Optional<? extends OptimisticExecutionPayloadExecutor> payloadExecutor)
+      final Optional<? extends OptimisticExecutionPayloadExecutor> payloadExecutor,
+      final Optional<List<InclusionList>> inclusionLists)
       throws BlockProcessingException {
     final UInt64 parentSlot = state.getLatestBlockHeader().getSlot();
     processBlockHeader(state, block);
@@ -417,6 +430,19 @@ public abstract class AbstractBlockProcessor implements BlockProcessor {
     return BlockValidationResult.SUCCESSFUL;
   }
 
+  @Override
+  public void processRandao(
+      final MutableBeaconState state,
+      final BeaconBlock block,
+      final BLSSignatureVerifier signatureVerifier)
+      throws BlockProcessingException {
+    final BlockValidationResult validationResult = verifyRandao(state, block, signatureVerifier);
+    if(!validationResult.isValid()) {
+      throw new BlockProcessingException(validationResult.getFailureReason());
+    }
+    processRandaoNoValidation(state, block.getBody());
+  }
+
   protected void processEth1Data(final MutableBeaconState state, final BeaconBlockBody body) {
     state.getEth1DataVotes().append(body.getEth1Data());
     final long voteCount = getVoteCount(state, body.getEth1Data());
@@ -453,10 +479,15 @@ public abstract class AbstractBlockProcessor implements BlockProcessor {
               state, body.getAttesterSlashings(), validatorExitContextSupplier);
           processAttestationsNoVerification(
               state, body.getAttestations(), indexedAttestationCache, parentSlot);
-          processDeposits(state, body.getDeposits());
+          processBodyDeposits(state, body);
           processVoluntaryExitsNoValidation(
               state, body.getVoluntaryExits(), validatorExitContextSupplier);
         });
+  }
+
+  protected void processBodyDeposits(final MutableBeaconState state, final BeaconBlockBody body)
+      throws BlockProcessingException {
+    processDeposits(state, body.getDeposits());
   }
 
   protected void verifyOutstandingDepositsAreProcessed(
@@ -504,19 +535,12 @@ public abstract class AbstractBlockProcessor implements BlockProcessor {
                 "process_proposer_slashings: %s",
                 invalidReason.map(OperationInvalidReason::describe).orElse(""));
 
-            removeBuilderPendingPayment(proposerSlashing, state);
-
             beaconStateMutators.slashValidator(
                 state,
                 proposerSlashing.getHeader1().getMessage().getProposerIndex().intValue(),
                 validatorExitContextSupplier);
           }
         });
-  }
-
-  protected void removeBuilderPendingPayment(
-      final ProposerSlashing proposerSlashing, final MutableBeaconState state) {
-    // NO-OP until Gloas
   }
 
   protected BlockValidationResult verifyProposerSlashings(

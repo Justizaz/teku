@@ -1,5 +1,5 @@
 /*
- * Copyright Consensys Software Inc., 2026
+ * Copyright (c) 2026 Consensys Incorporated. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with
  * the License. You may obtain a copy of the License at
@@ -13,6 +13,7 @@
 
 package tech.pegasys.teku.spec.logic.versions.bellatrix.block;
 
+import java.util.List;
 import java.util.Optional;
 import java.util.function.Supplier;
 import tech.pegasys.teku.bls.BLSSignatureVerifier;
@@ -27,6 +28,7 @@ import tech.pegasys.teku.spec.datastructures.blocks.blockbody.versions.bellatrix
 import tech.pegasys.teku.spec.datastructures.execution.ExecutionPayload;
 import tech.pegasys.teku.spec.datastructures.execution.ExecutionPayloadHeader;
 import tech.pegasys.teku.spec.datastructures.execution.NewPayloadRequest;
+import tech.pegasys.teku.spec.datastructures.execution.versions.heze.InclusionList;
 import tech.pegasys.teku.spec.datastructures.operations.SignedBlsToExecutionChange;
 import tech.pegasys.teku.spec.datastructures.state.beaconstate.BeaconState;
 import tech.pegasys.teku.spec.datastructures.state.beaconstate.MutableBeaconState;
@@ -85,7 +87,8 @@ public class BlockProcessorBellatrix extends BlockProcessorAltair {
       final BeaconBlock block,
       final IndexedAttestationCache indexedAttestationCache,
       final BLSSignatureVerifier signatureVerifier,
-      final Optional<? extends OptimisticExecutionPayloadExecutor> payloadExecutor)
+      final Optional<? extends OptimisticExecutionPayloadExecutor> payloadExecutor,
+      final Optional<List<InclusionList>> inclusionLists)
       throws BlockProcessingException {
     final MutableBeaconStateBellatrix state = MutableBeaconStateBellatrix.required(genericState);
     final BeaconBlockBody blockBody = block.getBody();
@@ -108,7 +111,7 @@ public class BlockProcessorBellatrix extends BlockProcessorAltair {
       // Bellatrix -> process_execution_payload
       // Capella -> process_execution_payload + process_withdrawals
       // Gloas -> process_withdrawals + process_execution_payload_bid
-      executionProcessing(genericState, block, payloadExecutor);
+      executionProcessing(genericState, block, payloadExecutor, inclusionLists);
     }
     processRandaoNoValidation(state, block.getBody());
     processEth1Data(state, block.getBody());
@@ -121,19 +124,21 @@ public class BlockProcessorBellatrix extends BlockProcessorAltair {
   public void executionProcessing(
       final MutableBeaconState genericState,
       final BeaconBlock beaconBlock,
-      final Optional<? extends OptimisticExecutionPayloadExecutor> payloadExecutor)
+      final Optional<? extends OptimisticExecutionPayloadExecutor> payloadExecutor,
+      final Optional<List<InclusionList>> inclusionLists)
       throws BlockProcessingException {
-    processExecutionPayload(genericState, beaconBlock.getBody(), payloadExecutor);
+    processExecutionPayload(genericState, beaconBlock.getBody(), payloadExecutor, inclusionLists);
   }
 
   @Override
   public void processExecutionPayload(
       final MutableBeaconState genericState,
       final BeaconBlockBody beaconBlockBody,
-      final Optional<? extends OptimisticExecutionPayloadExecutor> payloadExecutor)
+      final Optional<? extends OptimisticExecutionPayloadExecutor> payloadExecutor,
+      final Optional<List<InclusionList>> inclusionLists)
       throws BlockProcessingException {
 
-    validateExecutionPayload(genericState, beaconBlockBody, payloadExecutor);
+    validateExecutionPayload(genericState, beaconBlockBody, payloadExecutor, inclusionLists);
 
     final MutableBeaconStateBellatrix state = MutableBeaconStateBellatrix.required(genericState);
     final ExecutionPayloadHeader executionPayloadHeader =
@@ -164,7 +169,8 @@ public class BlockProcessorBellatrix extends BlockProcessorAltair {
   public void validateExecutionPayload(
       final BeaconState genericState,
       final BeaconBlockBody beaconBlockBody,
-      final Optional<? extends OptimisticExecutionPayloadExecutor> payloadExecutor)
+      final Optional<? extends OptimisticExecutionPayloadExecutor> payloadExecutor,
+      final Optional<List<InclusionList>> inclusionLists)
       throws BlockProcessingException {
     final BeaconStateBellatrix state = BeaconStateBellatrix.required(genericState);
     final ExecutionPayloadHeader executionPayloadHeader =
@@ -173,7 +179,7 @@ public class BlockProcessorBellatrix extends BlockProcessorAltair {
 
     if (payloadExecutor.isPresent()) {
       final NewPayloadRequest payloadToExecute =
-          computeNewPayloadRequest(genericState, beaconBlockBody);
+          computeNewPayloadRequest(genericState, beaconBlockBody, inclusionLists);
       final boolean optimisticallyAccept =
           payloadExecutor
               .get()
@@ -214,7 +220,9 @@ public class BlockProcessorBellatrix extends BlockProcessorAltair {
 
   @Override
   public NewPayloadRequest computeNewPayloadRequest(
-      final BeaconState state, final BeaconBlockBody beaconBlockBody)
+      final BeaconState state,
+      final BeaconBlockBody beaconBlockBody,
+      final Optional<List<InclusionList>> inclusionLists)
       throws BlockProcessingException {
     final ExecutionPayload executionPayload = extractExecutionPayload(beaconBlockBody);
     return new NewPayloadRequest(executionPayload);

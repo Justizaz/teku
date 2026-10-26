@@ -1,5 +1,5 @@
 /*
- * Copyright Consensys Software Inc., 2026
+ * Copyright (c) 2026 Consensys Incorporated. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with
  * the License. You may obtain a copy of the License at
@@ -58,6 +58,7 @@ import tech.pegasys.teku.ethereum.json.types.beacon.StateValidatorData;
 import tech.pegasys.teku.ethereum.json.types.node.PeerCount;
 import tech.pegasys.teku.ethereum.json.types.validator.AttesterDuties;
 import tech.pegasys.teku.ethereum.json.types.validator.BeaconCommitteeSelectionProof;
+import tech.pegasys.teku.ethereum.json.types.validator.InclusionListDuties;
 import tech.pegasys.teku.ethereum.json.types.validator.PayloadTimelinessCommitteeDuties;
 import tech.pegasys.teku.ethereum.json.types.validator.ProposerDuties;
 import tech.pegasys.teku.ethereum.json.types.validator.ProposerDuty;
@@ -94,6 +95,10 @@ import tech.pegasys.teku.spec.datastructures.epbs.versions.gloas.SignedExecution
 import tech.pegasys.teku.spec.datastructures.epbs.versions.gloas.SignedExecutionPayloadEnvelope;
 import tech.pegasys.teku.spec.datastructures.epbs.versions.gloas.SignedExecutionPayloadEnvelopeContents;
 import tech.pegasys.teku.spec.datastructures.epbs.versions.gloas.SignedProposerPreferences;
+import tech.pegasys.teku.spec.datastructures.execution.Transaction;
+import tech.pegasys.teku.spec.datastructures.execution.versions.heze.InclusionList;
+import tech.pegasys.teku.spec.datastructures.execution.versions.heze.SignedInclusionList;
+import tech.pegasys.teku.spec.datastructures.forkchoice.ForkChoiceNode;
 import tech.pegasys.teku.spec.datastructures.genesis.GenesisData;
 import tech.pegasys.teku.spec.datastructures.metadata.BlockContainerAndMetaData;
 import tech.pegasys.teku.spec.datastructures.operations.Attestation;
@@ -133,9 +138,11 @@ import tech.pegasys.teku.validator.api.SendSignedBlockResult;
 import tech.pegasys.teku.validator.api.SubmitDataError;
 import tech.pegasys.teku.validator.api.ValidatorApiChannel;
 import tech.pegasys.teku.validator.coordinator.duties.AttesterDutiesGenerator;
+import tech.pegasys.teku.validator.coordinator.duties.InclusionListDutiesGenerator;
 import tech.pegasys.teku.validator.coordinator.performance.PerformanceTracker;
 import tech.pegasys.teku.validator.coordinator.publisher.BlockPublisher;
 import tech.pegasys.teku.validator.coordinator.publisher.ExecutionPayloadPublisher;
+import tech.pegasys.teku.validator.coordinator.publisher.SignedInclusionListPublisher;
 
 public class ValidatorApiHandler implements ValidatorApiChannel, SlotEventsChannel {
 
@@ -182,9 +189,12 @@ public class ValidatorApiHandler implements ValidatorApiChannel, SlotEventsChann
   private final ExecutionPayloadBidManager executionPayloadBidManager;
   private final ProposerPreferencesManager proposerPreferencesManager;
   private final ExecutionProofManager executionProofManager;
+  private final SignedInclusionListPublisher signedInclusionListPublisher;
   private final StakedBuilderClientProvider stakedBuilderClientProvider;
 
   private final AttesterDutiesGenerator attesterDutiesGenerator;
+  private final InclusionListDutiesGenerator inclusionListDutiesGenerator;
+  private final InclusionListFactory inclusionListFactory;
 
   public ValidatorApiHandler(
       final ChainDataProvider chainDataProvider,
@@ -216,6 +226,8 @@ public class ValidatorApiHandler implements ValidatorApiChannel, SlotEventsChann
       final ExecutionPayloadBidManager executionPayloadBidManager,
       final ProposerPreferencesManager proposerPreferencesManager,
       final ExecutionProofManager executionProofManager,
+      final SignedInclusionListPublisher signedInclusionListPublisher,
+      final InclusionListFactory inclusionListFactory,
       final StakedBuilderClientProvider stakedBuilderClientProvider) {
     this.blockProductionAndPublishingPerformanceFactory =
         blockProductionAndPublishingPerformanceFactory;
@@ -246,8 +258,11 @@ public class ValidatorApiHandler implements ValidatorApiChannel, SlotEventsChann
     this.executionPayloadBidManager = executionPayloadBidManager;
     this.proposerPreferencesManager = proposerPreferencesManager;
     this.executionProofManager = executionProofManager;
+    this.signedInclusionListPublisher = signedInclusionListPublisher;
+    this.inclusionListFactory = inclusionListFactory;
     this.stakedBuilderClientProvider = stakedBuilderClientProvider;
     this.attesterDutiesGenerator = new AttesterDutiesGenerator(spec);
+    this.inclusionListDutiesGenerator = new InclusionListDutiesGenerator(spec);
   }
 
   @Override
@@ -427,6 +442,53 @@ public class ValidatorApiHandler implements ValidatorApiChannel, SlotEventsChann
   }
 
   @Override
+  public SafeFuture<Optional<InclusionListDuties>> getInclusionListDuties(
+      final UInt64 epoch, final IntCollection validatorIndices) {
+    if (!spec.atEpoch(epoch).getMilestone().isGreaterThanOrEqualTo(SpecMilestone.HEZE)) {
+      return SafeFuture.failedFuture(
+          new IllegalArgumentException(
+              "Cannot request inclusion list duties for epochs prior to Heze fork."));
+    }
+    if (isSyncActive()) {
+      return NodeSyncingException.failedFuture();
+    }
+
+    final UInt64 currentEpoch = combinedChainDataClient.getCurrentEpoch();
+    if (epoch.isGreaterThan(currentEpoch.plus(1 + DUTY_EPOCH_TOLERANCE))) {
+      return SafeFuture.failedFuture(
+          new IllegalArgumentException(
+              String.format(
+                  "Inclusion List duties were requested %s epochs ahead, only up to 1 epoch ahead is supported.",
+                  epoch.minus(currentEpoch).toString())));
+    }
+
+    final UInt64 slot = spec.getEarliestQueryableSlotForBeaconCommitteeInTargetEpoch(epoch);
+
+    return combinedChainDataClient
+        .getStateAtSlotExact(slot)
+        .thenApply(
+            maybeState ->
+                maybeState.map(
+                    state ->
+                        inclusionListDutiesGenerator.getInclusionListDutiesFromIndicesAndState(
+                            state,
+                            epoch,
+                            validatorIndices,
+                            combinedChainDataClient.isChainHeadOptimistic())));
+  }
+
+  @Override
+  public SafeFuture<Optional<InclusionList>> createInclusionList(
+      final UInt64 slot, final UInt64 validatorIndex) {
+    return inclusionListFactory.createInclusionList(slot, validatorIndex);
+  }
+
+  @Override
+  public SafeFuture<Optional<List<Transaction>>> getInclusionList(final UInt64 slot) {
+    return inclusionListFactory.getInclusionList(slot);
+  }
+
+  @Override
   public SafeFuture<Optional<PeerCount>> getPeerCount() {
     return SafeFuture.completedFuture(Optional.of(networkDataProvider.getPeerCount()));
   }
@@ -584,59 +646,107 @@ public class ValidatorApiHandler implements ValidatorApiChannel, SlotEventsChann
     final SafeFuture<Optional<AttestationData>> result =
         forkChoiceTrigger
             .prepareForAttestationProduction(slot)
+            .thenApply(__ -> getAttestationHeadNode(slot))
             .thenCompose(
-                __ ->
-                    combinedChainDataClient
-                        .getSignedBlockAndStateInEffectAtSlot(slot)
+                selectedHead ->
+                    getAttestationHeadBlockAndState(
+                            slot, selectedHead.map(AttestationHeadSelection::forkChoiceNode))
                         .thenCompose(
                             maybeBlockAndState -> {
                               if (maybeBlockAndState.isEmpty()) {
                                 return SafeFuture.completedFuture(Optional.empty());
                               }
                               final SignedBlockAndState blockAndState = maybeBlockAndState.get();
-                              final BeaconBlock block = blockAndState.getBlock().getMessage();
-
                               // The head block must not be optimistically synced.
-                              if (combinedChainDataClient.isOptimisticBlock(block.getRoot())) {
+                              if (selectedHead
+                                  .map(AttestationHeadSelection::optimistic)
+                                  .orElseGet(
+                                      () ->
+                                          combinedChainDataClient.isOptimisticBlock(
+                                              blockAndState.getRoot()))) {
                                 return NodeSyncingException.failedFuture();
                               }
-                              if (blockAndState.getSlot().compareTo(minQuerySlot) < 0) {
-                                // The current effective block is too far in the past - so roll the
-                                // state forward to the current epoch. Ensures we have the latest
-                                // justified checkpoint
-                                return combinedChainDataClient
-                                    .getCheckpointState(epoch, blockAndState)
-                                    .thenApply(
-                                        checkpointState ->
-                                            Optional.of(
-                                                createAttestationData(
-                                                    block,
-                                                    checkpointState.getState(),
-                                                    slot,
-                                                    computeCommitteeIndexForAttestation(
-                                                        slot, block, committeeIndex))));
-                              } else {
-                                final AttestationData attestationData =
-                                    createAttestationData(
-                                        block,
-                                        blockAndState.getState(),
-                                        slot,
-                                        computeCommitteeIndexForAttestation(
-                                            slot, block, committeeIndex));
-                                return SafeFuture.completedFuture(Optional.of(attestationData));
-                              }
+                              return createAttestationData(
+                                  epoch,
+                                  minQuerySlot,
+                                  slot,
+                                  committeeIndex,
+                                  blockAndState,
+                                  selectedHead.map(AttestationHeadSelection::forkChoiceNode));
                             }));
     result.always(context::stopTimer);
     return result;
   }
 
-  private int computeCommitteeIndexForAttestation(
-      final UInt64 slot, final BeaconBlock block, final int committeeIndex) {
-    return spec.atSlot(slot)
-        .getForkChoiceUtil()
-        .computeCommitteeIndexForAttestation(
-            slot, block, committeeIndex, combinedChainDataClient.getStore());
+  private SafeFuture<Optional<SignedBlockAndState>> getAttestationHeadBlockAndState(
+      final UInt64 slot, final Optional<ForkChoiceNode> selectedHead) {
+    if (!spec.isExecutionPayloadEnvelopeAvailableAtSlot(slot)) {
+      return combinedChainDataClient.getSignedBlockAndStateInEffectAtSlot(slot);
+    }
+
+    return selectedHead
+        .map(node -> combinedChainDataClient.getStore().retrieveBlockAndState(node.blockRoot()))
+        .orElseGet(() -> SafeFuture.completedFuture(Optional.empty()));
   }
+
+  private SafeFuture<Optional<AttestationData>> createAttestationData(
+      final UInt64 epoch,
+      final UInt64 minQuerySlot,
+      final UInt64 slot,
+      final int committeeIndex,
+      final SignedBlockAndState blockAndState,
+      final Optional<ForkChoiceNode> selectedHead) {
+    final BeaconBlock block = blockAndState.getBlock().getMessage();
+    final int computedCommitteeIndex =
+        spec.atSlot(slot)
+            .getForkChoiceUtil()
+            .computeCommitteeIndexForAttestation(slot, block, committeeIndex, selectedHead);
+
+    if (blockAndState.getSlot().compareTo(minQuerySlot) < 0) {
+      // The current effective block is too far in the past - so roll the state forward to the
+      // current epoch. Ensures we have the latest justified checkpoint.
+      return combinedChainDataClient
+          .getCheckpointState(epoch, blockAndState)
+          .thenApply(
+              checkpointState ->
+                  Optional.of(
+                      createAttestationData(
+                          block, checkpointState.getState(), slot, computedCommitteeIndex)));
+    }
+
+    final AttestationData attestationData =
+        createAttestationData(block, blockAndState.getState(), slot, computedCommitteeIndex);
+    return SafeFuture.completedFuture(Optional.of(attestationData));
+  }
+
+  private Optional<AttestationHeadSelection> getAttestationHeadNode(final UInt64 slot) {
+    if (!spec.isExecutionPayloadEnvelopeAvailableAtSlot(slot)) {
+      return Optional.empty();
+    }
+    return combinedChainDataClient
+        .getChainHead()
+        .flatMap(
+            head -> {
+              if (head.getSlot().isLessThanOrEqualTo(slot)) {
+                return Optional.of(
+                    new AttestationHeadSelection(head.getForkChoiceNode(), head.isOptimistic()));
+              }
+              // Preserve the payload variant selected by the canonical descendant. Slots before
+              // the fork choice anchor have no known variant, so no attestation data is produced.
+              return combinedChainDataClient
+                  .getStore()
+                  .getForkChoiceStrategy()
+                  .getAncestorNodeData(head.getForkChoiceNode(), slot)
+                  .map(
+                      ancestorData ->
+                          new AttestationHeadSelection(
+                              new ForkChoiceNode(
+                                  ancestorData.getRoot(), ancestorData.getPayloadStatus()),
+                              ancestorData.isOptimistic()));
+            });
+  }
+
+  private record AttestationHeadSelection(ForkChoiceNode forkChoiceNode, boolean optimistic) {}
 
   private AttestationData createAttestationData(
       final BeaconBlock block,
@@ -747,6 +857,7 @@ public class ValidatorApiHandler implements ValidatorApiChannel, SlotEventsChann
       final IntSet syncCommitteeIndices = subscription.syncCommitteeIndices();
       performanceTracker.saveExpectedSyncCommitteeParticipant(
           subscription.validatorIndex(), syncCommitteeIndices, untilEpoch.decrement());
+      syncCommitteeSubscriptionManager.recordDuty(subscription.validatorIndex(), unsubscribeSlot);
       syncCommitteeUtil
           .getSyncSubcommittees(syncCommitteeIndices)
           .forEach(index -> syncCommitteeSubscriptionManager.subscribe(index, unsubscribeSlot));
@@ -991,6 +1102,27 @@ public class ValidatorApiHandler implements ValidatorApiChannel, SlotEventsChann
         .exceptionally(
             err ->
                 Optional.of(new SubmitDataError(UInt64.valueOf(index), getRootCauseMessage(err))));
+  }
+
+  @Override
+  public SafeFuture<List<SubmitDataError>> sendSignedInclusionLists(
+      final List<SignedInclusionList> signedInclusionLists) {
+    return SafeFuture.collectAll(signedInclusionLists.stream().map(this::processInclusionList))
+        .thenApply(this::convertInternalValidationResults);
+  }
+
+  private SafeFuture<InternalValidationResult> processInclusionList(
+      final SignedInclusionList signedInclusionList) {
+    return signedInclusionListPublisher
+        .sendInclusionList(signedInclusionList)
+        .thenPeek(
+            result -> {
+              if (result.isReject()) {
+                VALIDATOR_LOGGER.producedInvalidInclusionList(
+                    signedInclusionList.getMessage().getSlot(),
+                    result.getDescription().orElse("Unknown reason"));
+              }
+            });
   }
 
   @Override

@@ -1,5 +1,5 @@
 /*
- * Copyright Consensys Software Inc., 2026
+ * Copyright (c) 2026 Consensys Incorporated. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with
  * the License. You may obtain a copy of the License at
@@ -29,6 +29,7 @@ import tech.pegasys.teku.spec.SpecMilestone;
 import tech.pegasys.teku.spec.SpecVersion;
 import tech.pegasys.teku.spec.config.SpecConfigFulu;
 import tech.pegasys.teku.spec.datastructures.epbs.versions.gloas.ExecutionPayloadBid;
+import tech.pegasys.teku.spec.datastructures.epbs.versions.gloas.ExecutionPayloadBidSchema;
 import tech.pegasys.teku.spec.datastructures.execution.versions.capella.Withdrawal;
 import tech.pegasys.teku.spec.datastructures.state.SyncCommittee;
 import tech.pegasys.teku.spec.datastructures.state.beaconstate.versions.gloas.BeaconStateGloas;
@@ -40,6 +41,7 @@ import tech.pegasys.teku.spec.datastructures.state.versions.electra.PendingParti
 import tech.pegasys.teku.spec.datastructures.state.versions.gloas.Builder;
 import tech.pegasys.teku.spec.datastructures.state.versions.gloas.BuilderPendingPayment;
 import tech.pegasys.teku.spec.datastructures.state.versions.gloas.BuilderPendingWithdrawal;
+import tech.pegasys.teku.spec.schemas.SchemaDefinitionsGloas;
 
 public class BeaconStateBuilderGloas
     extends AbstractBeaconStateBuilder<
@@ -93,9 +95,8 @@ public class BeaconStateBuilderGloas
 
   @Override
   protected BeaconStateGloas getEmptyState() {
-    return BeaconStateSchemaGloas.create(
-            spec.getConfig(), spec.getSchemaDefinitions().getSchemaRegistry())
-        .createEmpty();
+    return BeaconStateGloas.required(
+        spec.getSchemaDefinitions().getBeaconStateSchema().createEmpty());
   }
 
   @Override
@@ -109,7 +110,10 @@ public class BeaconStateBuilderGloas
     state.setLatestExecutionPayloadBid(latestExecutionPayloadBid);
     state.setNextWithdrawalIndex(nextWithdrawalIndex);
     state.setNextWithdrawalValidatorIndex(nextWithdrawalValidatorIndex);
-    state.setDepositRequestsStartIndex(depositRequestsStartIndex);
+    // deposit_requests_start_index was removed in Heze (EIP-8015)
+    if (hasEth1Fields()) {
+      state.setDepositRequestsStartIndex(depositRequestsStartIndex);
+    }
     state.setDepositBalanceToConsume(depositBalanceToConsume);
     state.setExitBalanceToConsume(exitBalanceToConsume);
     state.setEarliestExitEpoch(earliestExitEpoch);
@@ -137,6 +141,20 @@ public class BeaconStateBuilderGloas
       final int defaultItemsInSSZLists) {
     return new BeaconStateBuilderGloas(
         spec.forMilestone(SpecMilestone.GLOAS),
+        dataStructureUtil,
+        defaultValidatorCount,
+        defaultBuilderCount,
+        defaultItemsInSSZLists);
+  }
+
+  public static BeaconStateBuilderGloas create(
+      final DataStructureUtil dataStructureUtil,
+      final SpecVersion spec,
+      final int defaultValidatorCount,
+      final int defaultBuilderCount,
+      final int defaultItemsInSSZLists) {
+    return new BeaconStateBuilderGloas(
+        spec,
         dataStructureUtil,
         defaultValidatorCount,
         defaultBuilderCount,
@@ -204,7 +222,10 @@ public class BeaconStateBuilderGloas
   public BeaconStateBuilderGloas latestExecutionPayloadBid(
       final ExecutionPayloadBid latestExecutionPayloadBid) {
     checkNotNull(latestExecutionPayloadBid);
-    this.latestExecutionPayloadBid = latestExecutionPayloadBid;
+    this.latestExecutionPayloadBid =
+        SchemaDefinitionsGloas.required(spec.getSchemaDefinitions())
+            .getExecutionPayloadBidSchema()
+            .createFromExecutionPayloadBid(latestExecutionPayloadBid);
     return this;
   }
 
@@ -314,7 +335,23 @@ public class BeaconStateBuilderGloas
                     ? dataStructureUtil.randomUInt64(defaultValidatorCount)
                     : UInt64.ZERO);
 
-    this.latestExecutionPayloadBid = dataStructureUtil.randomExecutionPayloadBid();
+    final ExecutionPayloadBidSchema<? extends ExecutionPayloadBid> executionPayloadBidSchema =
+        SchemaDefinitionsGloas.required(spec.getSchemaDefinitions()).getExecutionPayloadBidSchema();
+    this.latestExecutionPayloadBid =
+        executionPayloadBidSchema.create(
+            dataStructureUtil.randomBytes32(),
+            dataStructureUtil.randomBytes32(),
+            dataStructureUtil.randomBytes32(),
+            dataStructureUtil.randomBytes32(),
+            dataStructureUtil.randomEth1Address(),
+            dataStructureUtil.randomUInt64(),
+            dataStructureUtil.randomBuilderIndex(),
+            dataStructureUtil.randomSlot(),
+            dataStructureUtil.randomUInt64(),
+            dataStructureUtil.randomUInt64(),
+            dataStructureUtil.randomBlobKzgCommitments(
+                executionPayloadBidSchema.getBlobKzgCommitmentsSchema()),
+            dataStructureUtil.randomBytes32());
 
     this.builders =
         dataStructureUtil.randomSszList(

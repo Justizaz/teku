@@ -1,5 +1,5 @@
 /*
- * Copyright Consensys Software Inc., 2026
+ * Copyright (c) 2026 Consensys Incorporated. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with
  * the License. You may obtain a copy of the License at
@@ -16,6 +16,7 @@ package tech.pegasys.teku.beaconrestapi.handlers.tekuv1.beacon;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 import static tech.pegasys.teku.infrastructure.http.HttpStatusCodes.SC_BAD_REQUEST;
 import static tech.pegasys.teku.infrastructure.http.HttpStatusCodes.SC_INTERNAL_SERVER_ERROR;
@@ -75,6 +76,27 @@ public class GetEth1DataTest extends AbstractMigratedBeaconHandlerTest {
     assertThat(request.getResponseCode()).isEqualTo(SC_NOT_FOUND);
     assertThat(request.getResponseBody())
         .isEqualTo(new HttpErrorResponse(SC_NOT_FOUND, "Not found"));
+  }
+
+  @Test
+  public void shouldReturnBadRequestForHezeState() throws Exception {
+    when(chainDataProvider.getBeaconStateAtHead())
+        .thenReturn(
+            SafeFuture.completedFuture(
+                Optional.of(
+                    new StateAndMetaData(
+                        dataStructureUtil.randomBeaconState(),
+                        SpecMilestone.HEZE,
+                        false,
+                        true,
+                        false))));
+
+    handler.handleRequest(request);
+
+    assertThat(request.getResponseCode()).isEqualTo(SC_BAD_REQUEST);
+    assertThat(request.getResponseBody())
+        .isEqualTo(new HttpErrorResponse(SC_BAD_REQUEST, GetEth1Data.ETH1_DATA_REMOVED_MESSAGE));
+    verifyNoInteractions(eth1DataProvider);
   }
 
   @Test

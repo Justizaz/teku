@@ -1,5 +1,5 @@
 /*
- * Copyright Consensys Software Inc., 2026
+ * Copyright (c) 2026 Consensys Incorporated. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with
  * the License. You may obtain a copy of the License at
@@ -42,6 +42,7 @@ import tech.pegasys.teku.spec.util.DataStructureUtil;
 import tech.pegasys.teku.statetransition.datacolumns.CustodyGroupCountManager;
 import tech.pegasys.teku.statetransition.datacolumns.DataColumnSidecarArchiveReconstructor;
 import tech.pegasys.teku.statetransition.datacolumns.log.rpc.DasReqRespLogger;
+import tech.pegasys.teku.statetransition.inclusionlist.InclusionListManager;
 import tech.pegasys.teku.storage.client.CombinedChainDataClient;
 import tech.pegasys.teku.storage.client.RecentChainData;
 
@@ -54,6 +55,7 @@ abstract class AbstractRequestHandlerTest<T extends RpcRequestHandler> {
   protected final CombinedChainDataClient combinedChainDataClient =
       mock(CombinedChainDataClient.class);
   protected final RecentChainData recentChainData = mock(RecentChainData.class);
+  protected final InclusionListManager inclusionListManager = mock(InclusionListManager.class);
 
   protected BeaconChainMethods beaconChainMethods;
 
@@ -73,12 +75,14 @@ abstract class AbstractRequestHandlerTest<T extends RpcRequestHandler> {
             combinedChainDataClient,
             () -> CustodyGroupCountManager.NOOP,
             recentChainData,
+            inclusionListManager,
             new NoOpMetricsSystem(),
             new StatusMessageFactory(spec, combinedChainDataClient, metricsSystem),
             new MetadataMessagesFactory(),
             getRpcEncoding(),
             DataColumnSidecarArchiveReconstructor.NOOP,
-            DasReqRespLogger.NOOP);
+            DasReqRespLogger.NOOP,
+            Optional.empty());
 
     reqHandler = createRequestHandler(beaconChainMethods);
 

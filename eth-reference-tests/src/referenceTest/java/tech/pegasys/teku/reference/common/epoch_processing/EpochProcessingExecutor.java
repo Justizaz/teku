@@ -1,5 +1,5 @@
 /*
- * Copyright Consensys Software Inc., 2026
+ * Copyright (c) 2026 Consensys Incorporated. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with
  * the License. You may obtain a copy of the License at
@@ -47,6 +47,7 @@ public class EpochProcessingExecutor {
       case INACTIVITY_UPDATES -> processInactivityUpdates(state);
       case PENDING_DEPOSITS -> processPendingDeposits(state);
       case PENDING_CONSOLIDATIONS -> processPendingConsolidations(state);
+      case PROCESS_PENDING_RANDAO_COMMITMENTS -> epochProcessor.processPendingRandaoCommitments(state);
       case PROPOSER_LOOKAHEAD -> epochProcessor.processProposerLookahead(state);
       case BUILDER_PENDING_PAYMENTS -> epochProcessor.processBuilderPendingPayments(state);
       case PTC_WINDOW -> epochProcessor.processPtcWindow(state);

@@ -1,5 +1,5 @@
 /*
- * Copyright Consensys Software Inc., 2026
+ * Copyright (c) 2026 Consensys Incorporated. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with
  * the License. You may obtain a copy of the License at
@@ -57,7 +57,8 @@ class TimeBasedEventAdapterTest {
     return Stream.of(
         Arguments.of("PHASE0", (Supplier<Spec>) TestSpecFactory::createMinimalPhase0),
         Arguments.of("ALTAIR", (Supplier<Spec>) TestSpecFactory::createMinimalAltair),
-        Arguments.of("GLOAS", (Supplier<Spec>) TestSpecFactory::createMinimalGloas));
+        Arguments.of("GLOAS", (Supplier<Spec>) TestSpecFactory::createMinimalGloas),
+        Arguments.of("HEZE", (Supplier<Spec>) TestSpecFactory::createMinimalHeze));
   }
 
   private TimeBasedEventAdapter createAdapter(final Spec spec, final Runnable onLastSlot) {
@@ -67,8 +68,10 @@ class TimeBasedEventAdapterTest {
           new Phase0TimeBasedEventAdapter(taskScheduler, validatorTimingChannel, onLastSlot, spec);
       case ALTAIR, BELLATRIX, CAPELLA, DENEB, ELECTRA, FULU ->
           new AltairTimeBasedEventAdapter(taskScheduler, validatorTimingChannel, onLastSlot, spec);
-      case GLOAS, HEZE ->
+      case GLOAS ->
           new GloasTimeBasedEventAdapter(taskScheduler, validatorTimingChannel, onLastSlot, spec);
+      case HEZE ->
+          new HezeTimeBasedEventAdapter(taskScheduler, validatorTimingChannel, onLastSlot, spec);
     };
   }
 

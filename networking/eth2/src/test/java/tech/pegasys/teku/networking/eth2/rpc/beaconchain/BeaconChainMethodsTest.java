@@ -1,5 +1,5 @@
 /*
- * Copyright Consensys Software Inc., 2026
+ * Copyright (c) 2026 Consensys Incorporated. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with
  * the License. You may obtain a copy of the License at
@@ -34,6 +34,7 @@ import tech.pegasys.teku.networking.eth2.rpc.beaconchain.methods.MetadataMessage
 import tech.pegasys.teku.networking.eth2.rpc.beaconchain.methods.StatusMessageFactory;
 import tech.pegasys.teku.networking.eth2.rpc.core.RpcRequestDecoder;
 import tech.pegasys.teku.networking.eth2.rpc.core.encodings.RpcEncoding;
+import tech.pegasys.teku.networking.p2p.rpc.RpcMethod;
 import tech.pegasys.teku.spec.Spec;
 import tech.pegasys.teku.spec.TestSpecFactory;
 import tech.pegasys.teku.spec.datastructures.networking.libp2p.rpc.status.StatusMessage;
@@ -41,6 +42,8 @@ import tech.pegasys.teku.spec.datastructures.networking.libp2p.rpc.status.versio
 import tech.pegasys.teku.statetransition.datacolumns.CustodyGroupCountManager;
 import tech.pegasys.teku.statetransition.datacolumns.DataColumnSidecarArchiveReconstructor;
 import tech.pegasys.teku.statetransition.datacolumns.log.rpc.DasReqRespLogger;
+import tech.pegasys.teku.statetransition.inclusionlist.InclusionListManager;
+import tech.pegasys.teku.statetransition.lightclient.LightClientUpdateStore;
 import tech.pegasys.teku.storage.client.CombinedChainDataClient;
 import tech.pegasys.teku.storage.client.RecentChainData;
 
@@ -63,6 +66,7 @@ public class BeaconChainMethodsTest {
   final AsyncRunner asyncRunner = new StubAsyncRunner();
   final CombinedChainDataClient combinedChainDataClient = mock(CombinedChainDataClient.class);
   final RecentChainData recentChainData = mock(RecentChainData.class);
+  final InclusionListManager inclusionListManager = mock(InclusionListManager.class);
   final MetricsSystem metricsSystem = new NoOpMetricsSystem();
   final StatusMessageFactory statusMessageFactory =
       new StatusMessageFactory(spec, combinedChainDataClient, metricsSystem);
@@ -201,11 +205,108 @@ public class BeaconChainMethodsTest {
                         "/eth2/beacon_chain/req/execution_payload_envelopes_by_range/1/ssz_snappy"));
   }
 
+  @Test
+  void shouldNotRegisterLightClientMethodsWhenServerDisabled() {
+    final BeaconChainMethods methods = getMethods(TestSpecFactory.createMinimalAltair());
+
+    assertThat(methods.lightClientFinalityUpdate()).isEmpty();
+    assertThat(methods.lightClientOptimisticUpdate()).isEmpty();
+    assertThat(methods.lightClientUpdatesByRange()).isEmpty();
+    assertThat(methods.lightClientBootstrap()).isEmpty();
+  }
+
+  @Test
+  void shouldNotRegisterLightClientMethodsPreAltair() {
+    final Spec spec = TestSpecFactory.createMinimalPhase0();
+    final BeaconChainMethods methods =
+        getMethods(spec, Optional.of(new LightClientUpdateStore(spec)));
+
+    assertThat(methods.lightClientFinalityUpdate()).isEmpty();
+    assertThat(methods.lightClientOptimisticUpdate()).isEmpty();
+    assertThat(methods.lightClientUpdatesByRange()).isEmpty();
+    assertThat(methods.lightClientBootstrap()).isEmpty();
+  }
+
+  @Test
+  void shouldRegisterLightClientLatestUpdateMethods() {
+    final Spec spec = TestSpecFactory.createMinimalAltair();
+    final BeaconChainMethods methods =
+        getMethods(spec, Optional.of(new LightClientUpdateStore(spec)));
+
+    assertThat(methods.lightClientFinalityUpdate())
+        .hasValueSatisfying(
+            method ->
+                assertThat(method.getIds())
+                    .containsExactly(
+                        "/eth2/beacon_chain/req/light_client_finality_update/1/ssz_snappy"));
+    assertThat(methods.lightClientOptimisticUpdate())
+        .hasValueSatisfying(
+            method ->
+                assertThat(method.getIds())
+                    .containsExactly(
+                        "/eth2/beacon_chain/req/light_client_optimistic_update/1/ssz_snappy"));
+  }
+
+  @Test
+  void shouldRegisterLightClientUpdatesByRange() {
+    final Spec spec = TestSpecFactory.createMinimalAltair();
+    final BeaconChainMethods methods =
+        getMethods(spec, Optional.of(new LightClientUpdateStore(spec)));
+
+    assertThat(methods.lightClientUpdatesByRange())
+        .hasValueSatisfying(
+            method ->
+                assertThat(method.getIds())
+                    .containsExactly(
+                        "/eth2/beacon_chain/req/light_client_updates_by_range/1/ssz_snappy"));
+  }
+
+  @Test
+  void shouldRegisterLightClientBootstrap() {
+    final Spec spec = TestSpecFactory.createMinimalAltair();
+    final BeaconChainMethods methods =
+        getMethods(spec, Optional.of(new LightClientUpdateStore(spec)));
+
+    assertThat(methods.lightClientBootstrap())
+        .hasValueSatisfying(
+            method ->
+                assertThat(method.getIds())
+                    .containsExactly("/eth2/beacon_chain/req/light_client_bootstrap/1/ssz_snappy"));
+  }
+
+  @Test
+  public void shouldCreateInclusionListsByIndicesWithHezeEnabled() {
+    final BeaconChainMethods methods = getMethods(TestSpecFactory.createMinimalHeze());
+
+    assertThat(methods.inclusionListByCommitteeIndices())
+        .hasValueSatisfying(
+            method ->
+                assertThat(method.getIds())
+                    .containsExactly(
+                        "/eth2/beacon_chain/req/inclusion_lists_by_indices/1/ssz_snappy"));
+    assertThat(methods.all()).contains(methods.inclusionListByCommitteeIndices().orElseThrow());
+  }
+
+  @Test
+  public void shouldNotCreateInclusionListsByIndicesWithHezeDisabled() {
+    final BeaconChainMethods methods = getMethods(TestSpecFactory.createMinimalGloas());
+
+    assertThat(methods.inclusionListByCommitteeIndices()).isEmpty();
+    assertThat(methods.all())
+        .flatMap(RpcMethod::getIds)
+        .noneMatch(id -> id.contains("inclusion_lists_by_indices"));
+  }
+
   private BeaconChainMethods getMethods() {
     return getMethods(TestSpecFactory.createMinimalPhase0());
   }
 
   private BeaconChainMethods getMethods(final Spec spec) {
+    return getMethods(spec, Optional.empty());
+  }
+
+  private BeaconChainMethods getMethods(
+      final Spec spec, final Optional<LightClientUpdateStore> lightClientUpdateStore) {
     return BeaconChainMethods.create(
         spec,
         asyncRunner,
@@ -213,11 +314,13 @@ public class BeaconChainMethodsTest {
         combinedChainDataClient,
         () -> CustodyGroupCountManager.NOOP,
         recentChainData,
+        inclusionListManager,
         metricsSystem,
         statusMessageFactory,
         metadataMessagesFactory,
         RpcEncoding.createSszSnappyEncoding(spec.getNetworkingConfig().getMaxPayloadSize()),
         DataColumnSidecarArchiveReconstructor.NOOP,
-        DasReqRespLogger.NOOP);
+        DasReqRespLogger.NOOP,
+        lightClientUpdateStore);
   }
 }

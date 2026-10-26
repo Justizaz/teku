@@ -1,5 +1,5 @@
 /*
- * Copyright Consensys Software Inc., 2026
+ * Copyright (c) 2026 Consensys Incorporated. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with
  * the License. You may obtain a copy of the License at
@@ -73,6 +73,7 @@ public class SpecConfigPhase0 implements SpecConfig {
   private final int minValidatorWithdrawabilityDelay;
   private final UInt64 shardCommitteePeriod;
   private final int slotDurationMillis;
+  private final int slotDurationMsHeze;
   private final int attestationDueBps;
   private final int aggregateDueBps;
   private final int proposerReorgCutoffBps;
@@ -162,6 +163,10 @@ public class SpecConfigPhase0 implements SpecConfig {
   private final Bytes4 hezeForkVersion;
   private final UInt64 hezeForkEpoch;
 
+  // eip8321 fork
+  private final Bytes4 eip8321ForkVersion;
+  private final UInt64 eip8321ForkEpoch;
+
   // ephemery
   private final Optional<UInt64> ephemeryResetPeriod;
 
@@ -232,6 +237,7 @@ public class SpecConfigPhase0 implements SpecConfig {
       final int reorgParentWeightThreshold,
       final UInt64 maxPerEpochActivationExitChurnLimit,
       final int slotDurationMillis,
+      final int slotDurationMsHeze,
       final int attestationDueBps,
       final int aggregateDueBps,
       final int proposerReorgCutoffBps,
@@ -253,6 +259,8 @@ public class SpecConfigPhase0 implements SpecConfig {
       final UInt64 gloasForkEpoch,
       final Bytes4 hezeForkVersion,
       final UInt64 hezeForkEpoch,
+      final Bytes4 eip8321ForkVersion,
+      final UInt64 eip8321ForkEpoch,
       final Optional<UInt64> ephemeryResetPeriod) {
     this.rawConfig = rawConfig;
     this.eth1FollowDistance = eth1FollowDistance;
@@ -321,6 +329,7 @@ public class SpecConfigPhase0 implements SpecConfig {
     this.reorgParentWeightThreshold = reorgParentWeightThreshold;
     this.maxPerEpochActivationExitChurnLimit = maxPerEpochActivationExitChurnLimit;
     this.slotDurationMillis = slotDurationMillis;
+    this.slotDurationMsHeze = slotDurationMsHeze;
     this.attestationDueBps = attestationDueBps;
     this.aggregateDueBps = aggregateDueBps;
     this.proposerReorgCutoffBps = proposerReorgCutoffBps;
@@ -340,6 +349,8 @@ public class SpecConfigPhase0 implements SpecConfig {
     this.gloasForkEpoch = gloasForkEpoch;
     this.hezeForkVersion = hezeForkVersion;
     this.hezeForkEpoch = hezeForkEpoch;
+    this.eip8321ForkVersion = eip8321ForkVersion;
+    this.eip8321ForkEpoch = eip8321ForkEpoch;
     this.ephemeryResetPeriod = ephemeryResetPeriod;
     this.blsSignatureVerifier = blsSignatureVerifier;
     this.batchSignatureVerifierSupplier = batchSignatureVerifierSupplier;
@@ -551,6 +562,16 @@ public class SpecConfigPhase0 implements SpecConfig {
   }
 
   @Override
+  public Bytes4 getEip8321ForkVersion() {
+    return eip8321ForkVersion;
+  }
+
+  @Override
+  public UInt64 getEip8321ForkEpoch() {
+    return eip8321ForkEpoch;
+  }
+
+  @Override
   public Optional<UInt64> getEphemeryResetPeriod() {
     return ephemeryResetPeriod;
   }
@@ -578,6 +599,11 @@ public class SpecConfigPhase0 implements SpecConfig {
   @Override
   public int getSlotDurationMillis() {
     return slotDurationMillis;
+  }
+
+  @Override
+  public int getSlotDurationMsHeze() {
+    return slotDurationMsHeze;
   }
 
   @Override
@@ -833,6 +859,7 @@ public class SpecConfigPhase0 implements SpecConfig {
         && minGenesisActiveValidatorCount == that.minGenesisActiveValidatorCount
         && proportionalSlashingMultiplier == that.proportionalSlashingMultiplier
         && secondsPerSlot == that.secondsPerSlot
+        && slotDurationMsHeze == that.slotDurationMsHeze
         && minAttestationInclusionDelay == that.minAttestationInclusionDelay
         && slotsPerEpoch == that.slotsPerEpoch
         && squareRootSlotsPerEpoch == that.squareRootSlotsPerEpoch
@@ -892,6 +919,8 @@ public class SpecConfigPhase0 implements SpecConfig {
         && Objects.equals(gloasForkEpoch, that.gloasForkEpoch)
         && Objects.equals(hezeForkVersion, that.hezeForkVersion)
         && Objects.equals(hezeForkEpoch, that.hezeForkEpoch)
+        && Objects.equals(eip8321ForkVersion, that.eip8321ForkVersion)
+        && Objects.equals(eip8321ForkEpoch, that.eip8321ForkEpoch)
         && Objects.equals(genesisDelay, that.genesisDelay)
         && Objects.equals(minEpochsToInactivityPenalty, that.minEpochsToInactivityPenalty)
         && Objects.equals(shardCommitteePeriod, that.shardCommitteePeriod)
@@ -926,6 +955,7 @@ public class SpecConfigPhase0 implements SpecConfig {
         genesisForkVersion,
         genesisDelay,
         secondsPerSlot,
+        slotDurationMsHeze,
         minAttestationInclusionDelay,
         slotsPerEpoch,
         squareRootSlotsPerEpoch,
@@ -981,6 +1011,8 @@ public class SpecConfigPhase0 implements SpecConfig {
         gloasForkEpoch,
         hezeForkVersion,
         hezeForkEpoch,
+        eip8321ForkVersion,
+        eip8321ForkEpoch,
         attestationSubnetPrefixBits,
         ephemeryResetPeriod);
   }

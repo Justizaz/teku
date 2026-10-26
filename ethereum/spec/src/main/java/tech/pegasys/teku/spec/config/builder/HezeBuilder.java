@@ -1,5 +1,5 @@
 /*
- * Copyright Consensys Software Inc., 2026
+ * Copyright (c) 2026 Consensys Incorporated. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with
  * the License. You may obtain a copy of the License at
@@ -17,7 +17,9 @@ import static com.google.common.base.Preconditions.checkNotNull;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Optional;
 import java.util.function.BiConsumer;
+import tech.pegasys.teku.infrastructure.unsigned.UInt64;
 import tech.pegasys.teku.spec.config.SpecConfigAndParent;
 import tech.pegasys.teku.spec.config.SpecConfigGloas;
 import tech.pegasys.teku.spec.config.SpecConfigHeze;
@@ -28,23 +30,36 @@ public class HezeBuilder extends BaseForkBuilder
 
   private Integer inclusionListDueBps;
   private Integer maxRequestInclusionList;
+  private Integer minSlotsForInclusionListsRequests;
   private Integer maxTransactionsBytesPerInclusionList;
 
   // heze preset
   private Integer inclusionListCommitteeSize;
+  private Integer maxSignedInclusionListSize;
+
+  // EIP-8198: optional, defaults to the MIN_EPOCHS_FOR_DATA_COLUMN_SIDECARS_REQUESTS window
+  private Optional<UInt64> minBlobDataRetentionMs = Optional.empty();
 
   HezeBuilder() {}
 
   @Override
   public SpecConfigAndParent<SpecConfigHeze> build(
       final SpecConfigAndParent<SpecConfigGloas> specConfigAndParent) {
+    final SpecConfigGloas gloasConfig = specConfigAndParent.specConfig();
     return SpecConfigAndParent.of(
         new SpecConfigHezeImpl(
-            specConfigAndParent.specConfig(),
+            gloasConfig,
             inclusionListDueBps,
             maxRequestInclusionList,
+            minSlotsForInclusionListsRequests,
             maxTransactionsBytesPerInclusionList,
-            inclusionListCommitteeSize),
+            maxSignedInclusionListSize,
+            inclusionListCommitteeSize,
+            minBlobDataRetentionMs.orElseGet(
+                () ->
+                    UInt64.valueOf(gloasConfig.getMinEpochsForDataColumnSidecarsRequests())
+                        .times(gloasConfig.getSlotsPerEpoch())
+                        .times(gloasConfig.getSlotDurationMillis()))),
         specConfigAndParent);
   }
 
@@ -57,6 +72,13 @@ public class HezeBuilder extends BaseForkBuilder
   public HezeBuilder maxRequestInclusionList(final Integer maxRequestInclusionList) {
     checkNotNull(maxRequestInclusionList);
     this.maxRequestInclusionList = maxRequestInclusionList;
+    return this;
+  }
+
+  public HezeBuilder minSlotsForInclusionListsRequests(
+      final Integer minSlotsForInclusionListsRequests) {
+    checkNotNull(minSlotsForInclusionListsRequests);
+    this.minSlotsForInclusionListsRequests = minSlotsForInclusionListsRequests;
     return this;
   }
 
@@ -73,6 +95,18 @@ public class HezeBuilder extends BaseForkBuilder
     return this;
   }
 
+  public HezeBuilder maxSignedInclusionListSize(final Integer maxSignedInclusionListSize) {
+    checkNotNull(maxSignedInclusionListSize);
+    this.maxSignedInclusionListSize = maxSignedInclusionListSize;
+    return this;
+  }
+
+  public HezeBuilder minBlobDataRetentionMs(final UInt64 minBlobDataRetentionMs) {
+    checkNotNull(minBlobDataRetentionMs);
+    this.minBlobDataRetentionMs = Optional.of(minBlobDataRetentionMs);
+    return this;
+  }
+
   @Override
   public void validate() {
     defaultValuesIfRequired(this);
@@ -84,11 +118,15 @@ public class HezeBuilder extends BaseForkBuilder
     final Map<String, Object> constants = new HashMap<>();
     constants.put("inclusionListDueBps", inclusionListDueBps);
     constants.put("maxRequestInclusionList", maxRequestInclusionList);
+    constants.put("minSlotsForInclusionListsRequests", minSlotsForInclusionListsRequests);
     constants.put("maxTransactionsBytesPerInclusionList", maxTransactionsBytesPerInclusionList);
     constants.put("inclusionListCommitteeSize", inclusionListCommitteeSize);
+    constants.put("maxSignedInclusionListSize", maxSignedInclusionListSize);
     return constants;
   }
 
   @Override
-  public void addOverridableItemsToRawConfig(final BiConsumer<String, Object> rawConfig) {}
+  public void addOverridableItemsToRawConfig(final BiConsumer<String, Object> rawConfig) {
+    rawConfig.accept("MAX_SIGNED_INCLUSION_LIST_SIZE", maxSignedInclusionListSize);
+  }
 }

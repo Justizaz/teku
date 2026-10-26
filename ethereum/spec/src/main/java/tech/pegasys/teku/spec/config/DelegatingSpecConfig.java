@@ -1,5 +1,5 @@
 /*
- * Copyright Consensys Software Inc., 2026
+ * Copyright (c) 2026 Consensys Incorporated. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with
  * the License. You may obtain a copy of the License at
@@ -236,6 +236,16 @@ public class DelegatingSpecConfig implements SpecConfig {
   }
 
   @Override
+  public Bytes4 getEip8321ForkVersion() {
+    return specConfig.getEip8321ForkVersion();
+  }
+
+  @Override
+  public UInt64 getEip8321ForkEpoch() {
+    return specConfig.getEip8321ForkEpoch();
+  }
+
+  @Override
   public int getSecondsPerSlot() {
     return specConfig.getSecondsPerSlot();
   }
@@ -258,6 +268,11 @@ public class DelegatingSpecConfig implements SpecConfig {
   @Override
   public int getSlotDurationMillis() {
     return specConfig.getSlotDurationMillis();
+  }
+
+  @Override
+  public int getSlotDurationMsHeze() {
+    return specConfig.getSlotDurationMsHeze();
   }
 
   @Override

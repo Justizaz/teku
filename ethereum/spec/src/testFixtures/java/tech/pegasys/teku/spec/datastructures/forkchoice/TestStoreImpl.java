@@ -1,5 +1,5 @@
 /*
- * Copyright Consensys Software Inc., 2026
+ * Copyright (c) 2026 Consensys Incorporated. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with
  * the License. You may obtain a copy of the License at
@@ -316,6 +316,11 @@ public class TestStoreImpl implements MutableStore, VoteUpdater {
   }
 
   @Override
+  public boolean satisfiesInclusionList(final Bytes32 blockRoot) {
+    return false;
+  }
+
+  @Override
   public Optional<List<BlobSidecar>> getBlobSidecarsIfAvailable(
       final SlotAndBlockRoot slotAndBlockRoot) {
     return Optional.ofNullable(blobSidecars.get(slotAndBlockRoot));
@@ -348,6 +353,11 @@ public class TestStoreImpl implements MutableStore, VoteUpdater {
   public void putExecutionPayload(
       final SignedExecutionPayloadEnvelope executionPayload, final boolean executionOptimistic) {
     executionPayloads.put(executionPayload.getBeaconBlockRoot(), executionPayload);
+  }
+
+  @Override
+  public void putUnsatisfiedInclusionListBlock(final Bytes32 blockRoot) {
+    // NO-OP
   }
 
   @Override

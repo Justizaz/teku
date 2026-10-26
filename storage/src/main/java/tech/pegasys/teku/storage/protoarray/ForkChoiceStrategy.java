@@ -1,5 +1,5 @@
 /*
- * Copyright Consensys Software Inc., 2026
+ * Copyright (c) 2026 Consensys Incorporated. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with
  * the License. You may obtain a copy of the License at
@@ -20,9 +20,11 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import org.apache.logging.log4j.LogManager;
@@ -36,6 +38,7 @@ import tech.pegasys.teku.spec.datastructures.blocks.SlotAndBlockRoot;
 import tech.pegasys.teku.spec.datastructures.forkchoice.ForkChoiceNode;
 import tech.pegasys.teku.spec.datastructures.forkchoice.ForkChoicePayloadStatus;
 import tech.pegasys.teku.spec.datastructures.forkchoice.ProtoNodeData;
+import tech.pegasys.teku.spec.datastructures.forkchoice.ProtoNodeDataWithParent;
 import tech.pegasys.teku.spec.datastructures.forkchoice.ReadOnlyForkChoiceStrategy;
 import tech.pegasys.teku.spec.datastructures.forkchoice.ReadOnlyStore;
 import tech.pegasys.teku.spec.datastructures.forkchoice.SlotAndForkChoiceNode;
@@ -59,6 +62,7 @@ public class ForkChoiceStrategy implements BlockMetadataStore, ReadOnlyForkChoic
   private final ProtoArray protoArray;
   private final BlockNodeVariantsIndex blockNodeIndex;
   private final ForkChoiceModelFactory forkChoiceModelFactory;
+  private final Set<Bytes32> unsatisfiedInclusionListBlocks;
   private List<UInt64> balances;
 
   private Optional<ForkChoiceNode> proposerBoostNode = Optional.empty();
@@ -73,7 +77,10 @@ public class ForkChoiceStrategy implements BlockMetadataStore, ReadOnlyForkChoic
     this.spec = spec;
     this.protoArray = protoArray;
     this.blockNodeIndex = blockNodeIndex;
-    this.forkChoiceModelFactory = new ForkChoiceModelFactory(spec);
+    this.unsatisfiedInclusionListBlocks = new HashSet<>();
+    this.forkChoiceModelFactory =
+        new ForkChoiceModelFactory(
+            spec, root -> !this.unsatisfiedInclusionListBlocks.contains(root));
     this.balances = balances;
     this.headSelectionContext =
         forkChoiceModelFactory.createHeadSelectionContext(
@@ -82,6 +89,26 @@ public class ForkChoiceStrategy implements BlockMetadataStore, ReadOnlyForkChoic
 
   private ForkChoiceModel getForkChoiceModel(final UInt64 slot) {
     return forkChoiceModelFactory.forSlot(slot);
+  }
+
+  public void onUnsatisfiedInclusionList(final Bytes32 blockRoot) {
+    protoArrayLock.writeLock().lock();
+    try {
+      if (blockNodeIndex.getBaseNode(blockRoot).isPresent()) {
+        unsatisfiedInclusionListBlocks.add(blockRoot);
+      }
+    } finally {
+      protoArrayLock.writeLock().unlock();
+    }
+  }
+
+  public boolean satisfiesInclusionList(final Bytes32 blockRoot) {
+    protoArrayLock.readLock().lock();
+    try {
+      return !unsatisfiedInclusionListBlocks.contains(blockRoot);
+    } finally {
+      protoArrayLock.readLock().unlock();
+    }
   }
 
   private Optional<ForkChoiceModel> getForkChoiceModelForRoot(final Bytes32 blockRoot) {
@@ -394,6 +421,16 @@ public class ForkChoiceStrategy implements BlockMetadataStore, ReadOnlyForkChoic
   }
 
   @Override
+  public boolean contains(final ForkChoiceNode node) {
+    protoArrayLock.readLock().lock();
+    try {
+      return protoArray.getNode(node).isPresent();
+    } finally {
+      protoArrayLock.readLock().unlock();
+    }
+  }
+
+  @Override
   public Optional<UInt64> blockSlot(final Bytes32 blockRoot) {
     protoArrayLock.readLock().lock();
     try {
@@ -436,6 +473,18 @@ public class ForkChoiceStrategy implements BlockMetadataStore, ReadOnlyForkChoic
               model ->
                   model.getExecutionGasLimitForBlockRootAndHash(
                       protoArray, blockNodeIndex, blockRoot, blockHash));
+    } finally {
+      protoArrayLock.readLock().unlock();
+    }
+  }
+
+  @Override
+  public boolean isAwaitingExecutionPayload(final Bytes32 blockRoot) {
+    protoArrayLock.readLock().lock();
+    try {
+      return getForkChoiceModelForRoot(blockRoot)
+          .map(model -> model.isAwaitingExecutionPayload(blockNodeIndex, blockRoot))
+          .orElse(false);
     } finally {
       protoArrayLock.readLock().unlock();
     }
@@ -596,6 +645,16 @@ public class ForkChoiceStrategy implements BlockMetadataStore, ReadOnlyForkChoic
   @Override
   public Optional<ForkChoiceNode> getAncestorNode(final ForkChoiceNode node, final UInt64 slot) {
     return getAncestorProtoNode(node, slot).map(ProtoNode::getForkChoiceNode);
+  }
+
+  @Override
+  public Optional<ProtoNodeData> getAncestorNodeData(final ForkChoiceNode node, final UInt64 slot) {
+    protoArrayLock.readLock().lock();
+    try {
+      return getAncestorProtoNode(node, slot).map(ProtoNode::getBlockData);
+    } finally {
+      protoArrayLock.readLock().unlock();
+    }
   }
 
   @Override
@@ -805,6 +864,24 @@ public class ForkChoiceStrategy implements BlockMetadataStore, ReadOnlyForkChoic
   }
 
   @Override
+  public List<ProtoNodeDataWithParent> getBlockDataWithParent() {
+    protoArrayLock.readLock().lock();
+    try {
+      return protoArray.getNodes().stream()
+          .map(
+              node ->
+                  new ProtoNodeDataWithParent(
+                      node.getBlockData(),
+                      node.getParentIndex()
+                          .map(protoArray::getNodeByIndex)
+                          .map(ProtoNode::getBlockData)))
+          .toList();
+    } finally {
+      protoArrayLock.readLock().unlock();
+    }
+  }
+
+  @Override
   public void applyUpdate(
       final Collection<BlockAndCheckpoints> newBlocks,
       final Map<Bytes32, ExecutionPayloadUpdate> newExecutionPayloads,
@@ -877,8 +954,7 @@ public class ForkChoiceStrategy implements BlockMetadataStore, ReadOnlyForkChoic
                               protoArray, blockNodeIndex, root)));
       final int sizeBefore = protoArray.getTotalTrackedNodeCount();
       protoArray.maybePrune(ForkChoiceNode.createBase(finalizedCheckpoint.getRoot()));
-      blockNodeIndex.removeIf(
-          root -> blockNodeIndex.getBaseNode(root).flatMap(protoArray::getNode).isEmpty());
+      removeStaleBlockRoots();
       if (protoArray.getTotalTrackedNodeCount() < sizeBefore) {
         forkChoiceModelFactory.onPrunedBlocks(blockNodeIndex);
       }
@@ -1072,8 +1148,7 @@ public class ForkChoiceStrategy implements BlockMetadataStore, ReadOnlyForkChoic
                     headSelectionContext);
               });
       if (status.isInvalid()) {
-        blockNodeIndex.removeIf(
-            root -> blockNodeIndex.getBaseNode(root).flatMap(protoArray::getNode).isEmpty());
+        removeStaleBlockRoots();
       }
     } finally {
       protoArrayLock.writeLock().unlock();
@@ -1113,11 +1188,16 @@ public class ForkChoiceStrategy implements BlockMetadataStore, ReadOnlyForkChoic
           verifiedInvalidTransition,
           headSelectionContext);
       if (status.isInvalid()) {
-        blockNodeIndex.removeIf(
-            root -> blockNodeIndex.getBaseNode(root).flatMap(protoArray::getNode).isEmpty());
+        removeStaleBlockRoots();
       }
     } finally {
       protoArrayLock.writeLock().unlock();
     }
+  }
+
+  private void removeStaleBlockRoots() {
+    blockNodeIndex.removeIf(
+        root -> blockNodeIndex.getBaseNode(root).flatMap(protoArray::getNode).isEmpty());
+    unsatisfiedInclusionListBlocks.removeIf(root -> blockNodeIndex.getBaseNode(root).isEmpty());
   }
 }
