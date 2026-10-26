@@ -33,17 +33,17 @@ import tech.pegasys.teku.spec.util.DataStructureUtil;
 class RandaoCommitmentRegistrationValidatorTest {
 
     private final Spec spec = TestSpecFactory.createMinimalEip8321();
-    private final Spec specGloas = TestSpecFactory.createMinimalGloas();
+    private final Spec specHeze = TestSpecFactory.createMinimalHeze();
     private final DataStructureUtil dataStructureUtil = new DataStructureUtil(spec);
-    private final DataStructureUtil gloasDataStructureUtil = new DataStructureUtil(specGloas);
+    private final DataStructureUtil hezeDataStructureUtil = new DataStructureUtil(specHeze);
     private final RandaoCommitmentRegistrationValidator validator =
             new RandaoCommitmentRegistrationValidator();
 
     private BeaconStateEip8321 createEip8321State(final int validatorCount) {
-        final BeaconState gloasState =
-                gloasDataStructureUtil.randomBeaconStateWithActiveValidators(validatorCount, UInt64.ZERO);
+        final BeaconState hezeState =
+                hezeDataStructureUtil.randomBeaconStateWithActiveValidators(validatorCount, UInt64.ZERO);
         return (BeaconStateEip8321)
-                spec.getGenesisSpec().getStateUpgrade().orElseThrow().upgrade(gloasState);
+                spec.getGenesisSpec().getStateUpgrade().orElseThrow().upgrade(hezeState);
     }
 
     @Test
@@ -139,13 +139,13 @@ class RandaoCommitmentRegistrationValidatorTest {
 
     @Test
     void validate_nonEip8321State_shouldFail() {
-        final BeaconState stateGloas = gloasDataStructureUtil.randomBeaconState(16);
+        final BeaconState stateHeze = hezeDataStructureUtil.randomBeaconState(16);
 
         final RandaoCommitmentRegistration registration =
                 new RandaoCommitmentRegistration(UInt64.ZERO, dataStructureUtil.randomBytes32());
 
         final Optional<OperationInvalidReason> result =
-                validator.validate(stateGloas.getFork(), stateGloas, registration);
+                validator.validate(stateHeze.getFork(), stateHeze, registration);
 
         assertThat(result).isPresent();
         assertThat(result.get().describe()).contains("State is not an EIP-8321 state");
