@@ -133,6 +133,7 @@ import tech.pegasys.teku.spec.datastructures.blobs.versions.deneb.BlobSidecar;
 import tech.pegasys.teku.spec.datastructures.blocks.SignedBeaconBlock;
 import tech.pegasys.teku.spec.datastructures.blocks.blockbody.BeaconBlockBodySchema;
 import tech.pegasys.teku.spec.datastructures.blocks.blockbody.versions.capella.BeaconBlockBodySchemaCapella;
+import tech.pegasys.teku.spec.datastructures.blocks.blockbody.versions.eip8321.BeaconBlockBodySchemaEip8321;
 import tech.pegasys.teku.spec.datastructures.epbs.versions.gloas.PayloadAttestationMessage;
 import tech.pegasys.teku.spec.datastructures.execution.ExecutionPayloadHeader;
 import tech.pegasys.teku.spec.datastructures.forkchoice.FastConfirmationStore;
@@ -142,6 +143,7 @@ import tech.pegasys.teku.spec.datastructures.networking.libp2p.rpc.BlobIdentifie
 import tech.pegasys.teku.spec.datastructures.operations.AttesterSlashing;
 import tech.pegasys.teku.spec.datastructures.operations.ProposerSlashing;
 import tech.pegasys.teku.spec.datastructures.operations.SignedBlsToExecutionChange;
+import tech.pegasys.teku.spec.datastructures.operations.SignedRandaoCommitmentRegistration;
 import tech.pegasys.teku.spec.datastructures.operations.SignedVoluntaryExit;
 import tech.pegasys.teku.spec.datastructures.state.AnchorPoint;
 import tech.pegasys.teku.spec.datastructures.state.beaconstate.BeaconState;
@@ -277,6 +279,7 @@ import tech.pegasys.teku.statetransition.validation.GossipValidationHelper;
 import tech.pegasys.teku.statetransition.validation.InternalValidationResult;
 import tech.pegasys.teku.statetransition.validation.ProposerPreferencesGossipValidator;
 import tech.pegasys.teku.statetransition.validation.ProposerSlashingValidator;
+import tech.pegasys.teku.statetransition.validation.RandaoCommitmentRegistrationGossipValidator;
 import tech.pegasys.teku.statetransition.validation.SignedBlsToExecutionChangeValidator;
 import tech.pegasys.teku.statetransition.validation.SignedInclusionListValidator;
 import tech.pegasys.teku.statetransition.validation.VoluntaryExitValidator;
@@ -403,6 +406,7 @@ public class BeaconChainController extends Service implements BeaconChainControl
   protected volatile OperationPool<ProposerSlashing> proposerSlashingPool;
   protected volatile OperationPool<SignedVoluntaryExit> voluntaryExitPool;
   protected volatile MappedOperationPool<SignedBlsToExecutionChange> blsToExecutionChangePool;
+  protected volatile MappedOperationPool<SignedRandaoCommitmentRegistration> randaoCommitmentRegistrationPool;
   protected volatile SyncCommitteeContributionPool syncCommitteeContributionPool;
   protected volatile SyncCommitteeMessagePool syncCommitteeMessagePool;
   protected volatile PayloadAttestationPool payloadAttestationPool;
@@ -796,6 +800,7 @@ public class BeaconChainController extends Service implements BeaconChainControl
     initProposerSlashingPool();
     initVoluntaryExitPool();
     initSignedBlsToExecutionChangePool();
+    initRandaoCommitmentRegistrationPool();
     initPayloadAttestationPool();
     initEth1DataCache();
     initDepositProvider();
@@ -1604,6 +1609,26 @@ public class BeaconChainController extends Service implements BeaconChainControl
         blsToExecutionChangePool::removeAll);
   }
 
+  protected void initRandaoCommitmentRegistrationPool() {
+    LOG.debug("BeaconChainController.initRandaoCommitmentRegistrationPool()");
+    final RandaoCommitmentRegistrationGossipValidator validator =
+            new RandaoCommitmentRegistrationGossipValidator(spec, recentChainData);
+
+    randaoCommitmentRegistrationPool =
+            new MappedOperationPool<>(
+                    "RandaoCommitmentRegistrationPool",
+                    metricsSystem,
+                    beaconBlockSchemaSupplier
+                            .andThen(BeaconBlockBodySchema::toVersionEip8321)
+                            .andThen(Optional::orElseThrow)
+                            .andThen(BeaconBlockBodySchemaEip8321::getRandaoCommitmentRegistrationsSchema),
+                    validator,
+                    operationPoolAsyncRunner,
+                    timeProvider);
+    blockImporter.subscribeToVerifiedBlockRandaoCommitmentRegistrations(
+            randaoCommitmentRegistrationPool::removeAll);
+  }
+
   protected void initPayloadAttestationPool() {
     LOG.debug("BeaconChainController.initPayloadAttestationPool()");
     if (spec.isMilestoneSupported(SpecMilestone.GLOAS)) {
@@ -1916,6 +1941,7 @@ public class BeaconChainController extends Service implements BeaconChainControl
                 proposerSlashingPool,
                 voluntaryExitPool,
                 blsToExecutionChangePool,
+                randaoCommitmentRegistrationPool,
                 syncCommitteeContributionPool,
                 payloadAttestationPool,
                 depositProvider,
@@ -2245,6 +2271,7 @@ public class BeaconChainController extends Service implements BeaconChainControl
             .gossipedSignedContributionAndProofProcessor(syncCommitteeContributionPool::addRemote)
             .gossipedSyncCommitteeMessageProcessor(syncCommitteeMessagePool::addRemote)
             .gossipedSignedBlsToExecutionChangeProcessor(blsToExecutionChangePool::addRemote)
+            .gossipedRandaoCommitmentRegistrationProcessor(randaoCommitmentRegistrationPool::addRemote)
             .gossipedExecutionPayloadProcessor(
                 executionPayloadManager::validateAndImportExecutionPayload)
             .gossipedPayloadAttestationMessageProcessor(payloadAttestationPool::addRemote)
@@ -2311,6 +2338,8 @@ public class BeaconChainController extends Service implements BeaconChainControl
         new LocalOperationAcceptedFilter<>(p2pNetwork::publishVoluntaryExit));
     blsToExecutionChangePool.subscribeOperationAdded(
         new LocalOperationAcceptedFilter<>(p2pNetwork::publishSignedBlsToExecutionChange));
+    randaoCommitmentRegistrationPool.subscribeOperationAdded(
+            new LocalOperationAcceptedFilter<>(p2pNetwork::publishRandaoCommitmentRegistration));
     payloadAttestationPool.subscribeOperationAdded(
         new LocalOperationAcceptedFilter<>(p2pNetwork::publishPayloadAttestationMessage));
     proposerPreferencesManager.subscribeOperationAdded(

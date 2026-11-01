@@ -38,6 +38,7 @@ import tech.pegasys.teku.spec.Spec;
 import tech.pegasys.teku.spec.SpecMilestone;
 import tech.pegasys.teku.spec.config.SpecConfig;
 import tech.pegasys.teku.spec.config.SpecConfigCapella;
+import tech.pegasys.teku.spec.config.SpecConfigEip8321;
 import tech.pegasys.teku.spec.config.SpecConfigElectra;
 import tech.pegasys.teku.spec.config.SpecConfigFulu;
 import tech.pegasys.teku.spec.datastructures.blobs.BlobKzgCommitmentsSchema;
@@ -70,6 +71,7 @@ import tech.pegasys.teku.spec.datastructures.operations.Attestation;
 import tech.pegasys.teku.spec.datastructures.operations.AttesterSlashing;
 import tech.pegasys.teku.spec.datastructures.operations.ProposerSlashing;
 import tech.pegasys.teku.spec.datastructures.operations.SignedBlsToExecutionChange;
+import tech.pegasys.teku.spec.datastructures.operations.SignedRandaoCommitmentRegistration;
 import tech.pegasys.teku.spec.datastructures.operations.SignedVoluntaryExit;
 import tech.pegasys.teku.spec.datastructures.state.beaconstate.BeaconState;
 import tech.pegasys.teku.spec.datastructures.state.beaconstate.BeaconStateCache;
@@ -99,6 +101,7 @@ public class BlockOperationSelectorFactory {
   private final OperationPool<ProposerSlashing> proposerSlashingPool;
   private final OperationPool<SignedVoluntaryExit> voluntaryExitPool;
   private final OperationPool<SignedBlsToExecutionChange> blsToExecutionChangePool;
+  private final OperationPool<SignedRandaoCommitmentRegistration> randaoCommitmentRegistrationPool;
   private final SyncCommitteeContributionPool contributionPool;
   private final PayloadAttestationPool payloadAttestationPool;
 
@@ -118,6 +121,7 @@ public class BlockOperationSelectorFactory {
       final OperationPool<ProposerSlashing> proposerSlashingPool,
       final OperationPool<SignedVoluntaryExit> voluntaryExitPool,
       final OperationPool<SignedBlsToExecutionChange> blsToExecutionChangePool,
+      final OperationPool<SignedRandaoCommitmentRegistration> randaoCommitmentRegistrationPool,
       final SyncCommitteeContributionPool contributionPool,
       final PayloadAttestationPool payloadAttestationPool,
       final DepositProvider depositProvider,
@@ -135,6 +139,7 @@ public class BlockOperationSelectorFactory {
     this.proposerSlashingPool = proposerSlashingPool;
     this.voluntaryExitPool = voluntaryExitPool;
     this.blsToExecutionChangePool = blsToExecutionChangePool;
+    this.randaoCommitmentRegistrationPool = randaoCommitmentRegistrationPool;
     this.contributionPool = contributionPool;
     this.payloadAttestationPool = payloadAttestationPool;
     this.depositProvider = depositProvider;
@@ -317,6 +322,14 @@ public class BlockOperationSelectorFactory {
             blsToExecutionChangePool.getItemsForBlock(
                 blockSlotState,
                 SpecConfigCapella.required(specConfig).getMaxBlsToExecutionChanges()));
+      }
+
+      // Post-EIP-8321: RANDAO commitment registration
+      if(bodyBuilder.supportsRandaoCommitmentRegistrations()) {
+        bodyBuilder.randaoCommitmentRegistrations(
+                randaoCommitmentRegistrationPool.getItemsForBlock(
+                        blockSlotState,
+                        SpecConfigEip8321.required(specConfig).getMaxRandaoCommitmentRegistrations()));
       }
 
       // Post-Gloas: Payload Attestations

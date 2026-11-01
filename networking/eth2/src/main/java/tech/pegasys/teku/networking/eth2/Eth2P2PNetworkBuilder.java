@@ -40,6 +40,7 @@ import tech.pegasys.teku.networking.eth2.gossip.forks.versions.GossipForkSubscri
 import tech.pegasys.teku.networking.eth2.gossip.forks.versions.GossipForkSubscriptionsBellatrix;
 import tech.pegasys.teku.networking.eth2.gossip.forks.versions.GossipForkSubscriptionsCapella;
 import tech.pegasys.teku.networking.eth2.gossip.forks.versions.GossipForkSubscriptionsDeneb;
+import tech.pegasys.teku.networking.eth2.gossip.forks.versions.GossipForkSubscriptionsEip8321;
 import tech.pegasys.teku.networking.eth2.gossip.forks.versions.GossipForkSubscriptionsElectra;
 import tech.pegasys.teku.networking.eth2.gossip.forks.versions.GossipForkSubscriptionsFulu;
 import tech.pegasys.teku.networking.eth2.gossip.forks.versions.GossipForkSubscriptionsFuluBpo;
@@ -99,6 +100,7 @@ import tech.pegasys.teku.spec.datastructures.lightclient.LightClientOptimisticUp
 import tech.pegasys.teku.spec.datastructures.operations.AttesterSlashing;
 import tech.pegasys.teku.spec.datastructures.operations.ProposerSlashing;
 import tech.pegasys.teku.spec.datastructures.operations.SignedBlsToExecutionChange;
+import tech.pegasys.teku.spec.datastructures.operations.SignedRandaoCommitmentRegistration;
 import tech.pegasys.teku.spec.datastructures.operations.SignedVoluntaryExit;
 import tech.pegasys.teku.spec.datastructures.operations.versions.altair.SignedContributionAndProof;
 import tech.pegasys.teku.spec.datastructures.operations.versions.altair.ValidatableSyncCommitteeMessage;
@@ -145,6 +147,7 @@ public class Eth2P2PNetworkBuilder {
   protected OperationProcessor<SignedVoluntaryExit> gossipedVoluntaryExitConsumer;
   protected OperationProcessor<SignedBlsToExecutionChange>
       gossipedSignedBlsToExecutionChangeProcessor;
+  protected OperationProcessor<SignedRandaoCommitmentRegistration> gossipedRandaoCommitmentRegistrationProcessor;
   protected OperationProcessor<SignedExecutionPayloadEnvelope> executionPayloadProcessor;
   protected OperationProcessor<PayloadAttestationMessage> payloadAttestationMessageProcessor;
   protected OperationProcessor<SignedExecutionPayloadBid> executionPayloadBidProcessor;
@@ -481,7 +484,7 @@ public class Eth2P2PNetworkBuilder {
               executionProofOperationProcessor,
               config.isExecutionProofTopicEnabled(),
               isSuperNodeSupplier);
-      case HEZE, EIP8321 ->
+      case HEZE ->
           new GossipForkSubscriptionsHeze(
               forkAndSpecMilestone.getFork(),
               spec,
@@ -508,6 +511,39 @@ public class Eth2P2PNetworkBuilder {
               executionPayloadBidProcessor,
               proposerPreferencesProcessor,
               inclusionListProcessor,
+              debugDataDumper,
+              dasGossipLogger,
+              executionProofOperationProcessor,
+              config.isExecutionProofTopicEnabled(),
+              isSuperNodeSupplier);
+      case EIP8321 ->
+          new GossipForkSubscriptionsEip8321(
+              forkAndSpecMilestone.getFork(),
+              spec,
+              asyncRunner,
+              metricsSystem,
+              network,
+              combinedChainDataClient.getRecentChainData(),
+              gossipEncoding,
+              gossipedBlockProcessor,
+              gossipedBlobSidecarProcessor,
+              gossipedAttestationConsumer,
+              gossipedAggregateProcessor,
+              gossipedAttesterSlashingConsumer,
+              gossipedProposerSlashingConsumer,
+              gossipedVoluntaryExitConsumer,
+              gossipedSignedContributionAndProofProcessor,
+              gossipedSyncCommitteeMessageProcessor,
+              lightClientFinalityUpdateProcessor,
+              lightClientOptimisticUpdateProcessor,
+              gossipedSignedBlsToExecutionChangeProcessor,
+              dataColumnSidecarOperationProcessor,
+              executionPayloadProcessor,
+              payloadAttestationMessageProcessor,
+              executionPayloadBidProcessor,
+              proposerPreferencesProcessor,
+              inclusionListProcessor,
+              gossipedRandaoCommitmentRegistrationProcessor,
               debugDataDumper,
               dasGossipLogger,
               executionProofOperationProcessor,
@@ -751,6 +787,7 @@ public class Eth2P2PNetworkBuilder {
     assertNotNull("gossipedSyncCommitteeMessageProcessor", gossipedSyncCommitteeMessageProcessor);
     assertNotNull(
         "gossipedSignedBlsToExecutionChangeProcessor", gossipedSignedBlsToExecutionChangeProcessor);
+    assertNotNull("gossipedRandaoCommitmentRegistrationProcessor", gossipedRandaoCommitmentRegistrationProcessor);
     assertNotNull(
         "gossipedDataColumnSidecarOperationProcessor", dataColumnSidecarOperationProcessor);
     assertNotNull("gossipedExecutionPayloadProcessor", executionPayloadProcessor);
@@ -895,6 +932,14 @@ public class Eth2P2PNetworkBuilder {
           gossipedSignedBlsToExecutionChangeProcessor) {
     checkNotNull(gossipedSignedBlsToExecutionChangeProcessor);
     this.gossipedSignedBlsToExecutionChangeProcessor = gossipedSignedBlsToExecutionChangeProcessor;
+    return this;
+  }
+
+  public Eth2P2PNetworkBuilder gossipedRandaoCommitmentRegistrationProcessor(
+      final OperationProcessor<SignedRandaoCommitmentRegistration>
+          gossipedRandaoCommitmentRegistrationProcessor) {
+    checkNotNull(gossipedRandaoCommitmentRegistrationProcessor);
+    this.gossipedRandaoCommitmentRegistrationProcessor = gossipedRandaoCommitmentRegistrationProcessor;
     return this;
   }
 

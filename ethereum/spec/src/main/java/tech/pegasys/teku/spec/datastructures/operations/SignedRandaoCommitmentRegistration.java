@@ -17,11 +17,12 @@ import tech.pegasys.teku.bls.BLSSignature;
 import tech.pegasys.teku.infrastructure.ssz.containers.Container2;
 import tech.pegasys.teku.infrastructure.ssz.containers.ContainerSchema2;
 import tech.pegasys.teku.infrastructure.ssz.tree.TreeNode;
+import tech.pegasys.teku.infrastructure.unsigned.UInt64;
 import tech.pegasys.teku.spec.datastructures.type.SszSignature;
 import tech.pegasys.teku.spec.datastructures.type.SszSignatureSchema;
 
 public class SignedRandaoCommitmentRegistration
-        extends Container2<SignedRandaoCommitmentRegistration, RandaoCommitmentRegistration, SszSignature> {
+        extends Container2<SignedRandaoCommitmentRegistration, RandaoCommitmentRegistration, SszSignature> implements MessageWithValidatorId{
     public static final SignedRandaoCommitmentRegistrationSchema SSZ_SCHEMA =
             new SignedRandaoCommitmentRegistrationSchema();
 
@@ -44,6 +45,11 @@ public class SignedRandaoCommitmentRegistration
 
     public BLSSignature getSignature() {
         return getField1().getSignature();
+    }
+
+    @Override
+    public UInt64 getValidatorId() {
+        return getMessage().getValidatorIndex();
     }
 
     public static class SignedRandaoCommitmentRegistrationSchema

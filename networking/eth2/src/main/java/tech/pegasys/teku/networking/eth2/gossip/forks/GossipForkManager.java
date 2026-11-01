@@ -49,6 +49,7 @@ import tech.pegasys.teku.spec.datastructures.lightclient.LightClientOptimisticUp
 import tech.pegasys.teku.spec.datastructures.operations.AttesterSlashing;
 import tech.pegasys.teku.spec.datastructures.operations.ProposerSlashing;
 import tech.pegasys.teku.spec.datastructures.operations.SignedBlsToExecutionChange;
+import tech.pegasys.teku.spec.datastructures.operations.SignedRandaoCommitmentRegistration;
 import tech.pegasys.teku.spec.datastructures.operations.SignedVoluntaryExit;
 import tech.pegasys.teku.spec.datastructures.operations.versions.altair.SignedContributionAndProof;
 import tech.pegasys.teku.spec.datastructures.operations.versions.altair.ValidatableSyncCommitteeMessage;
@@ -267,6 +268,14 @@ public class GossipForkManager {
         message,
         "signed bls to execution change",
         GossipForkSubscriptions::publishSignedBlsToExecutionChangeMessage);
+  }
+
+  public void publishRandaoCommitmentRegistration(final SignedRandaoCommitmentRegistration message) {
+    publishMessage(
+            spec.computeStartSlotAtEpoch(currentEpoch.orElseThrow()),
+            message,
+            "RANDAO commitment registration",
+            GossipForkSubscriptions::publishRandaoCommitmentRegistration);
   }
 
   public void publishPayloadAttestationMessage(final PayloadAttestationMessage message) {

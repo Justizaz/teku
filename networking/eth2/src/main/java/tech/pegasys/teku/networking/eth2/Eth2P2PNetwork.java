@@ -25,6 +25,7 @@ import tech.pegasys.teku.spec.datastructures.networking.libp2p.rpc.metadata.Meta
 import tech.pegasys.teku.spec.datastructures.operations.AttesterSlashing;
 import tech.pegasys.teku.spec.datastructures.operations.ProposerSlashing;
 import tech.pegasys.teku.spec.datastructures.operations.SignedBlsToExecutionChange;
+import tech.pegasys.teku.spec.datastructures.operations.SignedRandaoCommitmentRegistration;
 import tech.pegasys.teku.spec.datastructures.operations.SignedVoluntaryExit;
 import tech.pegasys.teku.spec.datastructures.operations.versions.altair.SignedContributionAndProof;
 import tech.pegasys.teku.spec.datastructures.operations.versions.altair.ValidatableSyncCommitteeMessage;
@@ -66,6 +67,8 @@ public interface Eth2P2PNetwork extends P2PNetwork<Eth2Peer> {
   void publishVoluntaryExit(SignedVoluntaryExit signedVoluntaryExit);
 
   void publishSignedBlsToExecutionChange(SignedBlsToExecutionChange signedBlsToExecutionChange);
+
+  void publishRandaoCommitmentRegistration(SignedRandaoCommitmentRegistration signedRandaoCommitmentRegistration);
 
   void publishPayloadAttestationMessage(PayloadAttestationMessage payloadAttestationMessage);
 

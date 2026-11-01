@@ -103,6 +103,12 @@ public class BeaconBlockBodyBuilderEip8321 extends BeaconBlockBodyBuilderGloas {
     return this;
   }
 
+  @Override
+  public boolean supportsRandaoCommitmentRegistrations() {
+    return true;
+  }
+
+  @Override
   public BeaconBlockBodyBuilderEip8321 randaoCommitmentRegistrations(final SszList<SignedRandaoCommitmentRegistration> randaoCommitmentRegistrations) {
     this.randaoCommitmentRegistrations = randaoCommitmentRegistrations;
     return this;

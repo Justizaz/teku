@@ -213,6 +213,7 @@ class BlockFactoryPhase0Test extends AbstractBlockFactoryTest {
             proposerSlashingPool,
             voluntaryExitPool,
             blsToExecutionChangePool,
+            randaoCommitmentRegistrationPool,
             syncCommitteeContributionPool,
             payloadAttestationPool,
             depositProvider,

@@ -79,6 +79,7 @@ import tech.pegasys.teku.spec.datastructures.operations.AttesterSlashing;
 import tech.pegasys.teku.spec.datastructures.operations.Deposit;
 import tech.pegasys.teku.spec.datastructures.operations.ProposerSlashing;
 import tech.pegasys.teku.spec.datastructures.operations.SignedBlsToExecutionChange;
+import tech.pegasys.teku.spec.datastructures.operations.SignedRandaoCommitmentRegistration;
 import tech.pegasys.teku.spec.datastructures.operations.SignedVoluntaryExit;
 import tech.pegasys.teku.spec.datastructures.operations.versions.altair.SignedContributionAndProof;
 import tech.pegasys.teku.spec.datastructures.state.beaconstate.BeaconState;
@@ -167,6 +168,10 @@ class BlockOperationSelectorFactoryTest {
               s -> s.toVersionCapella().orElseThrow().getBlsToExecutionChangesSchema()),
           blsToExecutionChangeValidator);
 
+  @SuppressWarnings("unchecked")
+  private final OperationPool<SignedRandaoCommitmentRegistration> randaoCommitmentRegistrationPool =
+          mock(OperationPool.class);
+
   private final SyncCommitteeContributionPool contributionPool =
       new SyncCommitteeContributionPool(spec, contributionValidator);
 
@@ -202,6 +207,7 @@ class BlockOperationSelectorFactoryTest {
         proposerSlashingPool,
         voluntaryExitPool,
         blsToExecutionChangePool,
+        randaoCommitmentRegistrationPool,
         contributionPool,
         payloadAttestationPool,
         depositProvider,
@@ -1185,6 +1191,7 @@ class BlockOperationSelectorFactoryTest {
     protected SszList<AttesterSlashing> attesterSlashings;
     protected SszList<SignedVoluntaryExit> voluntaryExits;
     protected SszList<SignedBlsToExecutionChange> blsToExecutionChanges;
+    protected SszList<SignedRandaoCommitmentRegistration> randaoCommitmentRegistrations;
     protected SyncAggregate syncAggregate;
     protected ExecutionPayload executionPayload;
     protected ExecutionPayloadHeader executionPayloadHeader;
@@ -1285,6 +1292,13 @@ class BlockOperationSelectorFactoryTest {
     public BeaconBlockBodyBuilder blsToExecutionChanges(
         final SszList<SignedBlsToExecutionChange> blsToExecutionChanges) {
       this.blsToExecutionChanges = blsToExecutionChanges;
+      return this;
+    }
+
+    @Override
+    public BeaconBlockBodyBuilder randaoCommitmentRegistrations(
+            final SszList<SignedRandaoCommitmentRegistration> randaoCommitmentRegistrations) {
+      this.randaoCommitmentRegistrations = randaoCommitmentRegistrations;
       return this;
     }
 

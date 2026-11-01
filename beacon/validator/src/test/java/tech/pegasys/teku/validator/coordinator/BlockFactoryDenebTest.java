@@ -190,6 +190,7 @@ public class BlockFactoryDenebTest extends AbstractBlockFactoryTest {
             proposerSlashingPool,
             voluntaryExitPool,
             blsToExecutionChangePool,
+            randaoCommitmentRegistrationPool,
             syncCommitteeContributionPool,
             payloadAttestationPool,
             depositProvider,

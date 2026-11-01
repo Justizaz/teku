@@ -96,6 +96,7 @@ public class BlockFactoryGloasTest extends AbstractBlockFactoryTest {
             proposerSlashingPool,
             voluntaryExitPool,
             blsToExecutionChangePool,
+            randaoCommitmentRegistrationPool,
             syncCommitteeContributionPool,
             payloadAttestationPool,
             depositProvider,

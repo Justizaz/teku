@@ -27,6 +27,7 @@ import tech.pegasys.teku.spec.datastructures.networking.libp2p.rpc.metadata.Meta
 import tech.pegasys.teku.spec.datastructures.operations.AttesterSlashing;
 import tech.pegasys.teku.spec.datastructures.operations.ProposerSlashing;
 import tech.pegasys.teku.spec.datastructures.operations.SignedBlsToExecutionChange;
+import tech.pegasys.teku.spec.datastructures.operations.SignedRandaoCommitmentRegistration;
 import tech.pegasys.teku.spec.datastructures.operations.SignedVoluntaryExit;
 import tech.pegasys.teku.spec.datastructures.operations.versions.altair.SignedContributionAndProof;
 import tech.pegasys.teku.spec.datastructures.operations.versions.altair.ValidatableSyncCommitteeMessage;
@@ -95,6 +96,10 @@ public class NoOpEth2P2PNetwork extends MockP2PNetwork<Eth2Peer> implements Eth2
   @Override
   public void publishSignedBlsToExecutionChange(
       final SignedBlsToExecutionChange signedBlsToExecutionChange) {}
+
+  @Override
+  public void publishRandaoCommitmentRegistration(
+          final SignedRandaoCommitmentRegistration signedRandaoCommitmentRegistration) {}
 
   @Override
   public void publishPayloadAttestationMessage(

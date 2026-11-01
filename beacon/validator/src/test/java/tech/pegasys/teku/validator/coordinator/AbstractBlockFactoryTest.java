@@ -82,6 +82,7 @@ import tech.pegasys.teku.spec.datastructures.operations.AttesterSlashing;
 import tech.pegasys.teku.spec.datastructures.operations.Deposit;
 import tech.pegasys.teku.spec.datastructures.operations.ProposerSlashing;
 import tech.pegasys.teku.spec.datastructures.operations.SignedBlsToExecutionChange;
+import tech.pegasys.teku.spec.datastructures.operations.SignedRandaoCommitmentRegistration;
 import tech.pegasys.teku.spec.datastructures.operations.SignedVoluntaryExit;
 import tech.pegasys.teku.spec.datastructures.state.beaconstate.BeaconState;
 import tech.pegasys.teku.spec.datastructures.state.beaconstate.BeaconStateCache;
@@ -123,6 +124,8 @@ public abstract class AbstractBlockFactoryTest {
   protected final OperationPool<SignedVoluntaryExit> voluntaryExitPool = mock(OperationPool.class);
   protected final OperationPool<SignedBlsToExecutionChange> blsToExecutionChangePool =
       mock(OperationPool.class);
+  protected final OperationPool<SignedRandaoCommitmentRegistration> randaoCommitmentRegistrationPool =
+          mock(OperationPool.class);
   protected final ForkChoiceNotifier forkChoiceNotifier = mock(ForkChoiceNotifier.class);
   protected final ExecutionLayerBlockProductionManager executionLayer =
       mock(ExecutionLayerBlockProductionManager.class);

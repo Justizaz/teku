@@ -159,6 +159,13 @@ public class BlockProcessorEip8321 extends BlockProcessorHeze {
         return BlockValidationResult.SUCCESSFUL;
     }
 
+    public boolean isRandaoCommitmentRegistrationSignatureValid(
+            final BeaconState state,
+            final SignedRandaoCommitmentRegistration registration) {
+        return operationSignatureVerifier.verifyRandaoCommitmentRegistrationSignature(
+                state, registration, BLSSignatureVerifier.SIMPLE);
+    }
+
     @Override
     protected void processOperationsNoValidation(
             final MutableBeaconState state,

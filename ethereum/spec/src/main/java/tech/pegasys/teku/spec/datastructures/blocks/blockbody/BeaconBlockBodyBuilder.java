@@ -28,6 +28,7 @@ import tech.pegasys.teku.spec.datastructures.operations.AttesterSlashing;
 import tech.pegasys.teku.spec.datastructures.operations.Deposit;
 import tech.pegasys.teku.spec.datastructures.operations.ProposerSlashing;
 import tech.pegasys.teku.spec.datastructures.operations.SignedBlsToExecutionChange;
+import tech.pegasys.teku.spec.datastructures.operations.SignedRandaoCommitmentRegistration;
 import tech.pegasys.teku.spec.datastructures.operations.SignedVoluntaryExit;
 import tech.pegasys.teku.spec.datastructures.type.SszKZGCommitment;
 
@@ -105,6 +106,12 @@ public interface BeaconBlockBodyBuilder {
   }
 
   BeaconBlockBodyBuilder parentExecutionRequests(ExecutionRequests parentExecutionRequests);
+
+  default boolean supportsRandaoCommitmentRegistrations() {
+    return false;
+  }
+
+  BeaconBlockBodyBuilder randaoCommitmentRegistrations(SszList<SignedRandaoCommitmentRegistration> randaoCommitmentRegistrations);
 
   BeaconBlockBody build();
 }

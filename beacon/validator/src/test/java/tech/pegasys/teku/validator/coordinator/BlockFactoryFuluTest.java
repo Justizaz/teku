@@ -188,6 +188,7 @@ public class BlockFactoryFuluTest extends AbstractBlockFactoryTest {
             proposerSlashingPool,
             voluntaryExitPool,
             blsToExecutionChangePool,
+            randaoCommitmentRegistrationPool,
             syncCommitteeContributionPool,
             payloadAttestationPool,
             depositProvider,

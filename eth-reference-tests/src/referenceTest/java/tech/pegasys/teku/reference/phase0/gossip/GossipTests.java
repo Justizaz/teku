@@ -69,5 +69,8 @@ public class GossipTests {
               new GossipExecutionPayloadBidTestExecutor(
                   "gossip_execution_payload_bid__ignore_builder_exit_in_parent_payload",
                   "gossip_execution_payload_bid__ignore_builder_exit_with_pending_balance"))
+          .put(
+              "networking/gossip_randao_commitment_registration",
+              new GossipRandaoCommitmentRegistrationTestExecutor())
           .build();
 }

@@ -42,6 +42,7 @@ public interface BeaconBlockBodyEip8321 extends BeaconBlockBodyGloas {
     @Override
     BeaconBlockBodySchemaEip8321<?> getSchema();
 
+    @Override
     default Optional<BeaconBlockBodyEip8321> toVersionEip8321() {
         return Optional.of(this);
     }

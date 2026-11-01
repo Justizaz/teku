@@ -38,6 +38,7 @@ import tech.pegasys.teku.spec.datastructures.operations.Attestation;
 import tech.pegasys.teku.spec.datastructures.operations.AttesterSlashing;
 import tech.pegasys.teku.spec.datastructures.operations.ProposerSlashing;
 import tech.pegasys.teku.spec.datastructures.operations.SignedBlsToExecutionChange;
+import tech.pegasys.teku.spec.datastructures.operations.SignedRandaoCommitmentRegistration;
 import tech.pegasys.teku.spec.datastructures.operations.SignedVoluntaryExit;
 import tech.pegasys.teku.spec.datastructures.state.CheckpointState;
 import tech.pegasys.teku.spec.executionlayer.ExecutionLayerChannel;
@@ -66,6 +67,8 @@ public class BlockImporter {
       voluntaryExitSubscribers = Subscribers.create(true);
   private final Subscribers<VerifiedBlockOperationsListener<SignedBlsToExecutionChange>>
       blsToExecutionChangeSubscribers = Subscribers.create(true);
+  private final Subscribers<VerifiedBlockOperationsListener<SignedRandaoCommitmentRegistration>>
+      randaoCommitmentRegistrationSubscribers = Subscribers.create(true);
 
   private final AtomicReference<CheckpointState> latestFinalizedCheckpointState =
       new AtomicReference<>(null);
@@ -238,6 +241,13 @@ public class BlockImporter {
             blsOperations ->
                 blsToExecutionChangeSubscribers.deliver(
                     VerifiedBlockOperationsListener::onOperationsFromBlock, blsOperations));
+    blockBody
+            .toVersionEip8321()
+            .ifPresent(
+                    eip8321Body ->
+                            randaoCommitmentRegistrationSubscribers.deliver(
+                                    VerifiedBlockOperationsListener::onOperationsFromBlock,
+                                    eip8321Body.getRandaoCommitmentRegistrations()));
   }
 
   public void subscribeToVerifiedBlockAttestations(
@@ -267,6 +277,12 @@ public class BlockImporter {
       final VerifiedBlockOperationsListener<SignedBlsToExecutionChange>
           verifiedBlockBlsToExecutionChangeListener) {
     blsToExecutionChangeSubscribers.subscribe(verifiedBlockBlsToExecutionChangeListener);
+  }
+
+  public void subscribeToVerifiedBlockRandaoCommitmentRegistrations(
+          final VerifiedBlockOperationsListener<SignedRandaoCommitmentRegistration>
+          verifiedBlockRandaoCommitmentRegistrationsListener) {
+    randaoCommitmentRegistrationSubscribers.subscribe(verifiedBlockRandaoCommitmentRegistrationsListener);
   }
 
   private String getBlockContent(final SignedBeaconBlock block) {
