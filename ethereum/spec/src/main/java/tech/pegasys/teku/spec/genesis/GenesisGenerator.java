@@ -49,7 +49,6 @@ import tech.pegasys.teku.spec.datastructures.state.beaconstate.common.BeaconStat
 import tech.pegasys.teku.spec.datastructures.state.beaconstate.versions.electra.BeaconStateElectra;
 import tech.pegasys.teku.spec.datastructures.state.beaconstate.versions.electra.MutableBeaconStateElectra;
 import tech.pegasys.teku.spec.datastructures.state.beaconstate.versions.fulu.MutableBeaconStateFulu;
-import tech.pegasys.teku.spec.datastructures.state.beaconstate.versions.gloas.BeaconStateSchemaGloas;
 import tech.pegasys.teku.spec.datastructures.state.beaconstate.versions.gloas.MutableBeaconStateGloas;
 import tech.pegasys.teku.spec.datastructures.state.versions.gloas.BuilderPendingPayment;
 import tech.pegasys.teku.spec.logic.versions.electra.helpers.BeaconStateMutatorsElectra;
@@ -223,8 +222,7 @@ public class GenesisGenerator {
       state.setLatestBlockHeader(
           createGenesisBlockHeader(
               schemaDefinitionsGloas.getBeaconBlockBodySchema().createGenesisBody(state)));
-      stateGloas.setBuilders(
-          BeaconStateSchemaGloas.required(state.getBeaconStateSchema()).getBuildersSchema().of());
+      stateGloas.getBuilders().clear();
       stateGloas.setNextWithdrawalBuilderIndex(UInt64.ZERO);
       final SszBitvector executionPayloadAvailability =
           schemaDefinitionsGloas

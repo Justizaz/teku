@@ -66,8 +66,8 @@ public class DataColumnSidecarSubnetSubscriptionsTest {
   private static final int SUBNET_ID = 1;
 
   private static final Spec SPEC =
-      TestSpecFactory.createMinimalWithCapellaDenebElectraFuluGloasAndHezeForkEpoch(
-          UInt64.ZERO, UInt64.ZERO, UInt64.ZERO, UInt64.ZERO, UInt64.valueOf(2), UInt64.valueOf(4));
+      TestSpecFactory.createMinimalWithCapellaDenebElectraFuluGloasHezeAndEip8321ForkEpoch(
+          UInt64.ZERO, UInt64.ZERO, UInt64.ZERO, UInt64.ZERO, UInt64.valueOf(2), UInt64.valueOf(4), UInt64.valueOf(6));
 
   private final DataStructureUtil dataStructureUtil = new DataStructureUtil(SPEC);
   private final StorageSystem storageSystem = InMemoryStorageSystemBuilder.buildDefault(SPEC);

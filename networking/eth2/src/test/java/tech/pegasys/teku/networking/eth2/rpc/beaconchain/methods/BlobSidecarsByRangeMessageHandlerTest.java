@@ -110,6 +110,7 @@ public class BlobSidecarsByRangeMessageHandlerTest {
           case FULU -> TestSpecFactory.createMinimalWithFuluForkEpoch(currentForkEpoch);
           case GLOAS -> TestSpecFactory.createMinimalWithGloasForkEpoch(currentForkEpoch);
           case HEZE -> TestSpecFactory.createMinimalWithHezeForkEpoch(currentForkEpoch);
+          case EIP8321 -> TestSpecFactory.createMinimalWithEip8321ForkEpoch(currentForkEpoch);
         };
 
     dataStructureUtil = new DataStructureUtil(spec);

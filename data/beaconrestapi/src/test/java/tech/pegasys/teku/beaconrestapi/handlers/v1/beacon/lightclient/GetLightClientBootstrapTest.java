@@ -135,7 +135,7 @@ public class GetLightClientBootstrapTest extends AbstractMigratedBeaconHandlerTe
   private static Set<String> expectedHeaderFields(final SpecMilestone milestone) {
     return switch (milestone) {
       case ALTAIR, BELLATRIX -> Set.of("beacon");
-      case GLOAS, HEZE -> Set.of("beacon", "execution_block_hash", "execution_branch");
+      case GLOAS, HEZE, EIP8321 -> Set.of("beacon", "execution_block_hash", "execution_branch");
       default -> Set.of("beacon", "execution", "execution_branch");
     };
   }
@@ -143,7 +143,7 @@ public class GetLightClientBootstrapTest extends AbstractMigratedBeaconHandlerTe
   private static int expectedSyncCommitteeBranchLength(final SpecMilestone milestone) {
     return switch (milestone) {
       case ELECTRA, FULU -> 6;
-      case GLOAS, HEZE -> 11;
+      case GLOAS, HEZE, EIP8321 -> 11;
       default -> 5;
     };
   }

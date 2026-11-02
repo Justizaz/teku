@@ -124,7 +124,7 @@ public class GetLightClientOptimisticUpdateTest extends AbstractMigratedBeaconHa
   private static Set<String> expectedHeaderFields(final SpecMilestone milestone) {
     return switch (milestone) {
       case ALTAIR, BELLATRIX -> Set.of("beacon");
-      case GLOAS, HEZE -> Set.of("beacon", "execution_block_hash", "execution_branch");
+      case GLOAS, HEZE, EIP8321 -> Set.of("beacon", "execution_block_hash", "execution_branch");
       default -> Set.of("beacon", "execution", "execution_branch");
     };
   }

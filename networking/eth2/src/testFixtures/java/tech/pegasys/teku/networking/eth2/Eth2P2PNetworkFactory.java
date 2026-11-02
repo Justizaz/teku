@@ -60,6 +60,7 @@ import tech.pegasys.teku.networking.eth2.gossip.forks.versions.GossipForkSubscri
 import tech.pegasys.teku.networking.eth2.gossip.forks.versions.GossipForkSubscriptionsBellatrix;
 import tech.pegasys.teku.networking.eth2.gossip.forks.versions.GossipForkSubscriptionsCapella;
 import tech.pegasys.teku.networking.eth2.gossip.forks.versions.GossipForkSubscriptionsDeneb;
+import tech.pegasys.teku.networking.eth2.gossip.forks.versions.GossipForkSubscriptionsEip8321;
 import tech.pegasys.teku.networking.eth2.gossip.forks.versions.GossipForkSubscriptionsElectra;
 import tech.pegasys.teku.networking.eth2.gossip.forks.versions.GossipForkSubscriptionsFulu;
 import tech.pegasys.teku.networking.eth2.gossip.forks.versions.GossipForkSubscriptionsGloas;
@@ -116,6 +117,7 @@ import tech.pegasys.teku.spec.datastructures.operations.Attestation;
 import tech.pegasys.teku.spec.datastructures.operations.AttesterSlashing;
 import tech.pegasys.teku.spec.datastructures.operations.ProposerSlashing;
 import tech.pegasys.teku.spec.datastructures.operations.SignedBlsToExecutionChange;
+import tech.pegasys.teku.spec.datastructures.operations.SignedRandaoCommitmentRegistration;
 import tech.pegasys.teku.spec.datastructures.operations.SignedVoluntaryExit;
 import tech.pegasys.teku.spec.datastructures.operations.versions.altair.SignedContributionAndProof;
 import tech.pegasys.teku.spec.datastructures.operations.versions.altair.ValidatableSyncCommitteeMessage;
@@ -192,6 +194,7 @@ public class Eth2P2PNetworkFactory {
     protected OperationProcessor<SignedExecutionPayloadBid> executionPayloadBidProcessor;
     protected OperationProcessor<SignedProposerPreferences> proposerPreferencesProcessor;
     protected OperationProcessor<SignedInclusionList> inclusionListProcessor;
+    protected OperationProcessor<SignedRandaoCommitmentRegistration> randaoCommitmentRegistrationProcessor;
     protected ProcessedAttestationSubscriptionProvider processedAttestationSubscriptionProvider;
     protected VerifiedBlockAttestationsSubscriptionProvider
         verifiedBlockAttestationsSubscriptionProvider;
@@ -708,6 +711,39 @@ public class Eth2P2PNetworkFactory {
                 executionProofOperationProcessor,
                 p2PConfig.isExecutionProofTopicEnabled(),
                 isSuperNodeSupplier);
+        case EIP8321 ->
+          new GossipForkSubscriptionsEip8321(
+                  forkAndSpecMilestone.getFork(),
+                  spec,
+                  asyncRunner,
+                  metricsSystem,
+                  network,
+                  recentChainData,
+                  gossipEncoding,
+                  gossipedBlockProcessor,
+                  gossipedBlobSidecarProcessor,
+                  gossipedAttestationProcessor,
+                  gossipedAggregateProcessor,
+                  attesterSlashingProcessor,
+                  proposerSlashingProcessor,
+                  voluntaryExitProcessor,
+                  signedContributionAndProofProcessor,
+                  syncCommitteeMessageProcessor,
+                  lightClientFinalityUpdateProcessor,
+                  lightClientOptimisticUpdateProcessor,
+                  signedBlsToExecutionChangeProcessor,
+                  dataColumnSidecarOperationProcessor,
+                  executionPayloadProcessor,
+                  payloadAttestationMessageProcessor,
+                  executionPayloadBidProcessor,
+                  proposerPreferencesProcessor,
+                  inclusionListProcessor,
+                  randaoCommitmentRegistrationProcessor,
+                  debugDataDumper,
+                  DasGossipLogger.NOOP,
+                  executionProofOperationProcessor,
+                  p2PConfig.isExecutionProofTopicEnabled(),
+                  isSuperNodeSupplier);
       };
     }
 
@@ -827,6 +863,9 @@ public class Eth2P2PNetworkFactory {
       }
       if (inclusionListProcessor == null) {
         inclusionListProcessor = OperationProcessor.noop();
+      }
+      if(randaoCommitmentRegistrationProcessor == null) {
+        randaoCommitmentRegistrationProcessor = OperationProcessor.noop();
       }
       if (isSuperNodeSupplier == null) {
         isSuperNodeSupplier = () -> false;
@@ -978,6 +1017,14 @@ public class Eth2P2PNetworkFactory {
             gossipedSignedBlsToExecutionChangeProcessor) {
       checkNotNull(gossipedSignedBlsToExecutionChangeProcessor);
       this.signedBlsToExecutionChangeProcessor = gossipedSignedBlsToExecutionChangeProcessor;
+      return this;
+    }
+
+    public Eth2P2PNetworkBuilder gossipedRandaoCommitmentRegistrationProcessor(
+            final OperationProcessor<SignedRandaoCommitmentRegistration>
+                gossipedRandaoCommitmentRegistrationProcessor) {
+      checkNotNull(gossipedRandaoCommitmentRegistrationProcessor);
+      this.randaoCommitmentRegistrationProcessor = gossipedRandaoCommitmentRegistrationProcessor;
       return this;
     }
 
