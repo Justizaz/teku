@@ -47,6 +47,7 @@ import tech.pegasys.teku.spec.datastructures.operations.Attestation;
 import tech.pegasys.teku.spec.datastructures.operations.AttesterSlashing;
 import tech.pegasys.teku.spec.datastructures.operations.ProposerSlashing;
 import tech.pegasys.teku.spec.datastructures.operations.SignedBlsToExecutionChange;
+import tech.pegasys.teku.spec.datastructures.operations.SignedRandaoCommitmentRegistration;
 import tech.pegasys.teku.spec.datastructures.operations.SignedVoluntaryExit;
 import tech.pegasys.teku.spec.datastructures.operations.versions.altair.SignedContributionAndProof;
 import tech.pegasys.teku.spec.datastructures.state.Validator;
@@ -97,25 +98,25 @@ public class NodeDataProvider {
   private final Spec spec;
 
   public NodeDataProvider(
-      final AggregatingAttestationPool attestationPool,
-      final InclusionListManager inclusionListManager,
-      final OperationPool<AttesterSlashing> attesterSlashingsPool,
-      final OperationPool<ProposerSlashing> proposerSlashingPool,
-      final OperationPool<SignedVoluntaryExit> voluntaryExitPool,
-      final OperationPool<SignedBlsToExecutionChange> blsToExecutionChangePool,
-      final SyncCommitteeContributionPool syncCommitteeContributionPool,
-      final BlockBlobSidecarsTrackersPool blockBlobSidecarsTrackersPool,
-      final AttestationManager attestationManager,
-      final boolean isLivenessTrackingEnabled,
-      final ActiveValidatorChannel activeValidatorChannel,
-      final ProposersDataManager proposersDataManager,
-      final ForkChoiceNotifier forkChoiceNotifier,
-      final RecentChainData recentChainData,
-      final DataColumnSidecarManager dataColumnSidecarManager,
-      final CustodyGroupCountManager custodyGroupCountManager,
-      final PayloadAttestationPool payloadAttestationPool,
-      final ProposerPreferencesManager proposerPreferencesManager,
-      final Spec spec) {
+          final AggregatingAttestationPool attestationPool,
+          final InclusionListManager inclusionListManager,
+          final OperationPool<AttesterSlashing> attesterSlashingsPool,
+          final OperationPool<ProposerSlashing> proposerSlashingPool,
+          final OperationPool<SignedVoluntaryExit> voluntaryExitPool,
+          final OperationPool<SignedBlsToExecutionChange> blsToExecutionChangePool,
+          final SyncCommitteeContributionPool syncCommitteeContributionPool,
+          final BlockBlobSidecarsTrackersPool blockBlobSidecarsTrackersPool,
+          final AttestationManager attestationManager,
+          final boolean isLivenessTrackingEnabled,
+          final ActiveValidatorChannel activeValidatorChannel,
+          final ProposersDataManager proposersDataManager,
+          final ForkChoiceNotifier forkChoiceNotifier,
+          final RecentChainData recentChainData,
+          final DataColumnSidecarManager dataColumnSidecarManager,
+          final CustodyGroupCountManager custodyGroupCountManager,
+          final PayloadAttestationPool payloadAttestationPool,
+          final ProposerPreferencesManager proposerPreferencesManager,
+          final Spec spec) {
     this.attestationPool = attestationPool;
     this.inclusionListManager = inclusionListManager;
     this.attesterSlashingPool = attesterSlashingsPool;
@@ -138,24 +139,24 @@ public class NodeDataProvider {
   }
 
   public List<Attestation> getAttestations(
-      final Optional<UInt64> maybeSlot, final Optional<UInt64> maybeCommitteeIndex) {
+          final Optional<UInt64> maybeSlot, final Optional<UInt64> maybeCommitteeIndex) {
     return attestationPool.getAttestations(maybeSlot, maybeCommitteeIndex);
   }
 
   public SafeFuture<Optional<SszBitvector>> getInclusionListBits(
-      final UInt64 proposalSlot, final Bytes32 parentRoot) {
+          final UInt64 proposalSlot, final Bytes32 parentRoot) {
     return inclusionListManager.getInclusionListBits(proposalSlot, parentRoot);
   }
 
   public SafeFuture<List<SignedInclusionList>> getInclusionLists(
-      final UInt64 slot, final Bytes32 dependentRoot, final SszBitvector committeeIndices) {
+          final UInt64 slot, final Bytes32 dependentRoot, final SszBitvector committeeIndices) {
     return inclusionListManager.getInclusionLists(slot, dependentRoot, committeeIndices);
   }
 
   public ObjectAndMetaData<List<Attestation>> getAttestationsAndMetaData(
-      final Optional<UInt64> maybeSlot, final Optional<UInt64> maybeCommitteeIndex) {
+          final Optional<UInt64> maybeSlot, final Optional<UInt64> maybeCommitteeIndex) {
     return lookupMetaData(
-        attestationPool.getAttestations(maybeSlot, maybeCommitteeIndex), maybeSlot);
+            attestationPool.getAttestations(maybeSlot, maybeCommitteeIndex), maybeSlot);
   }
 
   public Set<UInt64> getCustodyColumnIndices() {
@@ -163,18 +164,18 @@ public class NodeDataProvider {
   }
 
   private ObjectAndMetaData<List<Attestation>> lookupMetaData(
-      final List<Attestation> attestations, final Optional<UInt64> maybeSlot) {
+          final List<Attestation> attestations, final Optional<UInt64> maybeSlot) {
     final UInt64 slot =
-        getSlot(attestations, attestation -> attestation.getData().getSlot(), maybeSlot);
+            getSlot(attestations, attestation -> attestation.getData().getSlot(), maybeSlot);
     return new ObjectAndMetaData<>(
-        attestations, spec.atSlot(slot).getMilestone(), false, false, false);
+            attestations, spec.atSlot(slot).getMilestone(), false, false, false);
   }
 
   private <T> UInt64 getSlot(
-      final List<T> items, final Function<T, UInt64> itemToSlot, final Optional<UInt64> maybeSlot) {
+          final List<T> items, final Function<T, UInt64> itemToSlot, final Optional<UInt64> maybeSlot) {
     return maybeSlot
-        .or(() -> items.stream().findFirst().map(itemToSlot))
-        .orElseGet(() -> recentChainData.getCurrentSlot().orElse(UInt64.ZERO));
+            .or(() -> items.stream().findFirst().map(itemToSlot))
+            .orElseGet(() -> recentChainData.getCurrentSlot().orElse(UInt64.ZERO));
   }
 
   public List<AttesterSlashing> getAttesterSlashings() {
@@ -184,12 +185,12 @@ public class NodeDataProvider {
   public ObjectAndMetaData<List<AttesterSlashing>> getAttesterSlashingsAndMetaData() {
     final List<AttesterSlashing> attesterSlashings = new ArrayList<>(attesterSlashingPool.getAll());
     final UInt64 slot =
-        getSlot(
-            attesterSlashings,
-            attesterSlashing -> attesterSlashing.getAttestation1().getData().getSlot(),
-            Optional.empty());
+            getSlot(
+                    attesterSlashings,
+                    attesterSlashing -> attesterSlashing.getAttestation1().getData().getSlot(),
+                    Optional.empty());
     return new ObjectAndMetaData<>(
-        attesterSlashings, spec.atSlot(slot).getMilestone(), false, false, false);
+            attesterSlashings, spec.atSlot(slot).getMilestone(), false, false, false);
   }
 
   public List<ProposerSlashing> getProposerSlashings() {
@@ -201,87 +202,91 @@ public class NodeDataProvider {
   }
 
   public ObjectAndMetaData<List<PayloadAttestation>> getPayloadAttestationsAndMetaData(
-      final Optional<UInt64> maybeSlot) {
+          final Optional<UInt64> maybeSlot) {
     final List<PayloadAttestation> payloadAttestations =
-        recentChainData
-            .getBestState()
-            .map(SafeFuture::join)
-            .map(payloadAttestationPool::getPayloadAttestations)
-            .orElse(List.of());
+            recentChainData
+                    .getBestState()
+                    .map(SafeFuture::join)
+                    .map(payloadAttestationPool::getPayloadAttestations)
+                    .orElse(List.of());
     final List<PayloadAttestation> filteredPayloadAttestations =
-        maybeSlot
-            .map(
-                slot ->
-                    payloadAttestations.stream()
-                        .filter(
-                            payloadAttestation ->
-                                payloadAttestation.getData().getSlot().equals(slot))
-                        .toList())
-            .orElse(payloadAttestations);
+            maybeSlot
+                    .map(
+                            slot ->
+                                    payloadAttestations.stream()
+                                            .filter(
+                                                    payloadAttestation ->
+                                                            payloadAttestation.getData().getSlot().equals(slot))
+                                            .toList())
+                    .orElse(payloadAttestations);
     final UInt64 slot =
-        getSlot(
-            filteredPayloadAttestations,
-            payloadAttestation -> payloadAttestation.getData().getSlot(),
-            maybeSlot);
+            getSlot(
+                    filteredPayloadAttestations,
+                    payloadAttestation -> payloadAttestation.getData().getSlot(),
+                    maybeSlot);
     return new ObjectAndMetaData<>(
-        filteredPayloadAttestations, spec.atSlot(slot).getMilestone(), false, false, false);
+            filteredPayloadAttestations, spec.atSlot(slot).getMilestone(), false, false, false);
   }
 
   public SafeFuture<InternalValidationResult> postVoluntaryExit(final SignedVoluntaryExit exit) {
     final Optional<SafeFuture<BeaconState>> maybeFutureState = recentChainData.getBestState();
 
     return maybeFutureState
-        .map(
-            beaconStateSafeFuture ->
-                beaconStateSafeFuture
-                    .thenApply(
-                        state -> {
-                          final SszList<Validator> validators = state.getValidators();
-                          final UInt64 validatorId = exit.getValidatorId();
-                          if (validatorId.isGreaterThanOrEqualTo(validators.size())) {
-                            return InternalValidationResult.reject(
-                                "Validator index %s was not found", exit.getValidatorId());
-                          } else if (validators
-                              .get(validatorId.intValue())
-                              .getExitEpoch()
-                              .isLessThan(FAR_FUTURE_EPOCH)) {
-                            return InternalValidationResult.reject(
-                                "Validator index %s is already exiting (or exited)",
-                                exit.getValidatorId());
-                          }
-                          return InternalValidationResult.ACCEPT;
-                        })
-                    .thenApply(
-                        result -> {
-                          if (result.isAccept()) {
-                            try {
-                              // if we can't add this in a reasonable time we should fail.
-                              return voluntaryExitPool.addLocal(exit).get(5, TimeUnit.SECONDS);
-                            } catch (InterruptedException
-                                | ExecutionException
-                                | TimeoutException e) {
-                              return InternalValidationResult.reject(
-                                  "Failed to add voluntary exit for validator index %s to pool: %s",
-                                  exit.getValidatorId(), e.getMessage());
-                            }
-                          }
-                          return result;
-                        }))
-        .orElseGet(() -> SafeFuture.failedFuture(new ServiceUnavailableException()));
+            .map(
+                    beaconStateSafeFuture ->
+                            beaconStateSafeFuture
+                                    .thenApply(
+                                            state -> {
+                                              final SszList<Validator> validators = state.getValidators();
+                                              final UInt64 validatorId = exit.getValidatorId();
+                                              if (validatorId.isGreaterThanOrEqualTo(validators.size())) {
+                                                return InternalValidationResult.reject(
+                                                        "Validator index %s was not found", exit.getValidatorId());
+                                              } else if (validators
+                                                      .get(validatorId.intValue())
+                                                      .getExitEpoch()
+                                                      .isLessThan(FAR_FUTURE_EPOCH)) {
+                                                return InternalValidationResult.reject(
+                                                        "Validator index %s is already exiting (or exited)",
+                                                        exit.getValidatorId());
+                                              }
+                                              return InternalValidationResult.ACCEPT;
+                                            })
+                                    .thenApply(
+                                            result -> {
+                                              if (result.isAccept()) {
+                                                try {
+                                                  return voluntaryExitPool.addLocal(exit).get(5, TimeUnit.SECONDS);
+                                                } catch (InterruptedException
+                                                         | ExecutionException
+                                                         | TimeoutException e) {
+                                                  return InternalValidationResult.reject(
+                                                          "Failed to add voluntary exit for validator index %s to pool: %s",
+                                                          exit.getValidatorId(), e.getMessage());
+                                                }
+                                              }
+                                              return result;
+                                            }))
+            .orElseGet(() -> SafeFuture.failedFuture(new ServiceUnavailableException()));
   }
 
   public SafeFuture<InternalValidationResult> postAttesterSlashing(
-      final AttesterSlashing slashing) {
+          final AttesterSlashing slashing) {
     return attesterSlashingPool.addLocal(slashing);
   }
 
   public SafeFuture<InternalValidationResult> postProposerSlashing(
-      final ProposerSlashing slashing) {
+          final ProposerSlashing slashing) {
     return proposerSlashingPool.addLocal(slashing);
   }
 
+  public SafeFuture<Void> submitSignedRandaoCommitmentRegistration(
+          final SignedRandaoCommitmentRegistration registration) {
+    return SafeFuture.COMPLETE;
+  }
+
   public List<SignedBlsToExecutionChange> getBlsToExecutionChanges(
-      final Optional<Boolean> locallySubmitted) {
+          final Optional<Boolean> locallySubmitted) {
     if (locallySubmitted.isPresent() && locallySubmitted.get()) {
       return new ArrayList<>(blsToExecutionChangePool.getLocallySubmitted());
     }
@@ -289,7 +294,7 @@ public class NodeDataProvider {
   }
 
   public SafeFuture<List<SubmitDataError>> postBlsToExecutionChanges(
-      final List<SignedBlsToExecutionChange> blsToExecutionChanges) {
+          final List<SignedBlsToExecutionChange> blsToExecutionChanges) {
     final List<SafeFuture<Optional<SubmitDataError>>> maybeFutureErrors = new ArrayList<>();
 
     for (int i = 0; i < blsToExecutionChanges.size(); i++) {
@@ -297,30 +302,30 @@ public class NodeDataProvider {
     }
 
     return SafeFuture.collectAll(maybeFutureErrors.stream())
-        .thenApply(entries -> entries.stream().flatMap(Optional::stream).toList());
+            .thenApply(entries -> entries.stream().flatMap(Optional::stream).toList());
   }
 
   private SafeFuture<Optional<SubmitDataError>> addBlsToExecutionChange(
-      final int index, final SignedBlsToExecutionChange signedBlsToExecutionChange) {
+          final int index, final SignedBlsToExecutionChange signedBlsToExecutionChange) {
     return blsToExecutionChangePool
-        .addLocal(signedBlsToExecutionChange)
-        .thenApply(
-            internalValidationResult -> {
-              if (internalValidationResult.isAccept()) {
-                return Optional.empty();
-              }
-              LOG.debug(
-                  "BlsToExecutionChange failed status {} {}",
-                  internalValidationResult.code(),
-                  internalValidationResult.getDescription().orElse(""));
-              return Optional.of(
-                  new SubmitDataError(
-                      UInt64.valueOf(index),
-                      internalValidationResult
-                          .getDescription()
-                          .orElse(
-                              "Invalid BlsToExecutionChange, it will never pass validation so it's rejected")));
-            });
+            .addLocal(signedBlsToExecutionChange)
+            .thenApply(
+                    internalValidationResult -> {
+                      if (internalValidationResult.isAccept()) {
+                        return Optional.empty();
+                      }
+                      LOG.debug(
+                              "BlsToExecutionChange failed status {} {}",
+                              internalValidationResult.code(),
+                              internalValidationResult.getDescription().orElse(""));
+                      return Optional.of(
+                              new SubmitDataError(
+                                      UInt64.valueOf(index),
+                                      internalValidationResult
+                                              .getDescription()
+                                              .orElse(
+                                                      "Invalid BlsToExecutionChange, it will never pass validation so it's rejected")));
+                    });
   }
 
   public void subscribeToReceivedBlobSidecar(final NewBlobSidecarSubscriber listener) {
@@ -332,12 +337,12 @@ public class NodeDataProvider {
   }
 
   public void subscribeToAttesterSlashing(
-      final OperationAddedSubscriber<AttesterSlashing> listener) {
+          final OperationAddedSubscriber<AttesterSlashing> listener) {
     attesterSlashingPool.subscribeOperationAdded(listener);
   }
 
   public void subscribeToProposerSlashing(
-      final OperationAddedSubscriber<ProposerSlashing> listener) {
+          final OperationAddedSubscriber<ProposerSlashing> listener) {
     proposerSlashingPool.subscribeOperationAdded(listener);
   }
 
@@ -346,17 +351,17 @@ public class NodeDataProvider {
   }
 
   public void subscribeToNewVoluntaryExits(
-      final OperationAddedSubscriber<SignedVoluntaryExit> listener) {
+          final OperationAddedSubscriber<SignedVoluntaryExit> listener) {
     voluntaryExitPool.subscribeOperationAdded(listener);
   }
 
   public void subscribeToNewBlsToExecutionChanges(
-      final OperationAddedSubscriber<SignedBlsToExecutionChange> listener) {
+          final OperationAddedSubscriber<SignedBlsToExecutionChange> listener) {
     blsToExecutionChangePool.subscribeOperationAdded(listener);
   }
 
   public void subscribeToSyncCommitteeContributions(
-      final OperationAddedSubscriber<SignedContributionAndProof> listener) {
+          final OperationAddedSubscriber<SignedContributionAndProof> listener) {
     syncCommitteeContributionPool.subscribeOperationAdded(listener);
   }
 
@@ -365,12 +370,12 @@ public class NodeDataProvider {
   }
 
   public void subscribeToPayloadAttestationMessages(
-      final OperationAddedSubscriber<PayloadAttestationMessage> listener) {
+          final OperationAddedSubscriber<PayloadAttestationMessage> listener) {
     payloadAttestationPool.subscribeOperationAdded(listener);
   }
 
   public void subscribeToProposerPreferences(
-      final OperationAddedSubscriber<SignedProposerPreferences> listener) {
+          final OperationAddedSubscriber<SignedProposerPreferences> listener) {
     proposerPreferencesManager.subscribeOperationAdded(listener);
   }
 
@@ -379,18 +384,17 @@ public class NodeDataProvider {
   }
 
   public SafeFuture<Optional<List<ValidatorLivenessAtEpoch>>> getValidatorLiveness(
-      final List<UInt64> validatorIndices,
-      final UInt64 epoch,
-      final Optional<UInt64> maybeCurrentEpoch) {
+          final List<UInt64> validatorIndices,
+          final UInt64 epoch,
+          final Optional<UInt64> maybeCurrentEpoch) {
     if (!isLivenessTrackingEnabled) {
       return SafeFuture.failedFuture(
-          new BadRequestException(
-              "Validator liveness tracking is not enabled on this beacon node, cannot service request"));
+              new BadRequestException(
+                      "Validator liveness tracking is not enabled on this beacon node, cannot service request"));
     }
-    // if no validator indices were requested, that's a bad request.
     if (validatorIndices.isEmpty()) {
       return SafeFuture.failedFuture(
-          new BadRequestException("No validator indices posted in validator liveness request"));
+              new BadRequestException("No validator indices posted in validator liveness request"));
     }
     if (maybeCurrentEpoch.isEmpty()) {
       return SafeFuture.failedFuture(new ServiceUnavailableException());
@@ -399,28 +403,28 @@ public class NodeDataProvider {
     final UInt64 currentEpoch = maybeCurrentEpoch.get();
     if (currentEpoch.isLessThan(epoch)) {
       return SafeFuture.failedFuture(
-          new BadRequestException(
-              String.format(
-                  "Current node epoch %s, cannot check liveness for a future epoch %s",
-                  currentEpoch, epoch)));
+              new BadRequestException(
+                      String.format(
+                              "Current node epoch %s, cannot check liveness for a future epoch %s",
+                              currentEpoch, epoch)));
     } else if (currentEpoch.minusMinZero(TRACKED_EPOCHS).isGreaterThan(epoch)) {
       return SafeFuture.failedFuture(
-          new BadRequestException(
-              String.format(
-                  "Current node epoch %s, cannot check liveness for an epoch (%s) more than %d in the past",
-                  currentEpoch, epoch, TRACKED_EPOCHS)));
+              new BadRequestException(
+                      String.format(
+                              "Current node epoch %s, cannot check liveness for an epoch (%s) more than %d in the past",
+                              currentEpoch, epoch, TRACKED_EPOCHS)));
     }
 
     return activeValidatorChannel
-        .validatorsLiveAtEpoch(validatorIndices, epoch)
-        .thenApply(
-            validatorLivenessMap -> {
-              final List<ValidatorLivenessAtEpoch> livenessAtEpochs = new ArrayList<>();
-              validatorLivenessMap.forEach(
-                  (validatorIndex, liveness) ->
-                      livenessAtEpochs.add(new ValidatorLivenessAtEpoch(validatorIndex, liveness)));
-              return Optional.of(livenessAtEpochs);
-            });
+            .validatorsLiveAtEpoch(validatorIndices, epoch)
+            .thenApply(
+                    validatorLivenessMap -> {
+                      final List<ValidatorLivenessAtEpoch> livenessAtEpochs = new ArrayList<>();
+                      validatorLivenessMap.forEach(
+                              (validatorIndex, liveness) ->
+                                      livenessAtEpochs.add(new ValidatorLivenessAtEpoch(validatorIndex, liveness)));
+                      return Optional.of(livenessAtEpochs);
+                    });
   }
 
   public Map<UInt64, PreparedProposerInfo> getPreparedProposerInfo() {
