@@ -1,50 +1,74 @@
+/*
+ * Copyright (c) 2026 Consensys Incorporated. All rights reserved.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software distributed under the License is distributed on
+ * an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the
+ * specific language governing permissions and limitations under the License.
+ */
+
 package tech.pegasys.teku.beaconrestapi.handlers.v1.beacon;
 
-import static jakarta.servlet.http.HttpServletResponse.SC_OK;
 import static tech.pegasys.teku.infrastructure.http.HttpStatusCodes.SC_BAD_REQUEST;
-import static tech.pegasys.teku.infrastructure.json.types.CoreTypes.HTTP_ERROR_RESPONSE_TYPE;
+import static tech.pegasys.teku.infrastructure.http.HttpStatusCodes.SC_OK;
+import static tech.pegasys.teku.infrastructure.http.RestApiConstants.TAG_BEACON;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
-import tech.pegasys.teku.api.ChainDataProvider;
+import tech.pegasys.teku.api.DataProvider;
 import tech.pegasys.teku.api.NodeDataProvider;
 import tech.pegasys.teku.infrastructure.async.SafeFuture;
-import tech.pegasys.teku.infrastructure.http.RestApiConstants;
 import tech.pegasys.teku.infrastructure.restapi.endpoints.AsyncApiResponse;
 import tech.pegasys.teku.infrastructure.restapi.endpoints.EndpointMetadata;
 import tech.pegasys.teku.infrastructure.restapi.endpoints.RestApiEndpoint;
 import tech.pegasys.teku.infrastructure.restapi.endpoints.RestApiRequest;
 import tech.pegasys.teku.spec.datastructures.operations.SignedRandaoCommitmentRegistration;
+import tech.pegasys.teku.statetransition.validation.InternalValidationResult;
 
 public class PostSignedRandaoCommitmentRegistration extends RestApiEndpoint {
+    public static final String ROUTE = "/eth/v1/beacon/pool/randao_commitments";
     private final NodeDataProvider nodeDataProvider;
-    private final ChainDataProvider chainDataProvider;
 
-    public PostSignedRandaoCommitmentRegistration(
-            final NodeDataProvider nodeDataProvider,
-            final ChainDataProvider chainDataProvider) {
-        super(
-                EndpointMetadata.post("/eth/v1/beacon/pool/randao_registrations")
-                        .operationId("submitSignedRandaoCommitmentRegistration")
-                        .summary("Submit Signed RANDAO Commitment Registration")
-                        .description("Submit signed RANDAO commitment registration to the beacon node pool.")
-                        .tags(RestApiConstants.TAG_BEACON)
-                        .requestBodyType(SignedRandaoCommitmentRegistration.SSZ_SCHEMA.getJsonTypeDefinition())
-                        .response(SC_OK, "Success")
-                        .response(SC_BAD_REQUEST, "Invalid request body or signature", HTTP_ERROR_RESPONSE_TYPE)
-                        .build());
-        this.nodeDataProvider = nodeDataProvider;
-        this.chainDataProvider = chainDataProvider;
+    public PostSignedRandaoCommitmentRegistration(final NodeDataProvider provider) {
+        super(createEndpointMetadata());
+        this.nodeDataProvider = provider;
+    }
+
+    public PostSignedRandaoCommitmentRegistration(final DataProvider dataProvider) {
+        this(dataProvider.getNodeDataProvider());
+    }
+
+    private static EndpointMetadata createEndpointMetadata() {
+        return EndpointMetadata.post(ROUTE)
+                .operationId("submitSignedRandaoCommitmentRegistration")
+                .summary("Submit SignedRandaoCommitmentRegistration object to node's pool")
+                .description(
+                        "Submits SignedRandaoCommitmentRegistration object to node's pool and if passes validation node MUST broadcast it to network.")
+                .tags(TAG_BEACON)
+                .requestBodyType(SignedRandaoCommitmentRegistration.SSZ_SCHEMA.getJsonTypeDefinition())
+                .response(SC_OK, "Randao commitment registration is stored in node and broadcast to network")
+                .response(SC_BAD_REQUEST, "Invalid randao commitment registration")
+                .build();
     }
 
     @Override
     public void handleRequest(final RestApiRequest request) throws JsonProcessingException {
         final SignedRandaoCommitmentRegistration registration = request.getRequestBody();
-
-        final SafeFuture<Void> response = nodeDataProvider.submitSignedRandaoCommitmentRegistration(registration);
+        final SafeFuture<InternalValidationResult> future =
+                nodeDataProvider.submitSignedRandaoCommitmentRegistration(registration);
 
         request.respondAsync(
-                response
-                        .thenApply(unused -> AsyncApiResponse.respondOk(null))
-                        .exceptionally(error -> AsyncApiResponse.respondWithError(SC_BAD_REQUEST, error.getMessage())));
+                future.thenApply(
+                        result -> {
+                            if (result.isAccept()) {
+                                return AsyncApiResponse.respondWithCode(SC_OK);
+                            }
+                            return AsyncApiResponse.respondWithError(
+                                    SC_BAD_REQUEST,
+                                    result.getDescription().orElse("Invalid randao commitment registration"));
+                        }));
     }
 }

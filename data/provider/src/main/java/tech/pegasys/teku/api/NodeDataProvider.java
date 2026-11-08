@@ -82,6 +82,7 @@ public class NodeDataProvider {
   private final OperationPool<ProposerSlashing> proposerSlashingPool;
   private final OperationPool<SignedVoluntaryExit> voluntaryExitPool;
   private final OperationPool<SignedBlsToExecutionChange> blsToExecutionChangePool;
+  private final OperationPool<SignedRandaoCommitmentRegistration> randaoCommitmentRegistrationPool;
   private final SyncCommitteeContributionPool syncCommitteeContributionPool;
   private final BlockBlobSidecarsTrackersPool blockBlobSidecarsTrackersPool;
   private final AttestationManager attestationManager;
@@ -104,6 +105,7 @@ public class NodeDataProvider {
           final OperationPool<ProposerSlashing> proposerSlashingPool,
           final OperationPool<SignedVoluntaryExit> voluntaryExitPool,
           final OperationPool<SignedBlsToExecutionChange> blsToExecutionChangePool,
+          final OperationPool<SignedRandaoCommitmentRegistration> randaoCommitmentRegistrationPool,
           final SyncCommitteeContributionPool syncCommitteeContributionPool,
           final BlockBlobSidecarsTrackersPool blockBlobSidecarsTrackersPool,
           final AttestationManager attestationManager,
@@ -123,6 +125,7 @@ public class NodeDataProvider {
     this.proposerSlashingPool = proposerSlashingPool;
     this.voluntaryExitPool = voluntaryExitPool;
     this.blsToExecutionChangePool = blsToExecutionChangePool;
+    this.randaoCommitmentRegistrationPool = randaoCommitmentRegistrationPool;
     this.syncCommitteeContributionPool = syncCommitteeContributionPool;
     this.blockBlobSidecarsTrackersPool = blockBlobSidecarsTrackersPool;
     this.attestationManager = attestationManager;
@@ -280,9 +283,9 @@ public class NodeDataProvider {
     return proposerSlashingPool.addLocal(slashing);
   }
 
-  public SafeFuture<Void> submitSignedRandaoCommitmentRegistration(
+  public SafeFuture<InternalValidationResult> submitSignedRandaoCommitmentRegistration(
           final SignedRandaoCommitmentRegistration registration) {
-    return SafeFuture.COMPLETE;
+    return randaoCommitmentRegistrationPool.addLocal(registration);
   }
 
   public List<SignedBlsToExecutionChange> getBlsToExecutionChanges(

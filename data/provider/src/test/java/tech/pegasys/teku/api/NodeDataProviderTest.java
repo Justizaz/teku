@@ -36,6 +36,7 @@ import tech.pegasys.teku.spec.TestSpecFactory;
 import tech.pegasys.teku.spec.datastructures.operations.AttesterSlashing;
 import tech.pegasys.teku.spec.datastructures.operations.ProposerSlashing;
 import tech.pegasys.teku.spec.datastructures.operations.SignedBlsToExecutionChange;
+import tech.pegasys.teku.spec.datastructures.operations.SignedRandaoCommitmentRegistration;
 import tech.pegasys.teku.spec.datastructures.operations.SignedVoluntaryExit;
 import tech.pegasys.teku.spec.util.DataStructureUtil;
 import tech.pegasys.teku.statetransition.OperationPool;
@@ -62,18 +63,18 @@ public class NodeDataProviderTest {
   private final AggregatingAttestationPool attestationPool = mock(AggregatingAttestationPool.class);
   private final InclusionListManager inclusionListManager = mock(InclusionListManager.class);
   private final BlockBlobSidecarsTrackersPool blockBlobSidecarsTrackersPool =
-      mock(BlockBlobSidecarsTrackersPool.class);
+          mock(BlockBlobSidecarsTrackersPool.class);
   private final DataColumnSidecarManager dataColumnSidecarManager =
-      mock(DataColumnSidecarManager.class);
+          mock(DataColumnSidecarManager.class);
   private final AttestationManager attestationManager = mock(AttestationManager.class);
   private final ActiveValidatorChannel validatorChannel = mock(ActiveValidatorChannel.class);
   private final ProposersDataManager proposersDataManager = mock(ProposersDataManager.class);
   private final ForkChoiceNotifier forkChoiceNotifier = mock(ForkChoiceNotifier.class);
   private final CustodyGroupCountManager custodyGroupCountManager =
-      mock(CustodyGroupCountManager.class);
+          mock(CustodyGroupCountManager.class);
   private final PayloadAttestationPool payloadAttestationPool = mock(PayloadAttestationPool.class);
   private final ProposerPreferencesManager proposerPreferencesManager =
-      mock(ProposerPreferencesManager.class);
+          mock(ProposerPreferencesManager.class);
   private final RecentChainData recentChainData = mock(RecentChainData.class);
 
   private final OperationPool<AttesterSlashing> attesterSlashingPool = mock(OperationPool.class);
@@ -83,46 +84,50 @@ public class NodeDataProviderTest {
   private final OperationPool<SignedVoluntaryExit> voluntaryExitPool = mock(OperationPool.class);
 
   private final OperationPool<SignedBlsToExecutionChange> blsToExecutionChangePool =
-      mock(OperationPool.class);
+          mock(OperationPool.class);
+
+  private final OperationPool<SignedRandaoCommitmentRegistration> randaoCommitmentRegistrationPool =
+          mock(OperationPool.class);
 
   private final SyncCommitteeContributionPool syncCommitteeContributionPool =
-      mock(SyncCommitteeContributionPool.class);
+          mock(SyncCommitteeContributionPool.class);
   private NodeDataProvider provider;
 
   @BeforeEach
   public void setup() {
     provider =
-        new NodeDataProvider(
-            attestationPool,
-            inclusionListManager,
-            attesterSlashingPool,
-            proposerSlashingPool,
-            voluntaryExitPool,
-            blsToExecutionChangePool,
-            syncCommitteeContributionPool,
-            blockBlobSidecarsTrackersPool,
-            attestationManager,
-            false,
-            validatorChannel,
-            proposersDataManager,
-            forkChoiceNotifier,
-            recentChainData,
-            dataColumnSidecarManager,
-            custodyGroupCountManager,
-            payloadAttestationPool,
-            proposerPreferencesManager,
-            spec);
+            new NodeDataProvider(
+                    attestationPool,
+                    inclusionListManager,
+                    attesterSlashingPool,
+                    proposerSlashingPool,
+                    voluntaryExitPool,
+                    blsToExecutionChangePool,
+                    randaoCommitmentRegistrationPool,
+                    syncCommitteeContributionPool,
+                    blockBlobSidecarsTrackersPool,
+                    attestationManager,
+                    false,
+                    validatorChannel,
+                    proposersDataManager,
+                    forkChoiceNotifier,
+                    recentChainData,
+                    dataColumnSidecarManager,
+                    custodyGroupCountManager,
+                    payloadAttestationPool,
+                    proposerPreferencesManager,
+                    spec);
   }
 
   @Test
   void shouldAddBlsToExecutionChangesToPool() throws ExecutionException, InterruptedException {
     when(blsToExecutionChangePool.addLocal(any()))
-        .thenReturn(SafeFuture.completedFuture(InternalValidationResult.ACCEPT));
+            .thenReturn(SafeFuture.completedFuture(InternalValidationResult.ACCEPT));
     final SafeFuture<List<SubmitDataError>> future =
-        provider.postBlsToExecutionChanges(
-            List.of(
-                dataStructureUtil.randomSignedBlsToExecutionChange(),
-                dataStructureUtil.randomSignedBlsToExecutionChange()));
+            provider.postBlsToExecutionChanges(
+                    List.of(
+                            dataStructureUtil.randomSignedBlsToExecutionChange(),
+                            dataStructureUtil.randomSignedBlsToExecutionChange()));
     assertThat(future).isCompleted();
     assertThat(future.get()).isEqualTo(List.of());
   }
@@ -130,26 +135,26 @@ public class NodeDataProviderTest {
   @Test
   void blsToExecutionChanges_ReturnsListOfErrors() throws ExecutionException, InterruptedException {
     when(blsToExecutionChangePool.addLocal(any()))
-        .thenReturn(SafeFuture.completedFuture(InternalValidationResult.ACCEPT))
-        .thenReturn(
-            SafeFuture.completedFuture(InternalValidationResult.reject("Computer says no")));
+            .thenReturn(SafeFuture.completedFuture(InternalValidationResult.ACCEPT))
+            .thenReturn(
+                    SafeFuture.completedFuture(InternalValidationResult.reject("Computer says no")));
     final SafeFuture<List<SubmitDataError>> future =
-        provider.postBlsToExecutionChanges(
-            List.of(
-                dataStructureUtil.randomSignedBlsToExecutionChange(),
-                dataStructureUtil.randomSignedBlsToExecutionChange()));
+            provider.postBlsToExecutionChanges(
+                    List.of(
+                            dataStructureUtil.randomSignedBlsToExecutionChange(),
+                            dataStructureUtil.randomSignedBlsToExecutionChange()));
     assertThat(future).isCompleted();
     assertThat(future.get())
-        .isEqualTo(List.of(new SubmitDataError(UInt64.ONE, "Computer says no")));
+            .isEqualTo(List.of(new SubmitDataError(UInt64.ONE, "Computer says no")));
   }
 
   @Test
   void attestationsMetaDataLookUp_UseFirstAttestationSlot_WhenSlotParamNotProvided() {
     final Spec specMock = setUpMockedSpec();
     when(attestationPool.getAttestations(any(), any()))
-        .thenReturn(
-            List.of(
-                dataStructureUtil.randomAttestation(5), dataStructureUtil.randomAttestation(10)));
+            .thenReturn(
+                    List.of(
+                            dataStructureUtil.randomAttestation(5), dataStructureUtil.randomAttestation(10)));
     provider.getAttestationsAndMetaData(Optional.empty(), Optional.empty());
     verify(specMock).atSlot(eq(UInt64.valueOf(5)));
   }
@@ -158,9 +163,9 @@ public class NodeDataProviderTest {
   void attestationsMetaDataLookUp_UseSlot_WhenSlotParamProvided() {
     final Spec specMock = setUpMockedSpec();
     when(attestationPool.getAttestations(any(), any()))
-        .thenReturn(
-            List.of(
-                dataStructureUtil.randomAttestation(5), dataStructureUtil.randomAttestation(10)));
+            .thenReturn(
+                    List.of(
+                            dataStructureUtil.randomAttestation(5), dataStructureUtil.randomAttestation(10)));
     provider.getAttestationsAndMetaData(Optional.of(UInt64.valueOf(8)), Optional.empty());
     verify(specMock).atSlot(eq(UInt64.valueOf(8)));
   }
@@ -189,7 +194,7 @@ public class NodeDataProviderTest {
     final UInt64 slot = UInt64.valueOf(12);
     final Spec specMock = setUpMockedSpec();
     when(attesterSlashingPool.getAll())
-        .thenReturn(Set.of(dataStructureUtil.randomAttesterSlashingAtSlot(slot)));
+            .thenReturn(Set.of(dataStructureUtil.randomAttesterSlashingAtSlot(slot)));
     provider.getAttesterSlashingsAndMetaData();
     verify(specMock).atSlot(eq(slot));
   }
@@ -220,26 +225,27 @@ public class NodeDataProviderTest {
     when(specVersionMock.getMilestone()).thenReturn(specMilestone);
     when(specMock.atSlot(any())).thenReturn(specVersionMock);
     provider =
-        new NodeDataProvider(
-            attestationPool,
-            inclusionListManager,
-            attesterSlashingPool,
-            proposerSlashingPool,
-            voluntaryExitPool,
-            blsToExecutionChangePool,
-            syncCommitteeContributionPool,
-            blockBlobSidecarsTrackersPool,
-            attestationManager,
-            false,
-            validatorChannel,
-            proposersDataManager,
-            forkChoiceNotifier,
-            recentChainData,
-            dataColumnSidecarManager,
-            custodyGroupCountManager,
-            payloadAttestationPool,
-            proposerPreferencesManager,
-            specMock);
+            new NodeDataProvider(
+                    attestationPool,
+                    inclusionListManager,
+                    attesterSlashingPool,
+                    proposerSlashingPool,
+                    voluntaryExitPool,
+                    blsToExecutionChangePool,
+                    randaoCommitmentRegistrationPool,
+                    syncCommitteeContributionPool,
+                    blockBlobSidecarsTrackersPool,
+                    attestationManager,
+                    false,
+                    validatorChannel,
+                    proposersDataManager,
+                    forkChoiceNotifier,
+                    recentChainData,
+                    dataColumnSidecarManager,
+                    custodyGroupCountManager,
+                    payloadAttestationPool,
+                    proposerPreferencesManager,
+                    specMock);
     return specMock;
   }
 }
