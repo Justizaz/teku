@@ -18,7 +18,9 @@ import static tech.pegasys.teku.statetransition.validation.InternalValidationRes
 import static tech.pegasys.teku.statetransition.validation.InternalValidationResult.reject;
 
 import java.util.Optional;
+import java.util.Set;
 import tech.pegasys.teku.infrastructure.async.SafeFuture;
+import tech.pegasys.teku.infrastructure.collections.LimitedSet;
 import tech.pegasys.teku.infrastructure.unsigned.UInt64;
 import tech.pegasys.teku.spec.Spec;
 import tech.pegasys.teku.spec.datastructures.operations.RandaoCommitmentRegistration;
@@ -32,8 +34,12 @@ import tech.pegasys.teku.storage.client.RecentChainData;
 public class RandaoCommitmentRegistrationGossipValidator
     implements OperationValidator<SignedRandaoCommitmentRegistration> {
 
+  private static final int SEEN_CACHE_SIZE = 16_384;
+
   private final Spec spec;
   private final RecentChainData recentChainData;
+  private final Set<UInt64> seenValidatorIndices =
+      LimitedSet.createSynchronizedLRU(SEEN_CACHE_SIZE);
 
   public RandaoCommitmentRegistrationGossipValidator(
       final Spec spec, final RecentChainData recentChainData) {
@@ -44,6 +50,13 @@ public class RandaoCommitmentRegistrationGossipValidator
   @Override
   public SafeFuture<InternalValidationResult> validateForGossip(
       final SignedRandaoCommitmentRegistration signedRegistration) {
+    final RandaoCommitmentRegistration registration = signedRegistration.getMessage();
+    final UInt64 validatorIndex = registration.getValidatorIndex();
+
+    if (seenValidatorIndices.contains(validatorIndex)) {
+      return SafeFuture.completedFuture(ignore("RANDAO commitment registration already seen"));
+    }
+
     return recentChainData
         .getBestState()
         .orElseThrow(
@@ -112,6 +125,10 @@ public class RandaoCommitmentRegistrationGossipValidator
 
     if (!blockProcessor.isRandaoCommitmentRegistrationSignatureValid(state, signedRegistration)) {
       return reject("Invalid RANDAO commitment registration signature");
+    }
+
+    if (!seenValidatorIndices.add(validatorIndex)) {
+      return ignore("RANDAO commitment registration already seen");
     }
 
     return ACCEPT;
