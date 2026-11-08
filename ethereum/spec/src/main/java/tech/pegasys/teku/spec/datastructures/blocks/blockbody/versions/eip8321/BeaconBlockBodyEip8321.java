@@ -40,6 +40,11 @@ public interface BeaconBlockBodyEip8321 extends BeaconBlockBodyGloas {
     SszList<SignedRandaoCommitmentRegistration> getRandaoCommitmentRegistrations();
 
     @Override
+    default Optional<SszList<SignedRandaoCommitmentRegistration>> getOptionalRandaoCommitmentRegistrations() {
+        return Optional.of(getRandaoCommitmentRegistrations());
+    }
+
+    @Override
     BeaconBlockBodySchemaEip8321<?> getSchema();
 
     @Override

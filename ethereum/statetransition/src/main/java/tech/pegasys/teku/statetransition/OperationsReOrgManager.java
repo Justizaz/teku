@@ -30,6 +30,7 @@ import tech.pegasys.teku.spec.datastructures.operations.Attestation;
 import tech.pegasys.teku.spec.datastructures.operations.AttesterSlashing;
 import tech.pegasys.teku.spec.datastructures.operations.ProposerSlashing;
 import tech.pegasys.teku.spec.datastructures.operations.SignedBlsToExecutionChange;
+import tech.pegasys.teku.spec.datastructures.operations.SignedRandaoCommitmentRegistration;
 import tech.pegasys.teku.spec.datastructures.operations.SignedVoluntaryExit;
 import tech.pegasys.teku.statetransition.attestation.AggregatingAttestationPool;
 import tech.pegasys.teku.statetransition.attestation.AttestationManager;
@@ -47,6 +48,8 @@ public class OperationsReOrgManager implements ChainHeadChannel, LateBlockReorgP
   private final AttestationManager attestationManager;
   private final AggregatingAttestationPool attestationPool;
   private final MappedOperationPool<SignedBlsToExecutionChange> blsToExecutionOperationPool;
+  private final MappedOperationPool<SignedRandaoCommitmentRegistration>
+      randaoCommitmentRegistrationPool;
   private final RecentChainData recentChainData;
 
   public OperationsReOrgManager(
@@ -56,6 +59,8 @@ public class OperationsReOrgManager implements ChainHeadChannel, LateBlockReorgP
       final AggregatingAttestationPool attestationPool,
       final AttestationManager attestationManager,
       final MappedOperationPool<SignedBlsToExecutionChange> blsToExecutionOperationPool,
+      final MappedOperationPool<SignedRandaoCommitmentRegistration>
+          randaoCommitmentRegistrationPool,
       final RecentChainData recentChainData) {
     this.exitPool = exitPool;
     this.proposerSlashingPool = proposerSlashingPool;
@@ -63,6 +68,7 @@ public class OperationsReOrgManager implements ChainHeadChannel, LateBlockReorgP
     this.attestationManager = attestationManager;
     this.attestationPool = attestationPool;
     this.blsToExecutionOperationPool = blsToExecutionOperationPool;
+    this.randaoCommitmentRegistrationPool = randaoCommitmentRegistrationPool;
     this.recentChainData = recentChainData;
   }
 
@@ -131,6 +137,9 @@ public class OperationsReOrgManager implements ChainHeadChannel, LateBlockReorgP
                               blockBody
                                   .getOptionalBlsToExecutionChanges()
                                   .ifPresent(blsToExecutionOperationPool::addAll);
+                              blockBody
+                                  .getOptionalRandaoCommitmentRegistrations()
+                                  .ifPresent(randaoCommitmentRegistrationPool::addAll);
 
                               return processNonCanonicalBlockAttestations(
                                   blockBody.getAttestations().stream(), root);
@@ -202,6 +211,9 @@ public class OperationsReOrgManager implements ChainHeadChannel, LateBlockReorgP
                             blockBody
                                 .getOptionalBlsToExecutionChanges()
                                 .ifPresent(blsToExecutionOperationPool::removeAll);
+                            blockBody
+                                .getOptionalRandaoCommitmentRegistrations()
+                                .ifPresent(randaoCommitmentRegistrationPool::removeAll);
                           },
                           () ->
                               LOG.debug(

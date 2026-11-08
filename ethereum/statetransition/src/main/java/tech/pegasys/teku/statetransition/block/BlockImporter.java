@@ -242,12 +242,12 @@ public class BlockImporter {
                 blsToExecutionChangeSubscribers.deliver(
                     VerifiedBlockOperationsListener::onOperationsFromBlock, blsOperations));
     blockBody
-            .toVersionEip8321()
-            .ifPresent(
-                    eip8321Body ->
-                            randaoCommitmentRegistrationSubscribers.deliver(
-                                    VerifiedBlockOperationsListener::onOperationsFromBlock,
-                                    eip8321Body.getRandaoCommitmentRegistrations()));
+        .toVersionEip8321()
+        .ifPresent(
+            eip8321Body ->
+                randaoCommitmentRegistrationSubscribers.deliver(
+                    VerifiedBlockOperationsListener::onOperationsFromBlock,
+                    eip8321Body.getRandaoCommitmentRegistrations()));
   }
 
   public void subscribeToVerifiedBlockAttestations(
@@ -280,9 +280,10 @@ public class BlockImporter {
   }
 
   public void subscribeToVerifiedBlockRandaoCommitmentRegistrations(
-          final VerifiedBlockOperationsListener<SignedRandaoCommitmentRegistration>
+      final VerifiedBlockOperationsListener<SignedRandaoCommitmentRegistration>
           verifiedBlockRandaoCommitmentRegistrationsListener) {
-    randaoCommitmentRegistrationSubscribers.subscribe(verifiedBlockRandaoCommitmentRegistrationsListener);
+    randaoCommitmentRegistrationSubscribers.subscribe(
+        verifiedBlockRandaoCommitmentRegistrationsListener);
   }
 
   private String getBlockContent(final SignedBeaconBlock block) {

@@ -2644,6 +2644,7 @@ public class BeaconChainController extends Service implements BeaconChainControl
             aggregatingAttestationPool,
             attestationManager,
             blsToExecutionChangePool,
+            randaoCommitmentRegistrationPool,
             recentChainData);
     eventChannels.subscribe(ChainHeadChannel.class, operationsReOrgManager);
   }

@@ -31,26 +31,35 @@ import org.apache.tuweni.bytes.Bytes32;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import tech.pegasys.teku.infrastructure.async.SafeFuture;
+import tech.pegasys.teku.infrastructure.async.StubAsyncRunner;
+import tech.pegasys.teku.infrastructure.metrics.StubMetricsSystem;
+import tech.pegasys.teku.infrastructure.ssz.SszList;
+import tech.pegasys.teku.infrastructure.time.StubTimeProvider;
 import tech.pegasys.teku.infrastructure.unsigned.UInt64;
 import tech.pegasys.teku.spec.Spec;
 import tech.pegasys.teku.spec.TestSpecFactory;
 import tech.pegasys.teku.spec.datastructures.attestation.ValidatableAttestation;
 import tech.pegasys.teku.spec.datastructures.blocks.BeaconBlock;
+import tech.pegasys.teku.spec.datastructures.blocks.blockbody.versions.eip8321.BeaconBlockBodySchemaEip8321;
 import tech.pegasys.teku.spec.datastructures.forkchoice.ForkChoicePayloadStatus;
 import tech.pegasys.teku.spec.datastructures.operations.AttesterSlashing;
 import tech.pegasys.teku.spec.datastructures.operations.ProposerSlashing;
 import tech.pegasys.teku.spec.datastructures.operations.SignedBlsToExecutionChange;
+import tech.pegasys.teku.spec.datastructures.operations.SignedRandaoCommitmentRegistration;
 import tech.pegasys.teku.spec.datastructures.operations.SignedVoluntaryExit;
+import tech.pegasys.teku.spec.datastructures.state.beaconstate.BeaconState;
 import tech.pegasys.teku.spec.datastructures.util.AttestationProcessingResult;
 import tech.pegasys.teku.spec.util.DataStructureUtil;
 import tech.pegasys.teku.statetransition.attestation.AggregatingAttestationPool;
 import tech.pegasys.teku.statetransition.attestation.AttestationManager;
+import tech.pegasys.teku.statetransition.validation.InternalValidationResult;
+import tech.pegasys.teku.statetransition.validation.OperationValidator;
 import tech.pegasys.teku.storage.api.ReorgContext;
 import tech.pegasys.teku.storage.client.RecentChainData;
 
 @SuppressWarnings("unchecked")
 public class OperationsReOrgManagerTest {
-  private final Spec spec = TestSpecFactory.createMinimalCapella();
+  private final Spec spec = TestSpecFactory.createMinimalEip8321();
   private final DataStructureUtil dataStructureUtil = new DataStructureUtil(spec);
 
   private final OperationPool<ProposerSlashing> proposerSlashingOperationPool =
@@ -63,6 +72,8 @@ public class OperationsReOrgManagerTest {
   private final AttestationManager attestationManager = mock(AttestationManager.class);
   private final MappedOperationPool<SignedBlsToExecutionChange> blsToExecutionOperationPool =
       mock(MappedOperationPool.class);
+  private final MappedOperationPool<SignedRandaoCommitmentRegistration>
+      randaoCommitmentRegistrationOperationPool = mock(MappedOperationPool.class);
 
   private final RecentChainData recentChainData = mock(RecentChainData.class);
 
@@ -74,6 +85,7 @@ public class OperationsReOrgManagerTest {
           attestationPool,
           attestationManager,
           blsToExecutionOperationPool,
+          randaoCommitmentRegistrationOperationPool,
           recentChainData);
 
   @Test
@@ -145,12 +157,16 @@ public class OperationsReOrgManagerTest {
     verify(exitOperationPool).addAll(fork1Block1.getBody().getVoluntaryExits());
     verify(blsToExecutionOperationPool)
         .addAll(fork1Block1.getBody().getOptionalBlsToExecutionChanges().orElseThrow());
+    verify(randaoCommitmentRegistrationOperationPool)
+        .addAll(fork1Block1.getBody().getOptionalRandaoCommitmentRegistrations().orElseThrow());
 
     verify(proposerSlashingOperationPool).addAll(fork1Block2.getBody().getProposerSlashings());
     verify(attesterSlashingOperationPool).addAll(fork1Block2.getBody().getAttesterSlashings());
     verify(exitOperationPool).addAll(fork1Block2.getBody().getVoluntaryExits());
     verify(blsToExecutionOperationPool)
         .addAll(fork1Block2.getBody().getOptionalBlsToExecutionChanges().orElseThrow());
+    verify(randaoCommitmentRegistrationOperationPool)
+        .addAll(fork1Block2.getBody().getOptionalRandaoCommitmentRegistrations().orElseThrow());
 
     ArgumentCaptor<ValidatableAttestation> argument =
         ArgumentCaptor.forClass(ValidatableAttestation.class);
@@ -173,6 +189,7 @@ public class OperationsReOrgManagerTest {
     verify(exitOperationPool, never()).removeAll(any());
     verify(attestationPool, never()).onAttestationsIncludedInBlock(any(), any());
     verify(blsToExecutionOperationPool, never()).removeAll(any());
+    verify(randaoCommitmentRegistrationOperationPool, never()).removeAll(any());
 
     // complete non-canonical
     firstFork1Block2OnAttestationFuture.complete(AttestationProcessingResult.SUCCESSFUL);
@@ -187,6 +204,8 @@ public class OperationsReOrgManagerTest {
             fork2Block1.getSlot(), fork2Block1.getBody().getAttestations());
     verify(blsToExecutionOperationPool)
         .removeAll(fork2Block1.getBody().getOptionalBlsToExecutionChanges().orElseThrow());
+    verify(randaoCommitmentRegistrationOperationPool)
+        .removeAll(fork2Block1.getBody().getOptionalRandaoCommitmentRegistrations().orElseThrow());
 
     verify(proposerSlashingOperationPool).removeAll(fork2Block2.getBody().getProposerSlashings());
     verify(attesterSlashingOperationPool).removeAll(fork2Block2.getBody().getAttesterSlashings());
@@ -196,6 +215,8 @@ public class OperationsReOrgManagerTest {
             fork2Block2.getSlot(), fork2Block2.getBody().getAttestations());
     verify(blsToExecutionOperationPool)
         .removeAll(fork2Block2.getBody().getOptionalBlsToExecutionChanges().orElseThrow());
+    verify(randaoCommitmentRegistrationOperationPool)
+        .removeAll(fork2Block2.getBody().getOptionalRandaoCommitmentRegistrations().orElseThrow());
   }
 
   @Test
@@ -226,7 +247,8 @@ public class OperationsReOrgManagerTest {
         exitOperationPool,
         proposerSlashingOperationPool,
         attesterSlashingOperationPool,
-        blsToExecutionOperationPool);
+        blsToExecutionOperationPool,
+        randaoCommitmentRegistrationOperationPool);
   }
 
   @Test
@@ -274,6 +296,7 @@ public class OperationsReOrgManagerTest {
     verify(attesterSlashingOperationPool, never()).addAll(any());
     verify(attestationManager, never()).onAttestation(any());
     verify(blsToExecutionOperationPool, never()).addAll(any());
+    verify(randaoCommitmentRegistrationOperationPool, never()).addAll(any());
 
     verify(proposerSlashingOperationPool).removeAll(block2.getBody().getProposerSlashings());
     verify(attesterSlashingOperationPool).removeAll(block2.getBody().getAttesterSlashings());
@@ -282,6 +305,8 @@ public class OperationsReOrgManagerTest {
         .onAttestationsIncludedInBlock(block2.getSlot(), block2.getBody().getAttestations());
     verify(blsToExecutionOperationPool)
         .removeAll(block2.getBody().getOptionalBlsToExecutionChanges().orElseThrow());
+    verify(randaoCommitmentRegistrationOperationPool)
+        .removeAll(block2.getBody().getOptionalRandaoCommitmentRegistrations().orElseThrow());
 
     verify(proposerSlashingOperationPool).removeAll(block1.getBody().getProposerSlashings());
     verify(attesterSlashingOperationPool).removeAll(block1.getBody().getAttesterSlashings());
@@ -290,6 +315,8 @@ public class OperationsReOrgManagerTest {
         .onAttestationsIncludedInBlock(block1.getSlot(), block1.getBody().getAttestations());
     verify(blsToExecutionOperationPool)
         .removeAll(block1.getBody().getOptionalBlsToExecutionChanges().orElseThrow());
+    verify(randaoCommitmentRegistrationOperationPool)
+        .removeAll(block1.getBody().getOptionalRandaoCommitmentRegistrations().orElseThrow());
   }
 
   @Test
@@ -337,6 +364,8 @@ public class OperationsReOrgManagerTest {
     verify(exitOperationPool).addAll(lateBlock.getBody().getVoluntaryExits());
     verify(blsToExecutionOperationPool)
         .addAll(lateBlock.getBody().getOptionalBlsToExecutionChanges().orElseThrow());
+    verify(randaoCommitmentRegistrationOperationPool)
+        .addAll(lateBlock.getBody().getOptionalRandaoCommitmentRegistrations().orElseThrow());
 
     final ArgumentCaptor<ValidatableAttestation> argument =
         ArgumentCaptor.forClass(ValidatableAttestation.class);
@@ -345,5 +374,159 @@ public class OperationsReOrgManagerTest {
     assertThat(argument.getAllValues())
         .containsExactlyInAnyOrderElementsOf(attestationList)
         .allMatch(ValidatableAttestation::isValidIndexedAttestation);
+  }
+
+  @Test
+  void randaoCommitmentRegistration_shouldBeRequeuedWhenBlockBecomesNonCanonical() {
+    final BeaconBlock nonCanonicalBlock = dataStructureUtil.randomBeaconBlock(10);
+    final BeaconBlock canonicalHead = dataStructureUtil.randomBeaconBlock(12);
+
+    final UInt64 commonAncestorSlot = UInt64.valueOf(9);
+
+    final NavigableMap<UInt64, Bytes32> notCanonicalBlockRoots = new TreeMap<>();
+    notCanonicalBlockRoots.put(UInt64.valueOf(10), nonCanonicalBlock.hashTreeRoot());
+    when(recentChainData.getAncestorsOnFork(commonAncestorSlot, nonCanonicalBlock.hashTreeRoot()))
+        .thenReturn(notCanonicalBlockRoots);
+
+    when(recentChainData.getAncestorsOnFork(commonAncestorSlot, canonicalHead.hashTreeRoot()))
+        .thenReturn(new TreeMap<>());
+
+    when(recentChainData.retrieveBlockByRoot(nonCanonicalBlock.hashTreeRoot()))
+        .thenReturn(SafeFuture.completedFuture(Optional.of(nonCanonicalBlock)));
+
+    operationsReOrgManager.chainHeadUpdated(
+        UInt64.valueOf(12),
+        canonicalHead.getStateRoot(),
+        canonicalHead.hashTreeRoot(),
+        false,
+        false,
+        dataStructureUtil.randomBytes32(),
+        dataStructureUtil.randomBytes32(),
+        Optional.empty(),
+        ReorgContext.of(
+            nonCanonicalBlock.hashTreeRoot(),
+            dataStructureUtil.randomUInt64(),
+            nonCanonicalBlock.getStateRoot(),
+            commonAncestorSlot,
+            dataStructureUtil.randomBytes32()));
+
+    verify(randaoCommitmentRegistrationOperationPool)
+        .addAll(
+            nonCanonicalBlock.getBody().getOptionalRandaoCommitmentRegistrations().orElseThrow());
+  }
+
+  @Test
+  void randaoCommitmentRegistration_shouldBeRemovedWhenIncludedInCanonicalBlock() {
+    final BeaconBlock canonicalBlock = dataStructureUtil.randomBeaconBlock(12);
+    final UInt64 commonAncestorSlot = UInt64.valueOf(9);
+
+    final NavigableMap<UInt64, Bytes32> nowCanonicalBlockRoots = new TreeMap<>();
+    nowCanonicalBlockRoots.put(UInt64.valueOf(12), canonicalBlock.hashTreeRoot());
+    when(recentChainData.getAncestorsOnFork(commonAncestorSlot, canonicalBlock.hashTreeRoot()))
+        .thenReturn(nowCanonicalBlockRoots);
+
+    final Bytes32 oldHeadRoot = dataStructureUtil.randomBytes32();
+    when(recentChainData.getAncestorsOnFork(commonAncestorSlot, oldHeadRoot))
+        .thenReturn(new TreeMap<>());
+
+    when(recentChainData.retrieveBlockByRoot(canonicalBlock.hashTreeRoot()))
+        .thenReturn(SafeFuture.completedFuture(Optional.of(canonicalBlock)));
+
+    operationsReOrgManager.chainHeadUpdated(
+        UInt64.valueOf(12),
+        canonicalBlock.getStateRoot(),
+        canonicalBlock.hashTreeRoot(),
+        false,
+        false,
+        dataStructureUtil.randomBytes32(),
+        dataStructureUtil.randomBytes32(),
+        Optional.empty(),
+        ReorgContext.of(oldHeadRoot, UInt64.ZERO, Bytes32.ZERO, commonAncestorSlot, Bytes32.ZERO));
+
+    verify(randaoCommitmentRegistrationOperationPool)
+        .removeAll(
+            canonicalBlock.getBody().getOptionalRandaoCommitmentRegistrations().orElseThrow());
+    verify(randaoCommitmentRegistrationOperationPool, never()).addAll(any());
+  }
+
+  @Test
+  void randaoCommitmentRegistration_mappedPoolBehavior_shouldNotDuplicateOperationDuringReorg() {
+    final OperationValidator<SignedRandaoCommitmentRegistration> validator =
+        mock(OperationValidator.class);
+    final MappedOperationPool<SignedRandaoCommitmentRegistration> pool =
+        new MappedOperationPool<>(
+            "RandaoCommitmentRegistrationPool",
+            new StubMetricsSystem(),
+            slot ->
+                BeaconBlockBodySchemaEip8321.required(
+                        spec.atSlot(slot).getSchemaDefinitions().getBeaconBlockBodySchema())
+                    .getRandaoCommitmentRegistrationsSchema(),
+            validator,
+            new StubAsyncRunner(),
+            StubTimeProvider.withTimeInSeconds(1000));
+
+    final SignedRandaoCommitmentRegistration registration =
+        dataStructureUtil.randomSignedRandaoCommitmentRegistration();
+    when(validator.validateForGossip(registration))
+        .thenReturn(SafeFuture.completedFuture(InternalValidationResult.ACCEPT));
+
+    // Initially added to pool
+    assertThat(pool.addRemote(registration, Optional.empty())).isCompleted();
+    assertThat(pool.size()).isEqualTo(1);
+
+    final SszList<SignedRandaoCommitmentRegistration> sszList =
+        BeaconBlockBodySchemaEip8321.required(
+                spec.getGenesisSpec().getSchemaDefinitions().getBeaconBlockBodySchema())
+            .getRandaoCommitmentRegistrationsSchema()
+            .of(registration);
+
+    // Re-adding via addAll when already present in pool uses putIfAbsent and does not duplicate
+    pool.addAll(sszList);
+    assertThat(pool.size()).isEqualTo(1);
+    assertThat(pool.getAll()).containsExactly(registration);
+  }
+
+  @Test
+  void
+      randaoCommitmentRegistration_mappedPoolBehavior_shouldPruneWhenInvalidAgainstCanonicalState() {
+    final OperationValidator<SignedRandaoCommitmentRegistration> validator =
+        mock(OperationValidator.class);
+    final MappedOperationPool<SignedRandaoCommitmentRegistration> pool =
+        new MappedOperationPool<>(
+            "RandaoCommitmentRegistrationPool",
+            new StubMetricsSystem(),
+            slot ->
+                BeaconBlockBodySchemaEip8321.required(
+                        spec.atSlot(slot).getSchemaDefinitions().getBeaconBlockBodySchema())
+                    .getRandaoCommitmentRegistrationsSchema(),
+            validator,
+            new StubAsyncRunner(),
+            StubTimeProvider.withTimeInSeconds(1000));
+
+    final SignedRandaoCommitmentRegistration registration =
+        dataStructureUtil.randomSignedRandaoCommitmentRegistration();
+
+    // Re-added to pool during reorg
+    final SszList<SignedRandaoCommitmentRegistration> sszList =
+        BeaconBlockBodySchemaEip8321.required(
+                spec.getGenesisSpec().getSchemaDefinitions().getBeaconBlockBodySchema())
+            .getRandaoCommitmentRegistrationsSchema()
+            .of(registration);
+    pool.addAll(sszList);
+    assertThat(pool.size()).isEqualTo(1);
+
+    // When proposing/selecting items for block against state where validator is no longer valid
+    // (e.g. already activated on canonical state)
+    final BeaconState canonicalState = mock(BeaconState.class);
+    when(canonicalState.getSlot()).thenReturn(UInt64.valueOf(10));
+    when(validator.validateForBlockInclusion(canonicalState, registration))
+        .thenReturn(Optional.of(() -> "Validator already registered"));
+
+    final SszList<SignedRandaoCommitmentRegistration> itemsForBlock =
+        pool.getItemsForBlock(canonicalState, 128);
+
+    assertThat(itemsForBlock).isEmpty();
+    assertThat(pool.size()).isEqualTo(0);
+    assertThat(pool.getAll()).isEmpty();
   }
 }

@@ -144,6 +144,11 @@ import tech.pegasys.teku.spec.datastructures.blocks.blockbody.versions.deneb.Bea
 import tech.pegasys.teku.spec.datastructures.blocks.blockbody.versions.deneb.BeaconBlockBodySchemaDeneb;
 import tech.pegasys.teku.spec.datastructures.blocks.blockbody.versions.gloas.BeaconBlockBodyGloas;
 import tech.pegasys.teku.spec.datastructures.blocks.blockbody.versions.gloas.BeaconBlockBodySchemaGloas;
+import tech.pegasys.teku.spec.datastructures.blocks.blockbody.versions.eip8321.BeaconBlockBodySchemaEip8321;
+import tech.pegasys.teku.spec.config.SpecConfigEip8321;
+import tech.pegasys.teku.spec.datastructures.operations.RandaoCommitmentRegistration;
+import tech.pegasys.teku.spec.datastructures.operations.SignedRandaoCommitmentRegistration;
+import tech.pegasys.teku.spec.schemas.SchemaDefinitionsEip8321;
 import tech.pegasys.teku.spec.datastructures.builder.BlobsBundleSchema;
 import tech.pegasys.teku.spec.datastructures.builder.BuilderBid;
 import tech.pegasys.teku.spec.datastructures.builder.BuilderBidBuilder;
@@ -1623,6 +1628,13 @@ public final class DataStructureUtil {
               if (builder.supportsParentExecutionRequests()) {
                 builder.parentExecutionRequests(randomExecutionRequests(slot));
               }
+              if (builder.supportsRandaoCommitmentRegistrations()) {
+                builder.randaoCommitmentRegistrations(
+                    randomSignedRandaoCommitmentRegistrationsList(
+                        slot,
+                        BeaconBlockBodySchemaEip8321.required(schema)
+                            .getRandaoCommitmentRegistrationsSchema()));
+              }
               builderModifier.accept(builder);
               return SafeFuture.COMPLETE;
             })
@@ -1780,6 +1792,13 @@ public final class DataStructureUtil {
               if (builder.supportsParentExecutionRequests()) {
                 builder.parentExecutionRequests(randomExecutionRequests(slot));
               }
+              if (builder.supportsRandaoCommitmentRegistrations()) {
+                builder.randaoCommitmentRegistrations(
+                    randomSignedRandaoCommitmentRegistrationsList(
+                        slot,
+                        BeaconBlockBodySchemaEip8321.required(schema)
+                            .getRandaoCommitmentRegistrationsSchema()));
+              }
               builderModifier.accept(builder);
               return SafeFuture.COMPLETE;
             })
@@ -1849,6 +1868,13 @@ public final class DataStructureUtil {
               }
               if (builder.supportsParentExecutionRequests()) {
                 builder.parentExecutionRequests(randomExecutionRequests(slot));
+              }
+              if (builder.supportsRandaoCommitmentRegistrations()) {
+                builder.randaoCommitmentRegistrations(
+                    randomSignedRandaoCommitmentRegistrationsList(
+                        slot,
+                        BeaconBlockBodySchemaEip8321.required(schema)
+                            .getRandaoCommitmentRegistrationsSchema()));
               }
               builderModifier.accept(builder);
               return SafeFuture.COMPLETE;
@@ -2745,6 +2771,38 @@ public final class DataStructureUtil {
     return getCapellaSchemaDefinitions(randomSlot())
         .getSignedBlsToExecutionChangeSchema()
         .create(randomBlsToExecutionChange(), randomSignature());
+  }
+
+  public RandaoCommitmentRegistration randomRandaoCommitmentRegistration() {
+    return new RandaoCommitmentRegistration(randomValidatorIndex(), randomBytes32());
+  }
+
+  public SignedRandaoCommitmentRegistration randomSignedRandaoCommitmentRegistration() {
+    return new SignedRandaoCommitmentRegistration(
+        randomRandaoCommitmentRegistration(), randomSignature());
+  }
+
+  public SszList<SignedRandaoCommitmentRegistration> randomSignedRandaoCommitmentRegistrationsList() {
+    final UInt64 slot = randomSlot();
+    final BeaconBlockBodySchema<?> schema =
+        getEip8321SchemaDefinitions(slot).getBeaconBlockBodySchema();
+    return randomSignedRandaoCommitmentRegistrationsList(
+        slot,
+        BeaconBlockBodySchemaEip8321.required(schema)
+            .getRandaoCommitmentRegistrationsSchema());
+  }
+
+  public SszList<SignedRandaoCommitmentRegistration> randomSignedRandaoCommitmentRegistrationsList(
+      final UInt64 slot,
+      final SszListSchema<SignedRandaoCommitmentRegistration, ?>
+          signedRandaoCommitmentRegistrationSchema) {
+    final int maxRegistrations =
+        SpecConfigEip8321.required(spec.atSlot(slot).getConfig())
+            .getMaxRandaoCommitmentRegistrations();
+    return randomSszList(
+        signedRandaoCommitmentRegistrationSchema,
+        maxRegistrations,
+        this::randomSignedRandaoCommitmentRegistration);
   }
 
   public Bytes32 randomBlsWithdrawalCredentials() {
@@ -3942,6 +4000,10 @@ public final class DataStructureUtil {
 
   private SchemaDefinitionsHeze getHezeSchemaDefinitions(final UInt64 slot) {
     return SchemaDefinitionsHeze.required(spec.atSlot(slot).getSchemaDefinitions());
+  }
+
+  private SchemaDefinitionsEip8321 getEip8321SchemaDefinitions(final UInt64 slot) {
+    return SchemaDefinitionsEip8321.required(spec.atSlot(slot).getSchemaDefinitions());
   }
 
   int getEpochsPerEth1VotingPeriod() {

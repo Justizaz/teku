@@ -13,9 +13,12 @@
 
 package tech.pegasys.teku.spec.datastructures.blocks.blockbody.versions.eip8321;
 
+import static com.google.common.base.Preconditions.checkArgument;
+
 import tech.pegasys.teku.infrastructure.ssz.primitive.SszBytes32;
 import tech.pegasys.teku.infrastructure.ssz.schema.SszListSchema;
 import tech.pegasys.teku.infrastructure.ssz.schema.SszSchema;
+import tech.pegasys.teku.spec.datastructures.blocks.blockbody.BeaconBlockBodySchema;
 import tech.pegasys.teku.spec.datastructures.blocks.blockbody.versions.gloas.BeaconBlockBodySchemaGloas;
 import tech.pegasys.teku.spec.datastructures.operations.SignedRandaoCommitmentRegistration;
 
@@ -23,6 +26,14 @@ import java.util.Optional;
 
 public interface BeaconBlockBodySchemaEip8321<T extends BeaconBlockBodyEip8321>
         extends BeaconBlockBodySchemaGloas<T> {
+
+    static BeaconBlockBodySchemaEip8321<?> required(final BeaconBlockBodySchema<?> schema) {
+        checkArgument(
+                schema instanceof BeaconBlockBodySchemaEip8321<?>,
+                "Expected a BeaconBlockBodySchemaEip8321 but was %s",
+                schema.getClass());
+        return (BeaconBlockBodySchemaEip8321<?>) schema;
+    }
 
     SszSchema<SszBytes32> getHashChainRevealSchema();
 
