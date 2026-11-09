@@ -664,6 +664,10 @@ public class ValidatorClientService extends Service {
     return dataDirLayout.getValidatorDataDirectory().resolve("slashprotection");
   }
 
+  public static Path getHashChainStoragePath(final DataDirLayout dataDirLayout) {
+    return dataDirLayout.getValidatorDataDirectory().resolve("hash-chains");
+  }
+
   public static Path getManagedLocalKeystorePath(final DataDirLayout dataDirLayout) {
     return getKeyManagerPath(dataDirLayout).resolve("local");
   }
