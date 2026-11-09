@@ -74,6 +74,7 @@ import tech.pegasys.teku.spec.datastructures.metadata.ObjectAndMetaData;
 import tech.pegasys.teku.spec.datastructures.operations.Attestation;
 import tech.pegasys.teku.spec.datastructures.operations.AttestationData;
 import tech.pegasys.teku.spec.datastructures.operations.SignedAggregateAndProof;
+import tech.pegasys.teku.spec.datastructures.operations.SignedRandaoCommitmentRegistration;
 import tech.pegasys.teku.spec.datastructures.operations.versions.altair.SignedContributionAndProof;
 import tech.pegasys.teku.spec.datastructures.operations.versions.altair.SyncCommitteeContribution;
 import tech.pegasys.teku.spec.datastructures.operations.versions.altair.SyncCommitteeMessage;
@@ -422,6 +423,12 @@ public class RemoteValidatorApiHandler implements RemoteValidatorApiChannel {
       final SignedExecutionPayloadBid signedExecutionPayloadBid) {
     return sendRequest(
         () -> typeDefClient.publishSignedExecutionPayloadBid(signedExecutionPayloadBid));
+  }
+
+  @Override
+  public SafeFuture<Void> sendSignedRandaoCommitmentRegistration(
+      final SignedRandaoCommitmentRegistration registration) {
+    return sendRequest(() -> typeDefClient.sendSignedRandaoCommitmentRegistration(registration));
   }
 
   @Override

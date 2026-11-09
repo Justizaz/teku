@@ -56,6 +56,7 @@ import tech.pegasys.teku.spec.datastructures.metadata.BlockContainerAndMetaData;
 import tech.pegasys.teku.spec.datastructures.operations.Attestation;
 import tech.pegasys.teku.spec.datastructures.operations.AttestationData;
 import tech.pegasys.teku.spec.datastructures.operations.SignedAggregateAndProof;
+import tech.pegasys.teku.spec.datastructures.operations.SignedRandaoCommitmentRegistration;
 import tech.pegasys.teku.spec.datastructures.operations.versions.altair.SignedContributionAndProof;
 import tech.pegasys.teku.spec.datastructures.operations.versions.altair.SyncCommitteeContribution;
 import tech.pegasys.teku.spec.datastructures.operations.versions.altair.SyncCommitteeMessage;
@@ -253,6 +254,12 @@ public interface ValidatorApiChannel extends BuilderApiChannel, ChannelInterface
         }
 
         @Override
+        public SafeFuture<Void> sendSignedRandaoCommitmentRegistration(
+            final SignedRandaoCommitmentRegistration registration) {
+          return SafeFuture.COMPLETE;
+        }
+
+        @Override
         public SafeFuture<Optional<List<ValidatorLivenessAtEpoch>>> getValidatorsLiveness(
             final List<UInt64> validatorIndices, final UInt64 epoch) {
           return SafeFuture.completedFuture(Optional.empty());
@@ -411,6 +418,9 @@ public interface ValidatorApiChannel extends BuilderApiChannel, ChannelInterface
    * registration endpoint spec</a>
    */
   SafeFuture<Void> registerValidators(SszList<SignedValidatorRegistration> validatorRegistrations);
+
+  SafeFuture<Void> sendSignedRandaoCommitmentRegistration(
+      SignedRandaoCommitmentRegistration registration);
 
   SafeFuture<Optional<List<ValidatorLivenessAtEpoch>>> getValidatorsLiveness(
       List<UInt64> validatorIndices, UInt64 epoch);

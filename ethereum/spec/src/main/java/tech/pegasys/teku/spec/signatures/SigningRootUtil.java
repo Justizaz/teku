@@ -30,6 +30,7 @@ import tech.pegasys.teku.spec.datastructures.epbs.versions.gloas.ProposerPrefere
 import tech.pegasys.teku.spec.datastructures.execution.versions.heze.InclusionList;
 import tech.pegasys.teku.spec.datastructures.operations.AggregateAndProof;
 import tech.pegasys.teku.spec.datastructures.operations.AttestationData;
+import tech.pegasys.teku.spec.datastructures.operations.RandaoCommitmentRegistration;
 import tech.pegasys.teku.spec.datastructures.operations.VoluntaryExit;
 import tech.pegasys.teku.spec.datastructures.state.ForkInfo;
 import tech.pegasys.teku.spec.logic.common.helpers.MiscHelpers;
@@ -183,5 +184,14 @@ public class SigningRootUtil {
             forkInfo.getFork(),
             forkInfo.getGenesisValidatorsRoot());
     return spec.atSlot(slot).miscHelpers().computeSigningRoot(inclusionList, domain);
+  }
+
+  public Bytes signingRootForRandaoCommitmentRegistration(
+      final RandaoCommitmentRegistration registration, final Bytes32 genesisValidatorsRoot) {
+    final MiscHelpers miscHelpers = spec.getGenesisSpec().miscHelpers();
+    final Bytes32 domain =
+        miscHelpers.computeDomain(
+            Domain.DOMAIN_RANDAO_COMMITMENT_REGISTRATION, genesisValidatorsRoot);
+    return miscHelpers.computeSigningRoot(registration, domain);
   }
 }

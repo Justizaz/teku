@@ -104,6 +104,7 @@ import tech.pegasys.teku.spec.datastructures.metadata.BlockContainerAndMetaData;
 import tech.pegasys.teku.spec.datastructures.operations.Attestation;
 import tech.pegasys.teku.spec.datastructures.operations.AttestationData;
 import tech.pegasys.teku.spec.datastructures.operations.SignedAggregateAndProof;
+import tech.pegasys.teku.spec.datastructures.operations.SignedRandaoCommitmentRegistration;
 import tech.pegasys.teku.spec.datastructures.operations.versions.altair.SignedContributionAndProof;
 import tech.pegasys.teku.spec.datastructures.operations.versions.altair.SyncCommitteeContribution;
 import tech.pegasys.teku.spec.datastructures.operations.versions.altair.SyncCommitteeMessage;
@@ -1170,6 +1171,21 @@ public class ValidatorApiHandler implements ValidatorApiChannel, SlotEventsChann
               if (!result.isAccept()) {
                 throw new IllegalArgumentException(
                     "Invalid execution payload bid: "
+                        + result.getDescription().orElse("unknown reason"));
+              }
+            });
+  }
+
+  @Override
+  public SafeFuture<Void> sendSignedRandaoCommitmentRegistration(
+      final SignedRandaoCommitmentRegistration registration) {
+    return nodeDataProvider
+        .submitSignedRandaoCommitmentRegistration(registration)
+        .thenAccept(
+            result -> {
+              if (!result.isAccept()) {
+                throw new IllegalArgumentException(
+                    "Invalid randao commitment registration: "
                         + result.getDescription().orElse("unknown reason"));
               }
             });

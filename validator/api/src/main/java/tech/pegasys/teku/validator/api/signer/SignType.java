@@ -34,7 +34,8 @@ public enum SignType {
   EXECUTION_PAYLOAD_ENVELOPE("execution_payload_envelope"),
   PAYLOAD_ATTESTATION_MESSAGE("payload_attestation_message"),
   PROPOSER_PREFERENCES("proposer_preferences"),
-  BUILDER_REQUEST_AUTH("builder_request_auth");
+  BUILDER_REQUEST_AUTH("builder_request_auth"),
+  RANDAO_COMMITMENT_REGISTRATION("randao_commitment_registration");
 
   private final String name;
 

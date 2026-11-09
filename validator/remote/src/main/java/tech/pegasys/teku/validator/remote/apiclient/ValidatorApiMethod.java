@@ -64,7 +64,8 @@ public enum ValidatorApiMethod {
   SEND_SIGNED_INCLUSION_LIST("/eth/v1/validator/inclusion_list"),
   SEND_SIGNED_PROPOSER_PREFERENCES("eth/v1/validator/proposer_preferences"),
   SEND_BUILDER_PREFERENCES("eth/v1/validator/builder_preferences"),
-  SEND_SIGNED_EXECUTION_PAYLOAD_BID("eth/v1/beacon/execution_payload_bids");
+  SEND_SIGNED_EXECUTION_PAYLOAD_BID("eth/v1/beacon/execution_payload_bids"),
+  SEND_SIGNED_RANDAO_COMMITMENT_REGISTRATION("eth/v1/beacon/pool/randao_commitments");
 
   private final String path;
 

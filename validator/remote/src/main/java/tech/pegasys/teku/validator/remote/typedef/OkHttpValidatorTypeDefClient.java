@@ -59,6 +59,7 @@ import tech.pegasys.teku.spec.datastructures.metadata.ObjectAndMetaData;
 import tech.pegasys.teku.spec.datastructures.operations.Attestation;
 import tech.pegasys.teku.spec.datastructures.operations.AttestationData;
 import tech.pegasys.teku.spec.datastructures.operations.SignedAggregateAndProof;
+import tech.pegasys.teku.spec.datastructures.operations.SignedRandaoCommitmentRegistration;
 import tech.pegasys.teku.spec.datastructures.operations.versions.altair.SignedContributionAndProof;
 import tech.pegasys.teku.spec.datastructures.operations.versions.altair.SyncCommitteeContribution;
 import tech.pegasys.teku.spec.datastructures.operations.versions.altair.SyncCommitteeMessage;
@@ -86,6 +87,7 @@ import tech.pegasys.teku.validator.remote.typedef.handlers.GetSyncingStatusReque
 import tech.pegasys.teku.validator.remote.typedef.handlers.PostAttesterDutiesRequest;
 import tech.pegasys.teku.validator.remote.typedef.handlers.PostInclusionListDutiesRequest;
 import tech.pegasys.teku.validator.remote.typedef.handlers.PostPayloadTimelinessCommitteeDutiesRequest;
+import tech.pegasys.teku.validator.remote.typedef.handlers.PostRandaoCommitmentRegistrationRequest;
 import tech.pegasys.teku.validator.remote.typedef.handlers.PostSyncDutiesRequest;
 import tech.pegasys.teku.validator.remote.typedef.handlers.PrepareBeaconProposersRequest;
 import tech.pegasys.teku.validator.remote.typedef.handlers.ProduceBlockRequest;
@@ -438,5 +440,12 @@ public class OkHttpValidatorTypeDefClient extends OkHttpValidatorMinimalTypeDefC
     final PublishSignedExecutionPayloadBidRequest publishSignedExecutionPayloadBidRequest =
         new PublishSignedExecutionPayloadBidRequest(spec, getBaseEndpoint(), getOkHttpClient());
     publishSignedExecutionPayloadBidRequest.submit(signedExecutionPayloadBid);
+  }
+
+  public void sendSignedRandaoCommitmentRegistration(
+      final SignedRandaoCommitmentRegistration registration) {
+    final PostRandaoCommitmentRegistrationRequest postRandaoCommitmentRegistrationRequest =
+        new PostRandaoCommitmentRegistrationRequest(getBaseEndpoint(), getOkHttpClient());
+    postRandaoCommitmentRegistrationRequest.submit(registration);
   }
 }

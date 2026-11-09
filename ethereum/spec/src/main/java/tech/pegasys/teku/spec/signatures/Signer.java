@@ -29,6 +29,7 @@ import tech.pegasys.teku.spec.datastructures.epbs.versions.gloas.ProposerPrefere
 import tech.pegasys.teku.spec.datastructures.execution.versions.heze.InclusionList;
 import tech.pegasys.teku.spec.datastructures.operations.AggregateAndProof;
 import tech.pegasys.teku.spec.datastructures.operations.AttestationData;
+import tech.pegasys.teku.spec.datastructures.operations.RandaoCommitmentRegistration;
 import tech.pegasys.teku.spec.datastructures.operations.VoluntaryExit;
 import tech.pegasys.teku.spec.datastructures.operations.versions.altair.ContributionAndProof;
 import tech.pegasys.teku.spec.datastructures.operations.versions.altair.SyncAggregatorSelectionData;
@@ -76,6 +77,9 @@ public interface Signer {
   SafeFuture<BLSSignature> signBuilderRequestAuth(BuilderRequestAuth builderRequestAuth);
 
   SafeFuture<BLSSignature> signInclusionList(InclusionList inclusionList, ForkInfo forkInfo);
+
+  SafeFuture<BLSSignature> signRandaoCommitmentRegistration(
+      RandaoCommitmentRegistration registration, Bytes32 genesisValidatorsRoot);
 
   default boolean isLocal() {
     return getSigningServiceUrl().isEmpty();
