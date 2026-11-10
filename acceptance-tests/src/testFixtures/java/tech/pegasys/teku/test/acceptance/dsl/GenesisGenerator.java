@@ -96,9 +96,27 @@ public class GenesisGenerator {
   }
 
   public GenesisGenerator witGloasEpoch(final UInt64 gloasForkEpoch) {
+    return withGloasEpoch(gloasForkEpoch);
+  }
+
+  public GenesisGenerator withGloasEpoch(final UInt64 gloasForkEpoch) {
     specConfigModifier =
         specConfigModifier.andThen(
             specConfigBuilder -> specConfigBuilder.gloasForkEpoch(gloasForkEpoch));
+    return this;
+  }
+
+  public GenesisGenerator withHezeEpoch(final UInt64 hezeForkEpoch) {
+    specConfigModifier =
+        specConfigModifier.andThen(
+            specConfigBuilder -> specConfigBuilder.hezeForkEpoch(hezeForkEpoch));
+    return this;
+  }
+
+  public GenesisGenerator withEip8321Epoch(final UInt64 eip8321ForkEpoch) {
+    specConfigModifier =
+        specConfigModifier.andThen(
+            specConfigBuilder -> specConfigBuilder.eip8321ForkEpoch(eip8321ForkEpoch));
     return this;
   }
 

@@ -1,5 +1,5 @@
 /*
- * Copyright Consensys Software Inc., 2026
+ * Copyright (c) 2026 Consensys Incorporated. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with
  * the License. You may obtain a copy of the License at
@@ -48,7 +48,8 @@ class EpochProcessorEip8321Test {
 
   @Test
   void processPendingRandaoCommitments_shouldActivateDueCommitmentAtExactBoundary() {
-    final BeaconStateEip8321 baseState = createEip8321State(8, UInt64.valueOf(10 * spec.getGenesisSpecConfig().getSlotsPerEpoch()));
+    final BeaconStateEip8321 baseState =
+        createEip8321State(8, UInt64.valueOf(10 * spec.getGenesisSpecConfig().getSlotsPerEpoch()));
     final UInt64 currentEpoch = spec.computeEpochAtSlot(baseState.getSlot());
     assertThat(currentEpoch).isEqualTo(UInt64.valueOf(10));
     final UInt64 nextEpoch = currentEpoch.plus(1); // 11
@@ -74,13 +75,16 @@ class EpochProcessorEip8321Test {
   }
 
   @Test
-  void processPendingRandaoCommitments_shouldActivateDueCommitmentWhenActivationEpochLessThanNextEpoch() {
-    final BeaconStateEip8321 baseState = createEip8321State(8, UInt64.valueOf(10 * spec.getGenesisSpecConfig().getSlotsPerEpoch()));
+  void
+      processPendingRandaoCommitments_shouldActivateDueCommitmentWhenActivationEpochLessThanNextEpoch() {
+    final BeaconStateEip8321 baseState =
+        createEip8321State(8, UInt64.valueOf(10 * spec.getGenesisSpecConfig().getSlotsPerEpoch()));
     final UInt64 currentEpoch = spec.computeEpochAtSlot(baseState.getSlot()); // 10
 
     final Bytes32 commitment = dataStructureUtil.randomBytes32();
     final PendingRandaoCommitment pending =
-        new PendingRandaoCommitment(UInt64.valueOf(1), commitment, currentEpoch); // activationEpoch = 10 < 11
+        new PendingRandaoCommitment(
+            UInt64.valueOf(1), commitment, currentEpoch); // activationEpoch = 10 < 11
 
     final BeaconStateEip8321 preState =
         baseState.updatedEip8321(
@@ -97,7 +101,8 @@ class EpochProcessorEip8321Test {
 
   @Test
   void processPendingRandaoCommitments_shouldRetainFutureCommitment() {
-    final BeaconStateEip8321 baseState = createEip8321State(8, UInt64.valueOf(10 * spec.getGenesisSpecConfig().getSlotsPerEpoch()));
+    final BeaconStateEip8321 baseState =
+        createEip8321State(8, UInt64.valueOf(10 * spec.getGenesisSpecConfig().getSlotsPerEpoch()));
     final UInt64 currentEpoch = spec.computeEpochAtSlot(baseState.getSlot()); // 10
     final UInt64 futureActivationEpoch = currentEpoch.plus(2); // 12 > nextEpoch (11)
 
@@ -121,9 +126,8 @@ class EpochProcessorEip8321Test {
 
   @Test
   void processPendingRandaoCommitments_shouldActivateEligiblePrefixAndRetainSuffix() {
-    final BeaconStateEip8321 baseState = createEip8321State(
-            8,
-            UInt64.valueOf(10 * spec.getGenesisSpecConfig().getSlotsPerEpoch()));
+    final BeaconStateEip8321 baseState =
+        createEip8321State(8, UInt64.valueOf(10 * spec.getGenesisSpecConfig().getSlotsPerEpoch()));
     final UInt64 currentEpoch = spec.computeEpochAtSlot(baseState.getSlot()); // 10
     final UInt64 nextEpoch = currentEpoch.plus(1); // 11
 
@@ -140,15 +144,18 @@ class EpochProcessorEip8321Test {
     final PendingRandaoCommitment pending1 =
         new PendingRandaoCommitment(UInt64.ONE, commitment1, nextEpoch); // 11: duo
     final PendingRandaoCommitment pending2 =
-        new PendingRandaoCommitment(UInt64.valueOf(2), commitment2, nextEpoch.plus(2)); // 13: future
+        new PendingRandaoCommitment(
+            UInt64.valueOf(2), commitment2, nextEpoch.plus(2)); // 13: future
     final PendingRandaoCommitment pending3 =
-        new PendingRandaoCommitment(UInt64.valueOf(3), commitment3, nextEpoch.plus(3)); // 14: future
+        new PendingRandaoCommitment(
+            UInt64.valueOf(3), commitment3, nextEpoch.plus(3)); // 14: future
 
     final BeaconStateEip8321 preState =
         baseState.updatedEip8321(
             state ->
                 state.setPendingRandaoCommitments(
-                    getPendingSchema(state).createFromElements(List.of(pending0, pending1, pending2, pending3))));
+                    getPendingSchema(state)
+                        .createFromElements(List.of(pending0, pending1, pending2, pending3))));
 
     final BeaconStateEip8321 postState =
         preState.updatedEip8321(state -> epochProcessor.processPendingRandaoCommitments(state));
@@ -197,7 +204,8 @@ class EpochProcessorEip8321Test {
         baseState.updatedEip8321(
             state ->
                 state.setPendingRandaoCommitments(
-                    getPendingSchema(state).createFromElements(List.of(pendingDue, pendingFuture))));
+                    getPendingSchema(state)
+                        .createFromElements(List.of(pendingDue, pendingFuture))));
 
     final BeaconState postState = epochProcessor.processEpoch(preState);
     final BeaconStateEip8321 postStateEip8321 = BeaconStateEip8321.required(postState);

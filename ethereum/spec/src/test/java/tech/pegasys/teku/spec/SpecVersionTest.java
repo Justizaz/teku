@@ -114,7 +114,8 @@ class SpecVersionTest {
             SpecVersion.createEip8321(
                 SpecConfigEip8321.required(minimalConfig), SchemaRegistryBuilder.create());
         actualVersion =
-            SpecVersion.create(SpecMilestone.EIP8321, minimalConfig, SchemaRegistryBuilder.create());
+            SpecVersion.create(
+                SpecMilestone.EIP8321, minimalConfig, SchemaRegistryBuilder.create());
       }
     }
 

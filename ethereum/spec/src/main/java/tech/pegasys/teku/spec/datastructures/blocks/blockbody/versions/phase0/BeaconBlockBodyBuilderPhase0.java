@@ -168,7 +168,7 @@ public class BeaconBlockBodyBuilderPhase0 implements BeaconBlockBodyBuilder {
 
   @Override
   public BeaconBlockBodyBuilder randaoCommitmentRegistrations(
-          final SszList<SignedRandaoCommitmentRegistration> randaoCommitmentRegistrations) {
+      final SszList<SignedRandaoCommitmentRegistration> randaoCommitmentRegistrations) {
     return this;
   }
 

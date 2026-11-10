@@ -1,5 +1,5 @@
 /*
- * Copyright Consensys Software Inc., 2026
+ * Copyright (c) 2026 Consensys Incorporated. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with
  * the License. You may obtain a copy of the License at
@@ -13,16 +13,15 @@
 
 package tech.pegasys.teku.spec.config.builder;
 
-import tech.pegasys.teku.spec.config.SpecConfigAndParent;
-import tech.pegasys.teku.spec.config.SpecConfigEip8321;
-import tech.pegasys.teku.spec.config.SpecConfigEip8321Impl;
-import tech.pegasys.teku.spec.config.SpecConfigHeze;
+import static com.google.common.base.Preconditions.checkNotNull;
 
 import java.util.HashMap;
 import java.util.Map;
 import java.util.function.BiConsumer;
-
-import static com.google.common.base.Preconditions.checkNotNull;
+import tech.pegasys.teku.spec.config.SpecConfigAndParent;
+import tech.pegasys.teku.spec.config.SpecConfigEip8321;
+import tech.pegasys.teku.spec.config.SpecConfigEip8321Impl;
+import tech.pegasys.teku.spec.config.SpecConfigHeze;
 
 public class Eip8321Builder extends BaseForkBuilder
     implements ForkConfigBuilder<SpecConfigHeze, SpecConfigEip8321> {
@@ -50,7 +49,8 @@ public class Eip8321Builder extends BaseForkBuilder
     return this;
   }
 
-  public Eip8321Builder maxRandaoCommitmentRegistrations(final Integer maxRandaoCommitmentRegistrations) {
+  public Eip8321Builder maxRandaoCommitmentRegistrations(
+      final Integer maxRandaoCommitmentRegistrations) {
     checkNotNull(maxRandaoCommitmentRegistrations);
     this.maxRandaoCommitmentRegistrations = maxRandaoCommitmentRegistrations;
     return this;

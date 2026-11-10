@@ -1,5 +1,5 @@
 /*
- * Copyright Consensys Software Inc., 2026
+ * Copyright (c) 2026 Consensys Incorporated. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with
  * the License. You may obtain a copy of the License at
@@ -13,7 +13,12 @@
 
 package tech.pegasys.teku.spec.datastructures.state.beaconstate.versions.eip8321;
 
+import static com.google.common.base.Preconditions.checkArgument;
+
 import com.google.common.annotations.VisibleForTesting;
+import java.util.Comparator;
+import java.util.List;
+import java.util.stream.Stream;
 import tech.pegasys.teku.infrastructure.ssz.primitive.SszByte;
 import tech.pegasys.teku.infrastructure.ssz.primitive.SszBytes32;
 import tech.pegasys.teku.infrastructure.ssz.schema.ProgressiveSchemaUtils;
@@ -39,12 +44,6 @@ import tech.pegasys.teku.spec.datastructures.state.versions.electra.PendingDepos
 import tech.pegasys.teku.spec.datastructures.state.versions.gloas.Builder;
 import tech.pegasys.teku.spec.schemas.registry.SchemaRegistry;
 
-import java.util.Comparator;
-import java.util.List;
-import java.util.stream.Stream;
-
-import static com.google.common.base.Preconditions.checkArgument;
-
 public class BeaconStateSchemaEip8321
     extends AbstractBeaconStateSchema<BeaconStateEip8321, MutableBeaconStateEip8321> {
 
@@ -55,14 +54,12 @@ public class BeaconStateSchemaEip8321
 
   @VisibleForTesting
   BeaconStateSchemaEip8321(final SpecConfig specConfig, final SchemaRegistry schemaRegistry) {
-    super(
-        "BeaconStateEip8321",
-            ACTIVE_FIELDS,
-            getAllFields(specConfig, schemaRegistry));
+    super("BeaconStateEip8321", ACTIVE_FIELDS, getAllFields(specConfig, schemaRegistry));
   }
 
   private static boolean[] createActiveFields() {
-    final boolean[] activeFields = ProgressiveSchemaUtils.allActive(PENDING_RANDAO_COMMITMENTS_FIELD_INDEX + 1);
+    final boolean[] activeFields =
+        ProgressiveSchemaUtils.allActive(PENDING_RANDAO_COMMITMENTS_FIELD_INDEX + 1);
 
     activeFields[8] = false;
     activeFields[9] = false;
@@ -75,7 +72,8 @@ public class BeaconStateSchemaEip8321
   private static List<SszField> getAllFields(
       final SpecConfig specConfig, final SchemaRegistry schemaRegistry) {
     return Stream.concat(
-            BeaconStateSchemaHeze.getFields(SpecConfigHeze.required(specConfig), schemaRegistry).stream(),
+            BeaconStateSchemaHeze.getFields(SpecConfigHeze.required(specConfig), schemaRegistry)
+                .stream(),
             Stream.of(
                 new SszField(
                     RANDAO_COMMITMENTS_FIELD_INDEX,
@@ -88,8 +86,8 @@ public class BeaconStateSchemaEip8321
                     PENDING_RANDAO_COMMITMENTS_FIELD_INDEX,
                     "pending_randao_commitments",
                     () -> SszProgressiveListSchema.create(PendingRandaoCommitment.SSZ_SCHEMA))))
-            .sorted(Comparator.comparingInt(SszField::getIndex))
-            .toList();
+        .sorted(Comparator.comparingInt(SszField::getIndex))
+        .toList();
   }
 
   @SuppressWarnings("unchecked")
@@ -132,7 +130,8 @@ public class BeaconStateSchemaEip8321
 
   @SuppressWarnings("unchecked")
   public SszListSchema<PendingRandaoCommitment, ?> getPendingRandaoCommitmentsSchema() {
-    return (SszListSchema<PendingRandaoCommitment, ?>) getChildSchema(getFieldIndex("pending_randao_commitments"));
+    return (SszListSchema<PendingRandaoCommitment, ?>)
+        getChildSchema(getFieldIndex("pending_randao_commitments"));
   }
 
   @Override

@@ -1,5 +1,5 @@
 /*
- * Copyright Consensys Software Inc., 2026
+ * Copyright (c) 2026 Consensys Incorporated. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with
  * the License. You may obtain a copy of the License at
@@ -12,6 +12,8 @@
  */
 
 package tech.pegasys.teku.spec.datastructures.blocks.blockbody.versions.eip8321;
+
+import static com.google.common.base.Preconditions.checkArgument;
 
 import org.apache.tuweni.bytes.Bytes32;
 import tech.pegasys.teku.bls.BLSSignature;
@@ -34,8 +36,6 @@ import tech.pegasys.teku.spec.datastructures.operations.SignedRandaoCommitmentRe
 import tech.pegasys.teku.spec.datastructures.operations.SignedVoluntaryExit;
 import tech.pegasys.teku.spec.datastructures.type.SszSignature;
 import tech.pegasys.teku.spec.datastructures.util.Eip8015RemovedFields;
-
-import static com.google.common.base.Preconditions.checkArgument;
 
 public class BeaconBlockBodyEip8321Impl
     extends Container13<
@@ -91,7 +91,8 @@ public class BeaconBlockBodyEip8321Impl
     super(type);
   }
 
-  BeaconBlockBodyEip8321Impl(final BeaconBlockBodySchemaEip8321Impl type, final TreeNode backingNode) {
+  BeaconBlockBodyEip8321Impl(
+      final BeaconBlockBodySchemaEip8321Impl type, final TreeNode backingNode) {
     super(type, backingNode);
   }
 

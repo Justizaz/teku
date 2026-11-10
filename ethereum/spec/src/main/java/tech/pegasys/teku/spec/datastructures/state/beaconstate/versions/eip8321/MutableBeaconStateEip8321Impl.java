@@ -1,5 +1,5 @@
 /*
- * Copyright Consensys Software Inc., 2026
+ * Copyright (c) 2026 Consensys Incorporated. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with
  * the License. You may obtain a copy of the License at
@@ -27,7 +27,8 @@ import tech.pegasys.teku.spec.datastructures.state.beaconstate.common.SlotCaches
 import tech.pegasys.teku.spec.datastructures.state.beaconstate.common.TransitionCaches;
 import tech.pegasys.teku.spec.datastructures.state.beaconstate.versions.altair.ValidatorStatsAltair;
 
-public class MutableBeaconStateEip8321Impl extends AbstractMutableBeaconState<BeaconStateEip8321Impl>
+public class MutableBeaconStateEip8321Impl
+    extends AbstractMutableBeaconState<BeaconStateEip8321Impl>
     implements MutableBeaconStateEip8321, BeaconStateCache, ValidatorStatsAltair {
 
   MutableBeaconStateEip8321Impl(final BeaconStateEip8321Impl backingImmutableView) {
@@ -78,7 +79,8 @@ public class MutableBeaconStateEip8321Impl extends AbstractMutableBeaconState<Be
   }
 
   @Override
-  public void setPendingRandaoCommitments(final SszList<PendingRandaoCommitment> pendingRandaoCommitments) {
+  public void setPendingRandaoCommitments(
+      final SszList<PendingRandaoCommitment> pendingRandaoCommitments) {
     final int index = getSchema().getFieldIndex("pending_randao_commitments");
     set(index, pendingRandaoCommitments);
   }

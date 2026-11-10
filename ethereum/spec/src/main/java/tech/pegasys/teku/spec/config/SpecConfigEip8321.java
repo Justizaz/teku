@@ -1,5 +1,5 @@
 /*
- * Copyright Consensys Software Inc., 2026
+ * Copyright (c) 2026 Consensys Incorporated. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with
  * the License. You may obtain a copy of the License at
@@ -19,11 +19,12 @@ public interface SpecConfigEip8321 extends SpecConfigHeze {
 
   static SpecConfigEip8321 required(final SpecConfig specConfig) {
     return specConfig
-            .toVersionEip8321()
-            .orElseThrow(
-                    () ->
-                            new IllegalArgumentException(
-                                    "Expected EIP-8321 spec config but got: " + specConfig.getClass().getSimpleName()));
+        .toVersionEip8321()
+        .orElseThrow(
+            () ->
+                new IllegalArgumentException(
+                    "Expected EIP-8321 spec config but got: "
+                        + specConfig.getClass().getSimpleName()));
   }
 
   int getCommitmentRegistrationDelay();

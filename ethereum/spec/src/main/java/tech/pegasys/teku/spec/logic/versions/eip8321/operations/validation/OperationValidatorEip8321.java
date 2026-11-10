@@ -1,5 +1,5 @@
 /*
- * Copyright Consensys Software Inc., 2026
+ * Copyright (c) 2026 Consensys Incorporated. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with
  * the License. You may obtain a copy of the License at
@@ -14,7 +14,6 @@
 package tech.pegasys.teku.spec.logic.versions.eip8321.operations.validation;
 
 import java.util.Optional;
-
 import tech.pegasys.teku.spec.datastructures.operations.RandaoCommitmentRegistration;
 import tech.pegasys.teku.spec.datastructures.state.Fork;
 import tech.pegasys.teku.spec.datastructures.state.beaconstate.BeaconState;
@@ -28,28 +27,29 @@ import tech.pegasys.teku.spec.logic.versions.phase0.operations.validation.Volunt
 
 public class OperationValidatorEip8321 extends OperationValidatorCapella {
 
-    private final RandaoCommitmentRegistrationValidator randaoCommitmentRegistrationValidator =
-            new RandaoCommitmentRegistrationValidator();
+  private final RandaoCommitmentRegistrationValidator randaoCommitmentRegistrationValidator =
+      new RandaoCommitmentRegistrationValidator();
 
-    public OperationValidatorEip8321(
-            final Predicates predicates,
-            final BeaconStateAccessors beaconStateAccessors,
-            final AttestationDataValidator attestationDataValidator,
-            final AttestationUtil attestationUtil,
-            final VoluntaryExitValidator voluntaryExitValidator) {
-        super(
-                predicates,
-                beaconStateAccessors,
-                attestationDataValidator,
-                attestationUtil,
-                voluntaryExitValidator);
-    }
+  public OperationValidatorEip8321(
+      final Predicates predicates,
+      final BeaconStateAccessors beaconStateAccessors,
+      final AttestationDataValidator attestationDataValidator,
+      final AttestationUtil attestationUtil,
+      final VoluntaryExitValidator voluntaryExitValidator) {
+    super(
+        predicates,
+        beaconStateAccessors,
+        attestationDataValidator,
+        attestationUtil,
+        voluntaryExitValidator);
+  }
 
-    @Override
-    public Optional<OperationInvalidReason> validateRandaoCommitmentRegistration(
-            final Fork fork,
-            final BeaconState state,
-            final RandaoCommitmentRegistration randaoCommitmentRegistration) {
-        return randaoCommitmentRegistrationValidator.validate(fork, state, randaoCommitmentRegistration);
-    }
+  @Override
+  public Optional<OperationInvalidReason> validateRandaoCommitmentRegistration(
+      final Fork fork,
+      final BeaconState state,
+      final RandaoCommitmentRegistration randaoCommitmentRegistration) {
+    return randaoCommitmentRegistrationValidator.validate(
+        fork, state, randaoCommitmentRegistration);
+  }
 }

@@ -83,6 +83,7 @@ import tech.pegasys.teku.spec.datastructures.operations.IndexedAttestation;
 import tech.pegasys.teku.spec.datastructures.operations.IndexedAttestationSchema;
 import tech.pegasys.teku.spec.datastructures.operations.ProposerSlashing;
 import tech.pegasys.teku.spec.datastructures.operations.SignedBlsToExecutionChange;
+import tech.pegasys.teku.spec.datastructures.operations.SignedRandaoCommitmentRegistration;
 import tech.pegasys.teku.spec.datastructures.state.Checkpoint;
 import tech.pegasys.teku.spec.datastructures.state.Fork;
 import tech.pegasys.teku.spec.datastructures.state.ForkInfo;
@@ -396,6 +397,19 @@ public class TekuBeaconNode extends TekuNode {
     final String body = JsonUtil.serialize(List.of(signedBlsToExecutionChange), jsonTypeDefinition);
 
     httpClient.post(getRestApiUrl(), "/eth/v1/beacon/pool/bls_to_execution_changes", body);
+  }
+
+  public void submitRandaoCommitmentRegistration(
+      final SignedRandaoCommitmentRegistration signedRegistration) throws Exception {
+    final String body =
+        JsonUtil.serialize(
+            signedRegistration,
+            SignedRandaoCommitmentRegistration.SSZ_SCHEMA.getJsonTypeDefinition());
+    httpClient.post(getRestApiUrl(), "/eth/v1/beacon/pool/randao_commitments", body);
+  }
+
+  public BeaconState getHeadState() throws IOException {
+    return fetchHeadState().orElseThrow();
   }
 
   public void waitForBlsToExecutionChangeEventForValidator(final int validatorIndex) {

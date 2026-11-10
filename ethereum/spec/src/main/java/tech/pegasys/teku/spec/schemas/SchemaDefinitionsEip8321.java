@@ -1,5 +1,5 @@
 /*
- * Copyright Consensys Software Inc., 2026
+ * Copyright (c) 2026 Consensys Incorporated. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with
  * the License. You may obtain a copy of the License at
@@ -13,14 +13,13 @@
 
 package tech.pegasys.teku.spec.schemas;
 
+import static com.google.common.base.Preconditions.checkArgument;
+
+import java.util.Optional;
 import tech.pegasys.teku.spec.datastructures.blocks.blockbody.BeaconBlockBodyBuilder;
 import tech.pegasys.teku.spec.datastructures.blocks.blockbody.versions.eip8321.BeaconBlockBodyBuilderEip8321;
 import tech.pegasys.teku.spec.datastructures.blocks.blockbody.versions.eip8321.BeaconBlockBodySchemaEip8321Impl;
 import tech.pegasys.teku.spec.schemas.registry.SchemaRegistry;
-
-import java.util.Optional;
-
-import static com.google.common.base.Preconditions.checkArgument;
 
 public class SchemaDefinitionsEip8321 extends SchemaDefinitionsHeze {
 
@@ -40,7 +39,7 @@ public class SchemaDefinitionsEip8321 extends SchemaDefinitionsHeze {
   @Override
   public BeaconBlockBodyBuilder createBeaconBlockBodyBuilder() {
     return new BeaconBlockBodyBuilderEip8321(
-            (BeaconBlockBodySchemaEip8321Impl) getBeaconBlockBodySchema());
+        (BeaconBlockBodySchemaEip8321Impl) getBeaconBlockBodySchema());
   }
 
   @Override

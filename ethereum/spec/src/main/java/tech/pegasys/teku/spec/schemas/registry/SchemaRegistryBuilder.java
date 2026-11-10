@@ -851,7 +851,7 @@ public class SchemaRegistryBuilder {
             EIP8321,
             (registry, specConfig, schemaName) ->
                 BeaconBlockBodySchemaEip8321Impl.create(
-                     SpecConfigEip8321.required(specConfig), schemaName, registry))
+                    SpecConfigEip8321.required(specConfig), schemaName, registry))
         .build();
   }
 

@@ -1,5 +1,5 @@
 /*
- * Copyright Consensys Software Inc., 2026
+ * Copyright (c) 2026 Consensys Incorporated. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with
  * the License. You may obtain a copy of the License at
@@ -77,8 +77,7 @@ public class EpochProcessorEip8321 extends EpochProcessorHeze {
       }
 
       randaoCommitments.set(
-            pending.getValidatorIndex().intValue(),
-            SszBytes32.of(pending.getCommitment()));
+          pending.getValidatorIndex().intValue(), SszBytes32.of(pending.getCommitment()));
 
       nextPendingCommitment++;
     }
@@ -87,8 +86,6 @@ public class EpochProcessorEip8321 extends EpochProcessorHeze {
         BeaconStateSchemaEip8321.required(stateEip8321.getBeaconStateSchema())
             .getPendingRandaoCommitmentsSchema()
             .createFromElements(
-                    pendingList
-                            .asList()
-                            .subList(nextPendingCommitment, pendingList.size())));
+                pendingList.asList().subList(nextPendingCommitment, pendingList.size())));
   }
 }

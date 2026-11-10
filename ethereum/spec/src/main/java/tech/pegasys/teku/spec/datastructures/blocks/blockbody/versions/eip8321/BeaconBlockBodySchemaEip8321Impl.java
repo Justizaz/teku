@@ -1,5 +1,5 @@
 /*
- * Copyright Consensys Software Inc., 2026
+ * Copyright (c) 2026 Consensys Incorporated. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with
  * the License. You may obtain a copy of the License at
@@ -13,14 +13,22 @@
 
 package tech.pegasys.teku.spec.datastructures.blocks.blockbody.versions.eip8321;
 
+import static tech.pegasys.teku.spec.schemas.registry.SchemaTypes.ATTESTATION_SCHEMA;
+import static tech.pegasys.teku.spec.schemas.registry.SchemaTypes.EXECUTION_REQUESTS_SCHEMA;
+import static tech.pegasys.teku.spec.schemas.registry.SchemaTypes.PAYLOAD_ATTESTATION_SCHEMA;
+import static tech.pegasys.teku.spec.schemas.registry.SchemaTypes.SIGNED_BLS_TO_EXECUTION_CHANGE_SCHEMA;
+import static tech.pegasys.teku.spec.schemas.registry.SchemaTypes.SIGNED_EXECUTION_PAYLOAD_BID_SCHEMA;
+
 import it.unimi.dsi.fastutil.longs.LongList;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.function.Function;
 import tech.pegasys.teku.bls.BLSSignature;
 import tech.pegasys.teku.infrastructure.async.SafeFuture;
 import tech.pegasys.teku.infrastructure.ssz.SszData;
 import tech.pegasys.teku.infrastructure.ssz.SszList;
 import tech.pegasys.teku.infrastructure.ssz.containers.ContainerSchema13;
 import tech.pegasys.teku.infrastructure.ssz.primitive.SszBytes32;
-import tech.pegasys.teku.infrastructure.ssz.schema.ProgressiveSchemaUtils;
 import tech.pegasys.teku.infrastructure.ssz.schema.SszListSchema;
 import tech.pegasys.teku.infrastructure.ssz.schema.SszPrimitiveSchemas;
 import tech.pegasys.teku.infrastructure.ssz.schema.SszProgressiveListSchema;
@@ -55,16 +63,6 @@ import tech.pegasys.teku.spec.datastructures.util.Eip8015RemovedFields;
 import tech.pegasys.teku.spec.schemas.registry.SchemaRegistry;
 import tech.pegasys.teku.spec.schemas.registry.SchemaTypes;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.function.Function;
-
-import static tech.pegasys.teku.spec.schemas.registry.SchemaTypes.ATTESTATION_SCHEMA;
-import static tech.pegasys.teku.spec.schemas.registry.SchemaTypes.EXECUTION_REQUESTS_SCHEMA;
-import static tech.pegasys.teku.spec.schemas.registry.SchemaTypes.PAYLOAD_ATTESTATION_SCHEMA;
-import static tech.pegasys.teku.spec.schemas.registry.SchemaTypes.SIGNED_BLS_TO_EXECUTION_CHANGE_SCHEMA;
-import static tech.pegasys.teku.spec.schemas.registry.SchemaTypes.SIGNED_EXECUTION_PAYLOAD_BID_SCHEMA;
-
 public class BeaconBlockBodySchemaEip8321Impl
     extends ContainerSchema13<
         BeaconBlockBodyEip8321Impl,
@@ -84,8 +82,8 @@ public class BeaconBlockBodySchemaEip8321Impl
     implements BeaconBlockBodySchemaEip8321<BeaconBlockBodyEip8321Impl> {
 
   private static final boolean[] ACTIVE_FIELDS = {
-          true, false, true, true, true, true, false, true,
-          true, true, true, true, true, true, true};
+    true, false, true, true, true, true, false, true, true, true, true, true, true, true, true
+  };
 
   public static final String HASH_CHAIN_REVEAL = "hash_chain_reveal";
   public static final String RANDAO_COMMITMENT_REGISTRATIONS = "randao_commitment_registrations";
@@ -104,7 +102,8 @@ public class BeaconBlockBodySchemaEip8321Impl
       final NamedSchema<SszList<PayloadAttestation>> payloadAttestations,
       final NamedSchema<ExecutionRequests> executionRequests,
       final NamedSchema<SszBytes32> hashChainReveal,
-      final NamedSchema<SszList<SignedRandaoCommitmentRegistration>> randaoCommitmentRegistrations) {
+      final NamedSchema<SszList<SignedRandaoCommitmentRegistration>>
+          randaoCommitmentRegistrations) {
     super(
         containerName,
         ACTIVE_FIELDS,
@@ -167,12 +166,12 @@ public class BeaconBlockBodySchemaEip8321Impl
         namedSchema(
             BlockBodyFields.PARENT_EXECUTION_REQUESTS,
             SszSchema.as(ExecutionRequests.class, schemaRegistry.get(EXECUTION_REQUESTS_SCHEMA))),
-            namedSchema(HASH_CHAIN_REVEAL, SszPrimitiveSchemas.BYTES32_SCHEMA),
-            namedSchema(
-                    RANDAO_COMMITMENT_REGISTRATIONS,
-                    SszProgressiveListSchema.create(
-                            SignedRandaoCommitmentRegistration.SSZ_SCHEMA,
-                            specConfig.getMaxRandaoCommitmentRegistrations())));
+        namedSchema(HASH_CHAIN_REVEAL, SszPrimitiveSchemas.BYTES32_SCHEMA),
+        namedSchema(
+            RANDAO_COMMITMENT_REGISTRATIONS,
+            SszProgressiveListSchema.create(
+                SignedRandaoCommitmentRegistration.SSZ_SCHEMA,
+                specConfig.getMaxRandaoCommitmentRegistrations())));
   }
 
   @Override
@@ -190,17 +189,17 @@ public class BeaconBlockBodySchemaEip8321Impl
   @Override
   public BeaconBlockBody createGenesisBody(final BeaconState genesisState) {
     final ExecutionPayloadBid latestExecutionPayloadBid =
-            BeaconStateEip8321.required(genesisState).getLatestExecutionPayloadBid();
+        BeaconStateEip8321.required(genesisState).getLatestExecutionPayloadBid();
     final SignedExecutionPayloadBid signedExecutionPayloadBid =
-            getSignedExecutionPayloadBidSchema()
-                    .create(latestExecutionPayloadBid, BLSSignature.empty());
+        getSignedExecutionPayloadBidSchema()
+            .create(latestExecutionPayloadBid, BLSSignature.empty());
     final BeaconBlockBody emptyBody = createEmpty();
     final List<SszData> fieldValues = new ArrayList<>(emptyBody.size());
     for (int i = 0; i < emptyBody.size(); i++) {
       fieldValues.add(emptyBody.get(i));
     }
     fieldValues.set(
-            getFieldIndex(BlockBodyFields.SIGNED_EXECUTION_PAYLOAD_BID), signedExecutionPayloadBid);
+        getFieldIndex(BlockBodyFields.SIGNED_EXECUTION_PAYLOAD_BID), signedExecutionPayloadBid);
     return createFromFieldValues(fieldValues);
   }
 
@@ -301,14 +300,14 @@ public class BeaconBlockBodySchemaEip8321Impl
   @SuppressWarnings("unchecked")
   @Override
   public SszSchema<SszBytes32> getHashChainRevealSchema() {
-    return (SszSchema<SszBytes32>)
-            getChildSchema(getFieldIndex(HASH_CHAIN_REVEAL));
+    return (SszSchema<SszBytes32>) getChildSchema(getFieldIndex(HASH_CHAIN_REVEAL));
   }
 
   @SuppressWarnings("unchecked")
   @Override
-  public SszListSchema<SignedRandaoCommitmentRegistration, ?> getRandaoCommitmentRegistrationsSchema() {
+  public SszListSchema<SignedRandaoCommitmentRegistration, ?>
+      getRandaoCommitmentRegistrationsSchema() {
     return (SszListSchema<SignedRandaoCommitmentRegistration, ?>)
-            getChildSchema(getFieldIndex(RANDAO_COMMITMENT_REGISTRATIONS));
+        getChildSchema(getFieldIndex(RANDAO_COMMITMENT_REGISTRATIONS));
   }
 }

@@ -741,7 +741,14 @@ public class TestSpecFactory {
   private static SpecConfigAndParent<? extends SpecConfig> getEip8321SpecConfig(
       final Eth2Network network) {
     return getEip8321SpecConfig(
-        network, UInt64.ZERO, UInt64.ZERO, UInt64.ZERO, UInt64.ZERO, UInt64.ZERO, UInt64.ZERO, ZERO);
+        network,
+        UInt64.ZERO,
+        UInt64.ZERO,
+        UInt64.ZERO,
+        UInt64.ZERO,
+        UInt64.ZERO,
+        UInt64.ZERO,
+        ZERO);
   }
 
   private static SpecConfigAndParent<? extends SpecConfig> getEip8321SpecConfig(
@@ -756,16 +763,16 @@ public class TestSpecFactory {
     return getEip8321SpecConfig(
         network,
         builder ->
-          builder
-              .altairForkEpoch(ZERO)
-              .bellatrixForkEpoch(UInt64.ZERO)
-              .capellaForkEpoch(capellaForkEpoch)
-              .denebForkEpoch(denebForkEpoch)
-              .electraForkEpoch(electraForkEpoch)
-              .fuluForkEpoch(fuluForkEpoch)
-              .gloasForkEpoch(gloasForkEpoch)
-              .hezeForkEpoch(hezeForkEpoch)
-              .eip8321ForkEpoch(eip8321ForkEpoch));
+            builder
+                .altairForkEpoch(ZERO)
+                .bellatrixForkEpoch(UInt64.ZERO)
+                .capellaForkEpoch(capellaForkEpoch)
+                .denebForkEpoch(denebForkEpoch)
+                .electraForkEpoch(electraForkEpoch)
+                .fuluForkEpoch(fuluForkEpoch)
+                .gloasForkEpoch(gloasForkEpoch)
+                .hezeForkEpoch(hezeForkEpoch)
+                .eip8321ForkEpoch(eip8321ForkEpoch));
   }
 
   private static SpecConfigAndParent<? extends SpecConfig> getEip8321SpecConfig(
@@ -819,23 +826,23 @@ public class TestSpecFactory {
   }
 
   public static Spec createMinimalWithCapellaDenebElectraFuluGloasHezeAndEip8321ForkEpoch(
-          final UInt64 capellaForkEpoch,
-          final UInt64 denebForkEpoch,
-          final UInt64 electraForkEpoch,
-          final UInt64 fuluForkEpoch,
-          final UInt64 gloasForkEpoch,
-          final UInt64 hezeForkEpoch,
-          final UInt64 eip8321ForkEpoch) {
+      final UInt64 capellaForkEpoch,
+      final UInt64 denebForkEpoch,
+      final UInt64 electraForkEpoch,
+      final UInt64 fuluForkEpoch,
+      final UInt64 gloasForkEpoch,
+      final UInt64 hezeForkEpoch,
+      final UInt64 eip8321ForkEpoch) {
     final SpecConfigAndParent<? extends SpecConfig> config =
-            getEip8321SpecConfig(
-                    Eth2Network.MINIMAL,
-                    capellaForkEpoch,
-                    denebForkEpoch,
-                    electraForkEpoch,
-                    fuluForkEpoch,
-                    gloasForkEpoch,
-                    hezeForkEpoch,
-                    eip8321ForkEpoch);
+        getEip8321SpecConfig(
+            Eth2Network.MINIMAL,
+            capellaForkEpoch,
+            denebForkEpoch,
+            electraForkEpoch,
+            fuluForkEpoch,
+            gloasForkEpoch,
+            hezeForkEpoch,
+            eip8321ForkEpoch);
     return create(config, SpecMilestone.EIP8321);
   }
 

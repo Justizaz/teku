@@ -16,6 +16,7 @@ package tech.pegasys.teku.beaconrestapi.handlers.v1.beacon;
 import static tech.pegasys.teku.infrastructure.http.HttpStatusCodes.SC_BAD_REQUEST;
 import static tech.pegasys.teku.infrastructure.http.HttpStatusCodes.SC_OK;
 import static tech.pegasys.teku.infrastructure.http.RestApiConstants.TAG_BEACON;
+import static tech.pegasys.teku.infrastructure.json.types.CoreTypes.HTTP_ERROR_RESPONSE_TYPE;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import tech.pegasys.teku.api.DataProvider;
@@ -29,46 +30,48 @@ import tech.pegasys.teku.spec.datastructures.operations.SignedRandaoCommitmentRe
 import tech.pegasys.teku.statetransition.validation.InternalValidationResult;
 
 public class PostSignedRandaoCommitmentRegistration extends RestApiEndpoint {
-    public static final String ROUTE = "/eth/v1/beacon/pool/randao_commitments";
-    private final NodeDataProvider nodeDataProvider;
+  public static final String ROUTE = "/eth/v1/beacon/pool/randao_commitments";
+  private final NodeDataProvider nodeDataProvider;
 
-    public PostSignedRandaoCommitmentRegistration(final NodeDataProvider provider) {
-        super(createEndpointMetadata());
-        this.nodeDataProvider = provider;
-    }
+  public PostSignedRandaoCommitmentRegistration(final NodeDataProvider provider) {
+    super(createEndpointMetadata());
+    this.nodeDataProvider = provider;
+  }
 
-    public PostSignedRandaoCommitmentRegistration(final DataProvider dataProvider) {
-        this(dataProvider.getNodeDataProvider());
-    }
+  public PostSignedRandaoCommitmentRegistration(final DataProvider dataProvider) {
+    this(dataProvider.getNodeDataProvider());
+  }
 
-    private static EndpointMetadata createEndpointMetadata() {
-        return EndpointMetadata.post(ROUTE)
-                .operationId("submitSignedRandaoCommitmentRegistration")
-                .summary("Submit SignedRandaoCommitmentRegistration object to node's pool")
-                .description(
-                        "Submits SignedRandaoCommitmentRegistration object to node's pool and if passes validation node MUST broadcast it to network.")
-                .tags(TAG_BEACON)
-                .requestBodyType(SignedRandaoCommitmentRegistration.SSZ_SCHEMA.getJsonTypeDefinition())
-                .response(SC_OK, "Randao commitment registration is stored in node and broadcast to network")
-                .response(SC_BAD_REQUEST, "Invalid randao commitment registration")
-                .build();
-    }
+  private static EndpointMetadata createEndpointMetadata() {
+    return EndpointMetadata.post(ROUTE)
+        .operationId("submitSignedRandaoCommitmentRegistration")
+        .summary("Submit SignedRandaoCommitmentRegistration object to node's pool")
+        .description(
+            "Submits SignedRandaoCommitmentRegistration object to node's pool and if passes validation node MUST broadcast it to network.")
+        .tags(TAG_BEACON)
+        .requestBodyType(SignedRandaoCommitmentRegistration.SSZ_SCHEMA.getJsonTypeDefinition())
+        .response(
+            SC_OK, "Randao commitment registration is stored in node and broadcast to network")
+        .response(
+            SC_BAD_REQUEST, "Invalid randao commitment registration", HTTP_ERROR_RESPONSE_TYPE)
+        .build();
+  }
 
-    @Override
-    public void handleRequest(final RestApiRequest request) throws JsonProcessingException {
-        final SignedRandaoCommitmentRegistration registration = request.getRequestBody();
-        final SafeFuture<InternalValidationResult> future =
-                nodeDataProvider.submitSignedRandaoCommitmentRegistration(registration);
+  @Override
+  public void handleRequest(final RestApiRequest request) throws JsonProcessingException {
+    final SignedRandaoCommitmentRegistration registration = request.getRequestBody();
+    final SafeFuture<InternalValidationResult> future =
+        nodeDataProvider.submitSignedRandaoCommitmentRegistration(registration);
 
-        request.respondAsync(
-                future.thenApply(
-                        result -> {
-                            if (result.isAccept()) {
-                                return AsyncApiResponse.respondWithCode(SC_OK);
-                            }
-                            return AsyncApiResponse.respondWithError(
-                                    SC_BAD_REQUEST,
-                                    result.getDescription().orElse("Invalid randao commitment registration"));
-                        }));
-    }
+    request.respondAsync(
+        future.thenApply(
+            result -> {
+              if (result.isAccept()) {
+                return AsyncApiResponse.respondWithCode(SC_OK);
+              }
+              return AsyncApiResponse.respondWithError(
+                  SC_BAD_REQUEST,
+                  result.getDescription().orElse("Invalid randao commitment registration"));
+            }));
+  }
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright Consensys Software Inc., 2026
+ * Copyright (c) 2026 Consensys Incorporated. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with
  * the License. You may obtain a copy of the License at
@@ -13,10 +13,9 @@
 
 package tech.pegasys.teku.spec.config;
 
-import tech.pegasys.teku.spec.SpecMilestone;
-
 import java.util.Objects;
 import java.util.Optional;
+import tech.pegasys.teku.spec.SpecMilestone;
 
 public class SpecConfigEip8321Impl extends SpecConfigHezeImpl implements SpecConfigEip8321 {
 
@@ -24,10 +23,18 @@ public class SpecConfigEip8321Impl extends SpecConfigHezeImpl implements SpecCon
   private final int maxRandaoCommitmentRegistrations;
 
   public SpecConfigEip8321Impl(
-          final SpecConfigHeze specConfig,
-          final int commitmentRegistrationDelay,
-          final int maxRandaoCommitmentRegistrations) {
-    super(specConfig, specConfig.getInclusionListDueBps(), specConfig.getMaxRequestInclusionList(), specConfig.getMinSlotsForInclusionListsRequests(), specConfig.getMaxTransactionsBytesPerInclusionList(), specConfig.getMaxSignedInclusionListSize(), specConfig.getInclusionListCommitteeSize(), specConfig.getMinBlobDataRetentionMs());
+      final SpecConfigHeze specConfig,
+      final int commitmentRegistrationDelay,
+      final int maxRandaoCommitmentRegistrations) {
+    super(
+        specConfig,
+        specConfig.getInclusionListDueBps(),
+        specConfig.getMaxRequestInclusionList(),
+        specConfig.getMinSlotsForInclusionListsRequests(),
+        specConfig.getMaxTransactionsBytesPerInclusionList(),
+        specConfig.getMaxSignedInclusionListSize(),
+        specConfig.getInclusionListCommitteeSize(),
+        specConfig.getMinBlobDataRetentionMs());
     this.commitmentRegistrationDelay = commitmentRegistrationDelay;
     this.maxRandaoCommitmentRegistrations = maxRandaoCommitmentRegistrations;
   }
@@ -62,14 +69,12 @@ public class SpecConfigEip8321Impl extends SpecConfigHezeImpl implements SpecCon
     }
     SpecConfigEip8321Impl that = (SpecConfigEip8321Impl) o;
     return commitmentRegistrationDelay == that.commitmentRegistrationDelay
-            && maxRandaoCommitmentRegistrations == that.maxRandaoCommitmentRegistrations;
+        && maxRandaoCommitmentRegistrations == that.maxRandaoCommitmentRegistrations;
   }
 
   @Override
   public int hashCode() {
     return Objects.hash(
-            super.hashCode(),
-            commitmentRegistrationDelay,
-            maxRandaoCommitmentRegistrations);
+        super.hashCode(), commitmentRegistrationDelay, maxRandaoCommitmentRegistrations);
   }
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright Consensys Software Inc., 2026
+ * Copyright (c) 2026 Consensys Incorporated. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with
  * the License. You may obtain a copy of the License at
@@ -22,7 +22,6 @@ import static tech.pegasys.teku.spec.logic.versions.eip8321.operations.validatio
 import static tech.pegasys.teku.spec.logic.versions.eip8321.operations.validation.RandaoCommitmentRegistrationValidator.RandaoCommitmentRegistrationInvalidReason.zeroCommitment;
 
 import java.util.Optional;
-
 import tech.pegasys.teku.infrastructure.unsigned.UInt64;
 import tech.pegasys.teku.spec.datastructures.operations.RandaoCommitmentRegistration;
 import tech.pegasys.teku.spec.datastructures.state.Fork;
@@ -32,80 +31,77 @@ import tech.pegasys.teku.spec.logic.common.operations.validation.OperationInvali
 import tech.pegasys.teku.spec.logic.common.operations.validation.OperationStateTransitionValidator;
 
 public class RandaoCommitmentRegistrationValidator
-        implements OperationStateTransitionValidator<RandaoCommitmentRegistration> {
+    implements OperationStateTransitionValidator<RandaoCommitmentRegistration> {
 
-    public RandaoCommitmentRegistrationValidator() {
+  public RandaoCommitmentRegistrationValidator() {}
+
+  @Override
+  public Optional<OperationInvalidReason> validate(
+      final Fork fork, final BeaconState state, final RandaoCommitmentRegistration registration) {
+    return firstOf(
+        () -> checkValidatorIndex(state, registration.getValidatorIndex()),
+        () -> checkCommitment(registration),
+        () -> checkUnregistered(state, registration.getValidatorIndex()),
+        () -> checkNotPending(state, registration.getValidatorIndex()));
+  }
+
+  private Optional<OperationInvalidReason> checkValidatorIndex(
+      final BeaconState state, final UInt64 validatorIndex) {
+    return check(
+        validatorIndex.isLessThan(state.getValidators().size()),
+        invalidValidatorIndex(validatorIndex));
+  }
+
+  private Optional<OperationInvalidReason> checkCommitment(
+      final RandaoCommitmentRegistration registration) {
+    return check(!registration.getCommitment().isZero(), zeroCommitment());
+  }
+
+  private Optional<OperationInvalidReason> checkUnregistered(
+      final BeaconState state, final UInt64 validatorIndex) {
+    final Optional<BeaconStateEip8321> stateEip8321 = state.toVersionEip8321();
+    if (stateEip8321.isEmpty()) {
+      return Optional.of(invalidStateVersion());
+    }
+    final int index = validatorIndex.intValue();
+    return check(
+        stateEip8321.get().getRandaoCommitments().get(index).get().isZero(),
+        validatorAlreadyRegistered(validatorIndex));
+  }
+
+  private Optional<OperationInvalidReason> checkNotPending(
+      final BeaconState state, final UInt64 validatorIndex) {
+    final Optional<BeaconStateEip8321> stateEip8321 = state.toVersionEip8321();
+    if (stateEip8321.isEmpty()) {
+      return Optional.of(invalidStateVersion());
+    }
+    final boolean alreadyPending =
+        stateEip8321.get().getPendingRandaoCommitments().stream()
+            .anyMatch(pending -> pending.getValidatorIndex().equals(validatorIndex));
+    return check(!alreadyPending, validatorHasPendingRegistration(validatorIndex));
+  }
+
+  public static class RandaoCommitmentRegistrationInvalidReason {
+    public static OperationInvalidReason invalidValidatorIndex(final UInt64 validatorIndex) {
+      return () -> String.format("Invalid validator index: %s", validatorIndex);
     }
 
-    @Override
-    public Optional<OperationInvalidReason> validate(
-            final Fork fork,
-            final BeaconState state,
-            final RandaoCommitmentRegistration registration) {
-        return firstOf(
-                () -> checkValidatorIndex(state, registration.getValidatorIndex()),
-                () -> checkCommitment(registration),
-                () -> checkUnregistered(state, registration.getValidatorIndex()),
-                () -> checkNotPending(state, registration.getValidatorIndex()));
+    public static OperationInvalidReason zeroCommitment() {
+      return () -> "Commitment cannot be zero";
     }
 
-    private Optional<OperationInvalidReason> checkValidatorIndex(
-            final BeaconState state, final UInt64 validatorIndex) {
-        return check(
-                validatorIndex.isLessThan(state.getValidators().size()),
-                invalidValidatorIndex(validatorIndex));
+    public static OperationInvalidReason invalidStateVersion() {
+      return () -> "State is not an EIP-8321 state";
     }
 
-    private Optional<OperationInvalidReason> checkCommitment(
-            final RandaoCommitmentRegistration registration) {
-        return check(!registration.getCommitment().isZero(), zeroCommitment());
+    public static OperationInvalidReason validatorAlreadyRegistered(final UInt64 validatorIndex) {
+      return () ->
+          String.format("Validator %s already has a registered commitment", validatorIndex);
     }
 
-    private Optional<OperationInvalidReason> checkUnregistered(
-            final BeaconState state, final UInt64 validatorIndex) {
-        final Optional<BeaconStateEip8321> stateEip8321 = state.toVersionEip8321();
-        if (stateEip8321.isEmpty()) {
-            return Optional.of(invalidStateVersion());
-        }
-        final int index = validatorIndex.intValue();
-        return check(
-                stateEip8321.get().getRandaoCommitments().get(index).get().isZero(),
-                validatorAlreadyRegistered(validatorIndex));
+    public static OperationInvalidReason validatorHasPendingRegistration(
+        final UInt64 validatorIndex) {
+      return () -> String.format("Validator %s already has a pending registration", validatorIndex);
     }
-
-    private Optional<OperationInvalidReason> checkNotPending(
-            final BeaconState state, final UInt64 validatorIndex) {
-        final Optional<BeaconStateEip8321> stateEip8321 = state.toVersionEip8321();
-        if (stateEip8321.isEmpty()) {
-            return Optional.of(invalidStateVersion());
-        }
-        final boolean alreadyPending =
-                stateEip8321.get().getPendingRandaoCommitments().stream()
-                        .anyMatch(pending -> pending.getValidatorIndex().equals(validatorIndex));
-        return check(!alreadyPending, validatorHasPendingRegistration(validatorIndex));
-    }
-
-    public static class RandaoCommitmentRegistrationInvalidReason {
-        public static OperationInvalidReason invalidValidatorIndex(final UInt64 validatorIndex) {
-            return () -> String.format("Invalid validator index: %s", validatorIndex);
-        }
-
-        public static OperationInvalidReason zeroCommitment() {
-            return () -> "Commitment cannot be zero";
-        }
-
-        public static OperationInvalidReason invalidStateVersion() {
-            return () -> "State is not an EIP-8321 state";
-        }
-
-        public static OperationInvalidReason validatorAlreadyRegistered(final UInt64 validatorIndex) {
-            return () ->
-                    String.format("Validator %s already has a registered commitment", validatorIndex);
-        }
-
-        public static OperationInvalidReason validatorHasPendingRegistration(final UInt64 validatorIndex) {
-            return () ->
-                    String.format("Validator %s already has a pending registration", validatorIndex);
-        }
-    }
+  }
 }

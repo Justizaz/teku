@@ -1,5 +1,5 @@
 /*
- * Copyright Consensys Software Inc., 2026
+ * Copyright (c) 2026 Consensys Incorporated. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with
  * the License. You may obtain a copy of the License at
@@ -33,7 +33,8 @@ import tech.pegasys.teku.spec.datastructures.state.beaconstate.versions.altair.V
 public class BeaconStateEip8321Impl extends AbstractBeaconState<MutableBeaconStateEip8321>
     implements BeaconStateEip8321, BeaconStateCache, ValidatorStatsAltair {
 
-  BeaconStateEip8321Impl(final BeaconStateSchema<BeaconStateEip8321, MutableBeaconStateEip8321> schema) {
+  BeaconStateEip8321Impl(
+      final BeaconStateSchema<BeaconStateEip8321, MutableBeaconStateEip8321> schema) {
     super(schema);
   }
 

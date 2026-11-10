@@ -72,6 +72,7 @@ import tech.pegasys.teku.spec.datastructures.forkchoice.InclusionListStore;
 import tech.pegasys.teku.spec.datastructures.operations.AttesterSlashing;
 import tech.pegasys.teku.spec.datastructures.operations.ProposerSlashing;
 import tech.pegasys.teku.spec.datastructures.operations.SignedBlsToExecutionChange;
+import tech.pegasys.teku.spec.datastructures.operations.SignedRandaoCommitmentRegistration;
 import tech.pegasys.teku.spec.datastructures.operations.SignedVoluntaryExit;
 import tech.pegasys.teku.spec.generator.ChainBuilder;
 import tech.pegasys.teku.statetransition.MappedOperationPool;
@@ -159,6 +160,8 @@ public abstract class AbstractDataBackedRestAPIIntegrationTest {
   protected final OperationPool<AttesterSlashing> attesterSlashingPool = mock(OperationPool.class);
   protected final OperationPool<ProposerSlashing> proposerSlashingPool = mock(OperationPool.class);
   protected final OperationPool<SignedVoluntaryExit> voluntaryExitPool = mock(OperationPool.class);
+  protected final OperationPool<SignedRandaoCommitmentRegistration>
+      randaoCommitmentRegistrationPool = mock(OperationPool.class);
 
   protected final BlockProductionAndPublishingPerformanceFactory
       blockProductionAndPublishingFactory =
@@ -302,6 +305,7 @@ public abstract class AbstractDataBackedRestAPIIntegrationTest {
             .proposerSlashingPool(proposerSlashingPool)
             .voluntaryExitPool(voluntaryExitPool)
             .blsToExecutionChangePool(blsToExecutionChangePool)
+            .randaoCommitmentRegistrationPool(randaoCommitmentRegistrationPool)
             .syncCommitteeContributionPool(syncCommitteeContributionPool)
             .proposersDataManager(proposersDataManager)
             .forkChoiceNotifier(forkChoiceNotifier)

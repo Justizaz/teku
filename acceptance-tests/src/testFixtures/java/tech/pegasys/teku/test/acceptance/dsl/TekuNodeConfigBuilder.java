@@ -192,6 +192,16 @@ public class TekuNodeConfigBuilder {
     return this;
   }
 
+  public TekuNodeConfigBuilder withEip8321Epoch(final UInt64 eip8321ForkEpoch) {
+    mustBe(NodeType.BEACON_NODE);
+    LOG.debug("Xnetwork-eip8321-fork-epoch={}", eip8321ForkEpoch);
+    configMap.put("Xnetwork-eip8321-fork-epoch", eip8321ForkEpoch.toString());
+    specConfigModifier =
+        specConfigModifier.andThen(
+            specConfigBuilder -> specConfigBuilder.eip8321ForkEpoch(eip8321ForkEpoch));
+    return this;
+  }
+
   public TekuNodeConfigBuilder withExecutionEngine(final BesuNode node) {
     mustBe(NodeType.BEACON_NODE);
     return withExecutionEngineEndpoint(node.getInternalEngineJsonRpcUrl());

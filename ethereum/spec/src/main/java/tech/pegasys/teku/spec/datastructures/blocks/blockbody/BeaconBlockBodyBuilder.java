@@ -111,7 +111,8 @@ public interface BeaconBlockBodyBuilder {
     return false;
   }
 
-  BeaconBlockBodyBuilder randaoCommitmentRegistrations(SszList<SignedRandaoCommitmentRegistration> randaoCommitmentRegistrations);
+  BeaconBlockBodyBuilder randaoCommitmentRegistrations(
+      SszList<SignedRandaoCommitmentRegistration> randaoCommitmentRegistrations);
 
   default boolean supportsHashChainReveal() {
     return false;

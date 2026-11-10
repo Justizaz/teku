@@ -437,7 +437,7 @@ public abstract class AbstractBlockProcessor implements BlockProcessor {
       final BLSSignatureVerifier signatureVerifier)
       throws BlockProcessingException {
     final BlockValidationResult validationResult = verifyRandao(state, block, signatureVerifier);
-    if(!validationResult.isValid()) {
+    if (!validationResult.isValid()) {
       throw new BlockProcessingException(validationResult.getFailureReason());
     }
     processRandaoNoValidation(state, block.getBody());

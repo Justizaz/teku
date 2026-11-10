@@ -42,7 +42,6 @@ import tech.pegasys.teku.spec.datastructures.operations.Attestation;
 import tech.pegasys.teku.spec.datastructures.operations.AttesterSlashing;
 import tech.pegasys.teku.spec.datastructures.operations.Deposit;
 import tech.pegasys.teku.spec.datastructures.operations.ProposerSlashing;
-import tech.pegasys.teku.spec.datastructures.operations.RandaoCommitmentRegistration;
 import tech.pegasys.teku.spec.datastructures.operations.SignedBlsToExecutionChange;
 import tech.pegasys.teku.spec.datastructures.operations.SignedRandaoCommitmentRegistration;
 import tech.pegasys.teku.spec.datastructures.operations.SignedVoluntaryExit;
@@ -91,7 +90,8 @@ public interface BeaconBlockBody extends SszContainer {
     return Optional.empty();
   }
 
-  default Optional<SszList<SignedRandaoCommitmentRegistration>> getOptionalRandaoCommitmentRegistrations() {
+  default Optional<SszList<SignedRandaoCommitmentRegistration>>
+      getOptionalRandaoCommitmentRegistrations() {
     return Optional.empty();
   }
 

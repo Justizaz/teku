@@ -27,27 +27,26 @@ import tech.pegasys.teku.statetransition.validation.InternalValidationResult;
 
 public class PostSignedRandaoCommitmentRegistrationTest extends AbstractMigratedBeaconHandlerTest {
 
-    @BeforeEach
-    public void setup() {
-        setHandler(new PostSignedRandaoCommitmentRegistration(nodeDataProvider));
-    }
+  @BeforeEach
+  public void setup() {
+    setHandler(new PostSignedRandaoCommitmentRegistration(nodeDataProvider));
+  }
 
-    @Test
-    void shouldBeAbleToSubmitRandaoCommitmentRegistration() throws Exception {
-        final SignedRandaoCommitmentRegistration registration =
-                new SignedRandaoCommitmentRegistration(
-                        new RandaoCommitmentRegistration(
-                                dataStructureUtil.randomUInt64(),
-                                dataStructureUtil.randomBytes32()),
-                        dataStructureUtil.randomSignature());
+  @Test
+  void shouldBeAbleToSubmitRandaoCommitmentRegistration() throws Exception {
+    final SignedRandaoCommitmentRegistration registration =
+        new SignedRandaoCommitmentRegistration(
+            new RandaoCommitmentRegistration(
+                dataStructureUtil.randomUInt64(), dataStructureUtil.randomBytes32()),
+            dataStructureUtil.randomSignature());
 
-        request.setRequestBody(registration);
-        when(nodeDataProvider.submitSignedRandaoCommitmentRegistration(registration))
-                .thenReturn(SafeFuture.completedFuture(InternalValidationResult.ACCEPT));
+    request.setRequestBody(registration);
+    when(nodeDataProvider.submitSignedRandaoCommitmentRegistration(registration))
+        .thenReturn(SafeFuture.completedFuture(InternalValidationResult.ACCEPT));
 
-        handler.handleRequest(request);
+    handler.handleRequest(request);
 
-        assertThat(request.getResponseCode()).isEqualTo(SC_OK);
-        assertThat(request.getResponseBody()).isNull();
-    }
+    assertThat(request.getResponseCode()).isEqualTo(SC_OK);
+    assertThat(request.getResponseBody()).isNull();
+  }
 }

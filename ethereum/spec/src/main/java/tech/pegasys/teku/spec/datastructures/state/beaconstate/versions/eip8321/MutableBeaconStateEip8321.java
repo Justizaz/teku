@@ -1,5 +1,5 @@
 /*
- * Copyright Consensys Software Inc., 2026
+ * Copyright (c) 2026 Consensys Incorporated. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with
  * the License. You may obtain a copy of the License at
@@ -13,14 +13,13 @@
 
 package tech.pegasys.teku.spec.datastructures.state.beaconstate.versions.eip8321;
 
+import java.util.Optional;
 import tech.pegasys.teku.infrastructure.ssz.SszList;
 import tech.pegasys.teku.infrastructure.ssz.SszMutableList;
 import tech.pegasys.teku.infrastructure.ssz.primitive.SszBytes32;
 import tech.pegasys.teku.spec.datastructures.operations.PendingRandaoCommitment;
 import tech.pegasys.teku.spec.datastructures.state.beaconstate.MutableBeaconState;
 import tech.pegasys.teku.spec.datastructures.state.beaconstate.versions.heze.MutableBeaconStateHeze;
-
-import java.util.Optional;
 
 public interface MutableBeaconStateEip8321 extends MutableBeaconStateHeze, BeaconStateEip8321 {
   static MutableBeaconStateEip8321 required(final MutableBeaconState state) {

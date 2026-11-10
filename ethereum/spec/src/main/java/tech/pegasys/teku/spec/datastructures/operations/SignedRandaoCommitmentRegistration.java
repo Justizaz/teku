@@ -1,5 +1,5 @@
 /*
- * Copyright Consensys Software Inc., 2026
+ * Copyright (c) 2026 Consensys Incorporated. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with
  * the License. You may obtain a copy of the License at
@@ -22,48 +22,48 @@ import tech.pegasys.teku.spec.datastructures.type.SszSignature;
 import tech.pegasys.teku.spec.datastructures.type.SszSignatureSchema;
 
 public class SignedRandaoCommitmentRegistration
-        extends Container2<SignedRandaoCommitmentRegistration, RandaoCommitmentRegistration, SszSignature> implements MessageWithValidatorId{
-    public static final SignedRandaoCommitmentRegistrationSchema SSZ_SCHEMA =
-            new SignedRandaoCommitmentRegistrationSchema();
+    extends Container2<
+        SignedRandaoCommitmentRegistration, RandaoCommitmentRegistration, SszSignature>
+    implements MessageWithValidatorId {
+  public static final SignedRandaoCommitmentRegistrationSchema SSZ_SCHEMA =
+      new SignedRandaoCommitmentRegistrationSchema();
 
-    public SignedRandaoCommitmentRegistration(
-            final RandaoCommitmentRegistration message, final BLSSignature signature) {
-        super(
-                SSZ_SCHEMA,
-                message,
-                new SszSignature(signature));
-    }
+  public SignedRandaoCommitmentRegistration(
+      final RandaoCommitmentRegistration message, final BLSSignature signature) {
+    super(SSZ_SCHEMA, message, new SszSignature(signature));
+  }
 
-    protected SignedRandaoCommitmentRegistration(
-            final SignedRandaoCommitmentRegistrationSchema schema, final TreeNode backingNode) {
-        super(schema, backingNode);
-    }
+  protected SignedRandaoCommitmentRegistration(
+      final SignedRandaoCommitmentRegistrationSchema schema, final TreeNode backingNode) {
+    super(schema, backingNode);
+  }
 
-    public RandaoCommitmentRegistration getMessage() {
-        return getField0();
-    }
+  public RandaoCommitmentRegistration getMessage() {
+    return getField0();
+  }
 
-    public BLSSignature getSignature() {
-        return getField1().getSignature();
+  public BLSSignature getSignature() {
+    return getField1().getSignature();
+  }
+
+  @Override
+  public UInt64 getValidatorId() {
+    return getMessage().getValidatorIndex();
+  }
+
+  public static class SignedRandaoCommitmentRegistrationSchema
+      extends ContainerSchema2<
+          SignedRandaoCommitmentRegistration, RandaoCommitmentRegistration, SszSignature> {
+    public SignedRandaoCommitmentRegistrationSchema() {
+      super(
+          "SignedRandaoCommitmentRegistration",
+          namedSchema("message", RandaoCommitmentRegistration.SSZ_SCHEMA),
+          namedSchema("signature", SszSignatureSchema.INSTANCE));
     }
 
     @Override
-    public UInt64 getValidatorId() {
-        return getMessage().getValidatorIndex();
+    public SignedRandaoCommitmentRegistration createFromBackingNode(final TreeNode backingNode) {
+      return new SignedRandaoCommitmentRegistration(this, backingNode);
     }
-
-    public static class SignedRandaoCommitmentRegistrationSchema
-            extends ContainerSchema2<SignedRandaoCommitmentRegistration, RandaoCommitmentRegistration, SszSignature> {
-        public SignedRandaoCommitmentRegistrationSchema() {
-            super(
-                    "SignedRandaoCommitmentRegistration",
-                    namedSchema("message", RandaoCommitmentRegistration.SSZ_SCHEMA),
-                    namedSchema("signature", SszSignatureSchema.INSTANCE));
-        }
-
-        @Override
-        public SignedRandaoCommitmentRegistration createFromBackingNode(final TreeNode backingNode) {
-            return new SignedRandaoCommitmentRegistration(this, backingNode);
-        }
-    }
+  }
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright Consensys Software Inc., 2026
+ * Copyright (c) 2026 Consensys Incorporated. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with
  * the License. You may obtain a copy of the License at
@@ -14,6 +14,7 @@
 package tech.pegasys.teku.spec.datastructures.state.beaconstate.versions.eip8321;
 
 import com.google.common.base.MoreObjects;
+import java.util.Optional;
 import tech.pegasys.teku.infrastructure.ssz.SszCollection;
 import tech.pegasys.teku.infrastructure.ssz.SszData;
 import tech.pegasys.teku.infrastructure.ssz.SszList;
@@ -22,8 +23,6 @@ import tech.pegasys.teku.spec.datastructures.operations.PendingRandaoCommitment;
 import tech.pegasys.teku.spec.datastructures.state.beaconstate.BeaconState;
 import tech.pegasys.teku.spec.datastructures.state.beaconstate.versions.gloas.BeaconStateGloas;
 import tech.pegasys.teku.spec.datastructures.state.beaconstate.versions.heze.BeaconStateHeze;
-
-import java.util.Optional;
 
 public interface BeaconStateEip8321 extends BeaconStateHeze {
   static BeaconStateEip8321 required(final BeaconState state) {
@@ -56,8 +55,8 @@ public interface BeaconStateEip8321 extends BeaconStateHeze {
   MutableBeaconStateEip8321 createWritableCopy();
 
   default <E1 extends Exception, E2 extends Exception, E3 extends Exception>
-  BeaconStateEip8321 updatedEip8321(final Mutator<MutableBeaconStateEip8321, E1, E2, E3> mutator)
-          throws E1, E2, E3 {
+      BeaconStateEip8321 updatedEip8321(
+          final Mutator<MutableBeaconStateEip8321, E1, E2, E3> mutator) throws E1, E2, E3 {
     MutableBeaconStateEip8321 writableCopy = createWritableCopy();
     mutator.mutate(writableCopy);
     return writableCopy.commitChanges();
@@ -67,7 +66,6 @@ public interface BeaconStateEip8321 extends BeaconStateHeze {
   default Optional<BeaconStateEip8321> toVersionEip8321() {
     return Optional.of(this);
   }
-
 
   SszList<SszBytes32> getRandaoCommitments();
 

@@ -192,9 +192,7 @@ public interface BlockProcessor {
       throws BlockProcessingException;
 
   void processRandao(
-      MutableBeaconState state,
-      BeaconBlock block,
-      BLSSignatureVerifier signatureVerifier)
+      MutableBeaconState state, BeaconBlock block, BLSSignatureVerifier signatureVerifier)
       throws BlockProcessingException;
 
   default Optional<BlockProcessorAltair> toVersionAltair() {
