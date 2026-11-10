@@ -1,5 +1,5 @@
 /*
- * Copyright Consensys Software Inc., 2026
+ * Copyright (c) 2026 Consensys Incorporated. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with
  * the License. You may obtain a copy of the License at
@@ -50,6 +50,7 @@ import tech.pegasys.teku.spec.TestSpecFactory;
 import tech.pegasys.teku.statetransition.datacolumns.CustodyGroupCountManager;
 import tech.pegasys.teku.statetransition.datacolumns.DataColumnSidecarArchiveReconstructor;
 import tech.pegasys.teku.statetransition.datacolumns.log.rpc.DasReqRespLogger;
+import tech.pegasys.teku.statetransition.inclusionlist.InclusionListManager;
 import tech.pegasys.teku.storage.client.CombinedChainDataClient;
 import tech.pegasys.teku.storage.client.RecentChainData;
 
@@ -61,6 +62,7 @@ public class Eth2PeerManagerTest {
   private final CombinedChainDataClient combinedChainDataClient =
       mock(CombinedChainDataClient.class);
   private final RecentChainData recentChainData = mock(RecentChainData.class);
+  private final InclusionListManager inclusionListManager = mock(InclusionListManager.class);
   private final Eth2PeerFactory eth2PeerFactory = mock(Eth2PeerFactory.class);
   private final StubMetricsSystem metricsSystem = new StubMetricsSystem();
   private final StatusMessageFactory statusMessageFactory =
@@ -77,6 +79,7 @@ public class Eth2PeerManagerTest {
           combinedChainDataClient,
           () -> CustodyGroupCountManager.NOOP,
           recentChainData,
+          inclusionListManager,
           new NoOpMetricsSystem(),
           eth2PeerFactory,
           statusMessageFactory,
@@ -86,7 +89,8 @@ public class Eth2PeerManagerTest {
           Eth2P2PNetworkBuilder.DEFAULT_ETH2_RPC_OUTSTANDING_PING_THRESHOLD,
           Eth2P2PNetworkBuilder.DEFAULT_ETH2_STATUS_UPDATE_INTERVAL,
           DataColumnSidecarArchiveReconstructor.NOOP,
-          DasReqRespLogger.NOOP);
+          DasReqRespLogger.NOOP,
+          Optional.empty());
 
   @BeforeEach
   public void setUp() {

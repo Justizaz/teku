@@ -1,5 +1,5 @@
 /*
- * Copyright Consensys Software Inc., 2026
+ * Copyright (c) 2026 Consensys Incorporated. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with
  * the License. You may obtain a copy of the License at
@@ -93,6 +93,9 @@ class Eth2GossipTopicFilterTest {
           case HEZE ->
               TestSpecFactory.createMinimalHeze(
                   b -> b.fuluBuilder(fuluBuilder).hezeForkEpoch(nextMilestoneForkEpoch));
+          case EIP8321 ->
+              TestSpecFactory.createMinimalEip8321(
+                      b -> b.fuluBuilder(fuluBuilder).eip8321ForkEpoch(nextMilestoneForkEpoch));
         };
     p2pConfig = P2PConfig.builder().specProvider(spec).build();
     final StorageSystem storageSystem = InMemoryStorageSystemBuilder.buildDefault(spec);

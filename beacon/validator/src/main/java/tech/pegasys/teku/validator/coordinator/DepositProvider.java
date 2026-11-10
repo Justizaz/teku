@@ -1,5 +1,5 @@
 /*
- * Copyright Consensys Software Inc., 2026
+ * Copyright (c) 2026 Consensys Incorporated. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with
  * the License. You may obtain a copy of the License at
@@ -39,6 +39,7 @@ import tech.pegasys.teku.infrastructure.ssz.schema.SszListSchema;
 import tech.pegasys.teku.infrastructure.ssz.schema.collections.SszBytes32VectorSchema;
 import tech.pegasys.teku.infrastructure.unsigned.UInt64;
 import tech.pegasys.teku.spec.Spec;
+import tech.pegasys.teku.spec.SpecMilestone;
 import tech.pegasys.teku.spec.datastructures.blocks.Eth1Data;
 import tech.pegasys.teku.spec.datastructures.operations.Deposit;
 import tech.pegasys.teku.spec.datastructures.operations.DepositWithIndex;
@@ -113,6 +114,12 @@ public class DepositProvider implements Eth1EventsChannel, FinalizedCheckpointCh
   public void onNewFinalizedCheckpoint(
       final Checkpoint checkpoint, final boolean fromOptimisticBlock) {
     final BeaconState finalizedState = recentChainData.getStore().getLatestFinalized().getState();
+    if (spec.atSlot(finalizedState.getSlot())
+        .getMilestone()
+        .isGreaterThanOrEqualTo(SpecMilestone.HEZE)) {
+      // The Eth1 deposit bridge was removed in Heze (EIP-8015)
+      return;
+    }
     final UInt64 depositIndex = finalizedState.getEth1DepositIndex();
     pruneDeposits(depositIndex);
     synchronized (this) {

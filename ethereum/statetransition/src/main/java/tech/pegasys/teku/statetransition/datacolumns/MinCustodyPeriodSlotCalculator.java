@@ -1,5 +1,5 @@
 /*
- * Copyright Consensys Software Inc., 2026
+ * Copyright (c) 2026 Consensys Incorporated. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with
  * the License. You may obtain a copy of the License at
@@ -17,7 +17,6 @@ import java.util.Optional;
 import tech.pegasys.teku.infrastructure.unsigned.UInt64;
 import tech.pegasys.teku.spec.Spec;
 import tech.pegasys.teku.spec.SpecMilestone;
-import tech.pegasys.teku.spec.config.SpecConfigFulu;
 
 @FunctionalInterface
 public interface MinCustodyPeriodSlotCalculator {
@@ -31,12 +30,14 @@ public interface MinCustodyPeriodSlotCalculator {
 
     return currentSlot -> {
       final UInt64 currentEpoch = spec.computeEpochAtSlot(currentSlot);
-      return spec.getSpecConfig(currentEpoch)
+      return spec.atEpoch(currentEpoch)
+          .miscHelpers()
           .toVersionFulu()
-          .map(SpecConfigFulu::getMinEpochsForDataColumnSidecarsRequests)
           .map(
-              custodyPeriodEpochs ->
-                  currentEpoch.minusMinZero(custodyPeriodEpochs).max(fuluActivationEpoch))
+              miscHelpersFulu ->
+                  miscHelpersFulu
+                      .computeDataColumnSidecarRetentionStartEpoch(currentEpoch)
+                      .max(fuluActivationEpoch))
           .map(spec::computeStartSlotAtEpoch);
     };
   }

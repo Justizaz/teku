@@ -1,5 +1,5 @@
 /*
- * Copyright Consensys Software Inc., 2026
+ * Copyright (c) 2026 Consensys Incorporated. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with
  * the License. You may obtain a copy of the License at
@@ -47,7 +47,9 @@ public enum ExecutionPayloadFields implements SszFieldName {
   VALUE,
   EXECUTION_PAYMENT,
   BLOB_KZG_COMMITMENTS,
-  EXECUTION_REQUESTS_ROOT;
+  EXECUTION_REQUESTS_ROOT,
+  // Heze
+  INCLUSION_LIST_BITS;
 
   private final String sszFieldName;
 

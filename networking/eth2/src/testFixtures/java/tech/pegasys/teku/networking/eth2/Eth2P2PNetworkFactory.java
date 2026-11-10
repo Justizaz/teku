@@ -1,5 +1,5 @@
 /*
- * Copyright Consensys Software Inc., 2026
+ * Copyright (c) 2026 Consensys Incorporated. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with
  * the License. You may obtain a copy of the License at
@@ -60,9 +60,11 @@ import tech.pegasys.teku.networking.eth2.gossip.forks.versions.GossipForkSubscri
 import tech.pegasys.teku.networking.eth2.gossip.forks.versions.GossipForkSubscriptionsBellatrix;
 import tech.pegasys.teku.networking.eth2.gossip.forks.versions.GossipForkSubscriptionsCapella;
 import tech.pegasys.teku.networking.eth2.gossip.forks.versions.GossipForkSubscriptionsDeneb;
+import tech.pegasys.teku.networking.eth2.gossip.forks.versions.GossipForkSubscriptionsEip8321;
 import tech.pegasys.teku.networking.eth2.gossip.forks.versions.GossipForkSubscriptionsElectra;
 import tech.pegasys.teku.networking.eth2.gossip.forks.versions.GossipForkSubscriptionsFulu;
 import tech.pegasys.teku.networking.eth2.gossip.forks.versions.GossipForkSubscriptionsGloas;
+import tech.pegasys.teku.networking.eth2.gossip.forks.versions.GossipForkSubscriptionsHeze;
 import tech.pegasys.teku.networking.eth2.gossip.forks.versions.GossipForkSubscriptionsPhase0;
 import tech.pegasys.teku.networking.eth2.gossip.subnets.AttestationSubnetTopicProvider;
 import tech.pegasys.teku.networking.eth2.gossip.subnets.DataColumnSidecarSubnetTopicProvider;
@@ -108,10 +110,14 @@ import tech.pegasys.teku.spec.datastructures.epbs.versions.gloas.SignedExecution
 import tech.pegasys.teku.spec.datastructures.epbs.versions.gloas.SignedExecutionPayloadEnvelope;
 import tech.pegasys.teku.spec.datastructures.epbs.versions.gloas.SignedProposerPreferences;
 import tech.pegasys.teku.spec.datastructures.execution.ExecutionProof;
+import tech.pegasys.teku.spec.datastructures.execution.versions.heze.SignedInclusionList;
+import tech.pegasys.teku.spec.datastructures.lightclient.LightClientFinalityUpdate;
+import tech.pegasys.teku.spec.datastructures.lightclient.LightClientOptimisticUpdate;
 import tech.pegasys.teku.spec.datastructures.operations.Attestation;
 import tech.pegasys.teku.spec.datastructures.operations.AttesterSlashing;
 import tech.pegasys.teku.spec.datastructures.operations.ProposerSlashing;
 import tech.pegasys.teku.spec.datastructures.operations.SignedBlsToExecutionChange;
+import tech.pegasys.teku.spec.datastructures.operations.SignedRandaoCommitmentRegistration;
 import tech.pegasys.teku.spec.datastructures.operations.SignedVoluntaryExit;
 import tech.pegasys.teku.spec.datastructures.operations.versions.altair.SignedContributionAndProof;
 import tech.pegasys.teku.spec.datastructures.operations.versions.altair.ValidatableSyncCommitteeMessage;
@@ -126,6 +132,8 @@ import tech.pegasys.teku.statetransition.datacolumns.CustodyGroupCountManager;
 import tech.pegasys.teku.statetransition.datacolumns.DataColumnSidecarArchiveReconstructor;
 import tech.pegasys.teku.statetransition.datacolumns.log.gossip.DasGossipLogger;
 import tech.pegasys.teku.statetransition.datacolumns.log.rpc.DasReqRespLogger;
+import tech.pegasys.teku.statetransition.inclusionlist.InclusionListManager;
+import tech.pegasys.teku.statetransition.lightclient.LightClientUpdateStore;
 import tech.pegasys.teku.statetransition.util.DebugDataDumper;
 import tech.pegasys.teku.storage.api.StorageQueryChannel;
 import tech.pegasys.teku.storage.api.StubStorageQueryChannel;
@@ -162,6 +170,7 @@ public class Eth2P2PNetworkFactory {
     protected AsyncRunner asyncRunner;
     protected EventChannels eventChannels;
     protected RecentChainData recentChainData;
+    protected InclusionListManager inclusionListManager;
     protected StorageQueryChannel historicalChainData = new StubStorageQueryChannel();
     protected OperationProcessor<SignedBeaconBlock> gossipedBlockProcessor;
     protected OperationProcessor<BlobSidecar> gossipedBlobSidecarProcessor;
@@ -172,6 +181,11 @@ public class Eth2P2PNetworkFactory {
     protected OperationProcessor<SignedVoluntaryExit> voluntaryExitProcessor;
     protected OperationProcessor<SignedContributionAndProof> signedContributionAndProofProcessor;
     protected OperationProcessor<ValidatableSyncCommitteeMessage> syncCommitteeMessageProcessor;
+    protected Optional<OperationProcessor<LightClientFinalityUpdate>>
+        lightClientFinalityUpdateProcessor = Optional.empty();
+    protected Optional<OperationProcessor<LightClientOptimisticUpdate>>
+        lightClientOptimisticUpdateProcessor = Optional.empty();
+    protected Optional<LightClientUpdateStore> lightClientUpdateStore = Optional.empty();
     protected OperationProcessor<SignedBlsToExecutionChange> signedBlsToExecutionChangeProcessor;
     protected OperationProcessor<DataColumnSidecar> dataColumnSidecarOperationProcessor;
     protected OperationProcessor<ExecutionProof> executionProofOperationProcessor;
@@ -179,6 +193,8 @@ public class Eth2P2PNetworkFactory {
     protected OperationProcessor<PayloadAttestationMessage> payloadAttestationMessageProcessor;
     protected OperationProcessor<SignedExecutionPayloadBid> executionPayloadBidProcessor;
     protected OperationProcessor<SignedProposerPreferences> proposerPreferencesProcessor;
+    protected OperationProcessor<SignedInclusionList> inclusionListProcessor;
+    protected OperationProcessor<SignedRandaoCommitmentRegistration> randaoCommitmentRegistrationProcessor;
     protected ProcessedAttestationSubscriptionProvider processedAttestationSubscriptionProvider;
     protected VerifiedBlockAttestationsSubscriptionProvider
         verifiedBlockAttestationsSubscriptionProvider;
@@ -329,6 +345,7 @@ public class Eth2P2PNetworkFactory {
                 blobKzgCommitmentsProvider,
                 () -> custodyGroupCountManager,
                 metadataMessagesFactory,
+                inclusionListManager,
                 METRICS_SYSTEM,
                 attestationSubnetService,
                 syncCommitteeSubnetService,
@@ -341,11 +358,13 @@ public class Eth2P2PNetworkFactory {
                 timeProvider,
                 P2PConfig.DEFAULT_PEER_BLOCKS_RATE_LIMIT,
                 P2PConfig.DEFAULT_PEER_BLOB_SIDECARS_RATE_LIMIT,
+                P2PConfig.DEFAULT_PEER_INCLUSION_LISTS_RATE_LIMIT,
                 P2PConfig.DEFAULT_PEER_REQUEST_LIMIT,
                 spec,
                 __ -> Optional.of(discoveryNodeId),
                 DataColumnSidecarArchiveReconstructor.NOOP,
-                DasReqRespLogger.NOOP);
+                DasReqRespLogger.NOOP,
+                lightClientUpdateStore);
 
         List<RpcMethod<?, ?, ?>> rpcMethods =
             eth2PeerManager.getBeaconChainMethods().all().stream()
@@ -512,6 +531,8 @@ public class Eth2P2PNetworkFactory {
                 voluntaryExitProcessor,
                 signedContributionAndProofProcessor,
                 syncCommitteeMessageProcessor,
+                lightClientFinalityUpdateProcessor,
+                lightClientOptimisticUpdateProcessor,
                 debugDataDumper);
         case BELLATRIX ->
             new GossipForkSubscriptionsBellatrix(
@@ -530,6 +551,8 @@ public class Eth2P2PNetworkFactory {
                 voluntaryExitProcessor,
                 signedContributionAndProofProcessor,
                 syncCommitteeMessageProcessor,
+                lightClientFinalityUpdateProcessor,
+                lightClientOptimisticUpdateProcessor,
                 debugDataDumper);
         case CAPELLA ->
             new GossipForkSubscriptionsCapella(
@@ -548,6 +571,8 @@ public class Eth2P2PNetworkFactory {
                 voluntaryExitProcessor,
                 signedContributionAndProofProcessor,
                 syncCommitteeMessageProcessor,
+                lightClientFinalityUpdateProcessor,
+                lightClientOptimisticUpdateProcessor,
                 signedBlsToExecutionChangeProcessor,
                 debugDataDumper);
         case DENEB ->
@@ -568,6 +593,8 @@ public class Eth2P2PNetworkFactory {
                 voluntaryExitProcessor,
                 signedContributionAndProofProcessor,
                 syncCommitteeMessageProcessor,
+                lightClientFinalityUpdateProcessor,
+                lightClientOptimisticUpdateProcessor,
                 signedBlsToExecutionChangeProcessor,
                 debugDataDumper);
         case ELECTRA ->
@@ -588,6 +615,8 @@ public class Eth2P2PNetworkFactory {
                 voluntaryExitProcessor,
                 signedContributionAndProofProcessor,
                 syncCommitteeMessageProcessor,
+                lightClientFinalityUpdateProcessor,
+                lightClientOptimisticUpdateProcessor,
                 signedBlsToExecutionChangeProcessor,
                 debugDataDumper,
                 executionProofOperationProcessor,
@@ -610,6 +639,8 @@ public class Eth2P2PNetworkFactory {
                 voluntaryExitProcessor,
                 signedContributionAndProofProcessor,
                 syncCommitteeMessageProcessor,
+                lightClientFinalityUpdateProcessor,
+                lightClientOptimisticUpdateProcessor,
                 signedBlsToExecutionChangeProcessor,
                 dataColumnSidecarOperationProcessor,
                 debugDataDumper,
@@ -617,7 +648,7 @@ public class Eth2P2PNetworkFactory {
                 executionProofOperationProcessor,
                 p2PConfig.isExecutionProofTopicEnabled(),
                 isSuperNodeSupplier);
-        case GLOAS, HEZE ->
+        case GLOAS ->
             new GossipForkSubscriptionsGloas(
                 forkAndSpecMilestone.getFork(),
                 spec,
@@ -635,6 +666,8 @@ public class Eth2P2PNetworkFactory {
                 voluntaryExitProcessor,
                 signedContributionAndProofProcessor,
                 syncCommitteeMessageProcessor,
+                lightClientFinalityUpdateProcessor,
+                lightClientOptimisticUpdateProcessor,
                 signedBlsToExecutionChangeProcessor,
                 dataColumnSidecarOperationProcessor,
                 executionPayloadProcessor,
@@ -646,6 +679,71 @@ public class Eth2P2PNetworkFactory {
                 executionProofOperationProcessor,
                 p2PConfig.isExecutionProofTopicEnabled(),
                 isSuperNodeSupplier);
+        case HEZE ->
+            new GossipForkSubscriptionsHeze(
+                forkAndSpecMilestone.getFork(),
+                spec,
+                asyncRunner,
+                metricsSystem,
+                network,
+                recentChainData,
+                gossipEncoding,
+                gossipedBlockProcessor,
+                gossipedBlobSidecarProcessor,
+                gossipedAttestationProcessor,
+                gossipedAggregateProcessor,
+                attesterSlashingProcessor,
+                proposerSlashingProcessor,
+                voluntaryExitProcessor,
+                signedContributionAndProofProcessor,
+                syncCommitteeMessageProcessor,
+                lightClientFinalityUpdateProcessor,
+                lightClientOptimisticUpdateProcessor,
+                signedBlsToExecutionChangeProcessor,
+                dataColumnSidecarOperationProcessor,
+                executionPayloadProcessor,
+                payloadAttestationMessageProcessor,
+                executionPayloadBidProcessor,
+                proposerPreferencesProcessor,
+                inclusionListProcessor,
+                debugDataDumper,
+                DasGossipLogger.NOOP,
+                executionProofOperationProcessor,
+                p2PConfig.isExecutionProofTopicEnabled(),
+                isSuperNodeSupplier);
+        case EIP8321 ->
+          new GossipForkSubscriptionsEip8321(
+                  forkAndSpecMilestone.getFork(),
+                  spec,
+                  asyncRunner,
+                  metricsSystem,
+                  network,
+                  recentChainData,
+                  gossipEncoding,
+                  gossipedBlockProcessor,
+                  gossipedBlobSidecarProcessor,
+                  gossipedAttestationProcessor,
+                  gossipedAggregateProcessor,
+                  attesterSlashingProcessor,
+                  proposerSlashingProcessor,
+                  voluntaryExitProcessor,
+                  signedContributionAndProofProcessor,
+                  syncCommitteeMessageProcessor,
+                  lightClientFinalityUpdateProcessor,
+                  lightClientOptimisticUpdateProcessor,
+                  signedBlsToExecutionChangeProcessor,
+                  dataColumnSidecarOperationProcessor,
+                  executionPayloadProcessor,
+                  payloadAttestationMessageProcessor,
+                  executionPayloadBidProcessor,
+                  proposerPreferencesProcessor,
+                  inclusionListProcessor,
+                  randaoCommitmentRegistrationProcessor,
+                  debugDataDumper,
+                  DasGossipLogger.NOOP,
+                  executionProofOperationProcessor,
+                  p2PConfig.isExecutionProofTopicEnabled(),
+                  isSuperNodeSupplier);
       };
     }
 
@@ -763,6 +861,12 @@ public class Eth2P2PNetworkFactory {
       if (proposerPreferencesProcessor == null) {
         proposerPreferencesProcessor = OperationProcessor.noop();
       }
+      if (inclusionListProcessor == null) {
+        inclusionListProcessor = OperationProcessor.noop();
+      }
+      if(randaoCommitmentRegistrationProcessor == null) {
+        randaoCommitmentRegistrationProcessor = OperationProcessor.noop();
+      }
       if (isSuperNodeSupplier == null) {
         isSuperNodeSupplier = () -> false;
       }
@@ -806,6 +910,13 @@ public class Eth2P2PNetworkFactory {
     public Eth2P2PNetworkBuilder recentChainData(final RecentChainData recentChainData) {
       checkNotNull(recentChainData);
       this.recentChainData = recentChainData;
+      return this;
+    }
+
+    public Eth2P2PNetworkBuilder inclusionListManager(
+        final InclusionListManager inclusionListManager) {
+      checkNotNull(inclusionListManager);
+      this.inclusionListManager = inclusionListManager;
       return this;
     }
 
@@ -880,11 +991,40 @@ public class Eth2P2PNetworkFactory {
       return this;
     }
 
+    public Eth2P2PNetworkBuilder gossipedLightClientFinalityUpdateProcessor(
+        final OperationProcessor<LightClientFinalityUpdate> processor) {
+      checkNotNull(processor);
+      this.lightClientFinalityUpdateProcessor = Optional.of(processor);
+      return this;
+    }
+
+    public Eth2P2PNetworkBuilder gossipedLightClientOptimisticUpdateProcessor(
+        final OperationProcessor<LightClientOptimisticUpdate> processor) {
+      checkNotNull(processor);
+      this.lightClientOptimisticUpdateProcessor = Optional.of(processor);
+      return this;
+    }
+
+    public Eth2P2PNetworkBuilder lightClientUpdateStore(
+        final LightClientUpdateStore lightClientUpdateStore) {
+      checkNotNull(lightClientUpdateStore);
+      this.lightClientUpdateStore = Optional.of(lightClientUpdateStore);
+      return this;
+    }
+
     public Eth2P2PNetworkBuilder gossipedSignedBlsToExecutionChangeProcessor(
         final OperationProcessor<SignedBlsToExecutionChange>
             gossipedSignedBlsToExecutionChangeProcessor) {
       checkNotNull(gossipedSignedBlsToExecutionChangeProcessor);
       this.signedBlsToExecutionChangeProcessor = gossipedSignedBlsToExecutionChangeProcessor;
+      return this;
+    }
+
+    public Eth2P2PNetworkBuilder gossipedRandaoCommitmentRegistrationProcessor(
+            final OperationProcessor<SignedRandaoCommitmentRegistration>
+                gossipedRandaoCommitmentRegistrationProcessor) {
+      checkNotNull(gossipedRandaoCommitmentRegistrationProcessor);
+      this.randaoCommitmentRegistrationProcessor = gossipedRandaoCommitmentRegistrationProcessor;
       return this;
     }
 

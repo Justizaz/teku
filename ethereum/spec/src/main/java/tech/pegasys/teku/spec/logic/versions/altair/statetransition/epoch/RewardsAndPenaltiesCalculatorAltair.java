@@ -1,5 +1,5 @@
 /*
- * Copyright Consensys Software Inc., 2026
+ * Copyright (c) 2026 Consensys Incorporated. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with
  * the License. You may obtain a copy of the License at
@@ -103,7 +103,8 @@ public class RewardsAndPenaltiesCalculatorAltair extends RewardsAndPenaltiesCalc
     // Cache baseRewardPerIncrement - while it is also cached in transition caches,
     // looking it up from there for every single validator is quite expensive.
     final UInt64 baseRewardPerIncrement =
-        beaconStateAccessorsAltair.getBaseRewardPerIncrement(stateAltair);
+        beaconStateAccessorsAltair.getBaseRewardPerIncrement(
+            stateAltair, beaconStateAccessorsAltair.getPreviousEpoch(stateAltair));
     for (int i = 0; i < statusList.size(); i++) {
       final ValidatorStatus validator = statusList.get(i);
       if (!validator.isEligibleValidator()) {
@@ -167,8 +168,7 @@ public class RewardsAndPenaltiesCalculatorAltair extends RewardsAndPenaltiesCalc
   public void processInactivityPenaltyDeltas(final RewardAndPenaltyDeltas deltas) {
     final List<ValidatorStatus> statusList = validatorStatuses.getStatuses();
     final SszUInt64List inactivityScores = stateAltair.getInactivityScores();
-    final UInt64 penaltyDenominator =
-        specConfigAltair.getInactivityScoreBias().times(getInactivityPenaltyQuotient());
+    final UInt64 penaltyDenominator = getInactivityPenaltyDenominator();
     for (int i = 0; i < statusList.size(); i++) {
       final ValidatorStatus validator = statusList.get(i);
       if (!validator.isEligibleValidator()) {
@@ -184,6 +184,10 @@ public class RewardsAndPenaltiesCalculatorAltair extends RewardsAndPenaltiesCalc
       final UInt64 penalty = penaltyNumerator.dividedBy(penaltyDenominator);
       deltas.getDelta(i).penalize(RewardComponent.INACTIVITY, penalty);
     }
+  }
+
+  protected UInt64 getInactivityPenaltyDenominator() {
+    return specConfigAltair.getInactivityScoreBias().times(getInactivityPenaltyQuotient());
   }
 
   protected UInt64 getInactivityPenaltyQuotient() {

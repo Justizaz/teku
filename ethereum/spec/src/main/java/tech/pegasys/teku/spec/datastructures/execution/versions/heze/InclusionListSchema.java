@@ -1,5 +1,5 @@
 /*
- * Copyright Consensys Software Inc., 2026
+ * Copyright (c) 2026 Consensys Incorporated. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with
  * the License. You may obtain a copy of the License at
@@ -17,7 +17,6 @@ import static tech.pegasys.teku.spec.schemas.registry.SchemaTypes.TRANSACTIONS_S
 import static tech.pegasys.teku.spec.schemas.registry.SchemaTypes.TRANSACTION_SCHEMA;
 
 import java.util.List;
-import org.apache.tuweni.bytes.Bytes;
 import org.apache.tuweni.bytes.Bytes32;
 import tech.pegasys.teku.infrastructure.ssz.SszList;
 import tech.pegasys.teku.infrastructure.ssz.containers.ContainerSchema4;
@@ -42,7 +41,7 @@ public class InclusionListSchema
         "InclusionList",
         namedSchema("slot", SszPrimitiveSchemas.UINT64_SCHEMA),
         namedSchema("validator_index", SszPrimitiveSchemas.UINT64_SCHEMA),
-        namedSchema("inclusion_list_committee_root", SszPrimitiveSchemas.BYTES32_SCHEMA),
+        namedSchema("dependent_root", SszPrimitiveSchemas.BYTES32_SCHEMA),
         namedSchema("transactions", schemaRegistry.get(TRANSACTIONS_SCHEMA)));
     this.transactionSchema = schemaRegistry.get(TRANSACTION_SCHEMA);
   }
@@ -55,9 +54,9 @@ public class InclusionListSchema
   public InclusionList create(
       final UInt64 slot,
       final UInt64 validatorIndex,
-      final Bytes32 inclusionListCommitteeRoot,
-      final List<Bytes> transactions) {
-    return new InclusionList(this, slot, validatorIndex, inclusionListCommitteeRoot, transactions);
+      final Bytes32 dependentRoot,
+      final List<Transaction> transactions) {
+    return new InclusionList(this, slot, validatorIndex, dependentRoot, transactions);
   }
 
   public SszByteListSchema<Transaction> getTransactionSchema() {

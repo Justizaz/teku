@@ -1,5 +1,5 @@
 /*
- * Copyright Consensys Software Inc., 2026
+ * Copyright (c) 2026 Consensys Incorporated. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with
  * the License. You may obtain a copy of the License at
@@ -437,6 +437,29 @@ public class OkHttpHttpExecutionEngineClientTest {
     assertThat(requestData.get("params"))
         .asInstanceOf(LIST)
         .containsExactly(blobVersionedHashes.stream().map(VersionedHash::toHexString).toList());
+  }
+
+  @TestTemplate
+  public void getInclusionListV1_shouldBuildRequestAndDeserializeStringTransactions()
+      throws Exception {
+    final List<String> inclusionListTransactions =
+        List.of(Bytes.random(4).toHexString(), Bytes.random(8).toHexString());
+    final JsonRpcResponse responseBody = new JsonRpcResponse(inclusionListTransactions);
+    mockSuccessfulResponse(objectMapper.writeValueAsString(responseBody));
+
+    final Bytes32 parentHash = dataStructureUtil.randomBytes32();
+    final SafeFuture<Response<List<String>>> futureResponse =
+        eeClient.getInclusionListV1(parentHash);
+
+    assertThat(futureResponse)
+        .succeedsWithin(1, TimeUnit.SECONDS)
+        .matches(response -> response.payload().equals(inclusionListTransactions));
+
+    final Map<String, Object> requestData = takeRequest();
+    verifyJsonRpcMethodCall(requestData, "engine_getInclusionListV1");
+    assertThat(requestData.get("params"))
+        .asInstanceOf(LIST)
+        .containsExactly(parentHash.toHexString());
   }
 
   private void mockSuccessfulResponse(final String responseBody) {

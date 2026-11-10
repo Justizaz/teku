@@ -1,5 +1,5 @@
 /*
- * Copyright Consensys Software Inc., 2026
+ * Copyright (c) 2026 Consensys Incorporated. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with
  * the License. You may obtain a copy of the License at
@@ -32,14 +32,15 @@ import tech.pegasys.teku.api.NodeDataProvider;
 import tech.pegasys.teku.api.SyncDataProvider;
 import tech.pegasys.teku.api.response.EventType;
 import tech.pegasys.teku.beacon.sync.events.SyncState;
+import tech.pegasys.teku.beaconrestapi.BeaconRestApiTypes;
 import tech.pegasys.teku.infrastructure.async.AsyncRunner;
 import tech.pegasys.teku.infrastructure.events.EventChannels;
 import tech.pegasys.teku.infrastructure.json.JsonUtil;
+import tech.pegasys.teku.infrastructure.json.types.SerializableTypeDefinition;
 import tech.pegasys.teku.infrastructure.restapi.endpoints.ListQueryParameterUtils;
 import tech.pegasys.teku.infrastructure.time.TimeProvider;
 import tech.pegasys.teku.infrastructure.unsigned.UInt64;
 import tech.pegasys.teku.spec.Spec;
-import tech.pegasys.teku.spec.SpecMilestone;
 import tech.pegasys.teku.spec.datastructures.attestation.ValidatableAttestation;
 import tech.pegasys.teku.spec.datastructures.blobs.DataColumnSidecar;
 import tech.pegasys.teku.spec.datastructures.blobs.versions.deneb.BlobSidecar;
@@ -48,6 +49,7 @@ import tech.pegasys.teku.spec.datastructures.epbs.versions.gloas.PayloadAttestat
 import tech.pegasys.teku.spec.datastructures.epbs.versions.gloas.SignedExecutionPayloadBid;
 import tech.pegasys.teku.spec.datastructures.epbs.versions.gloas.SignedExecutionPayloadEnvelope;
 import tech.pegasys.teku.spec.datastructures.epbs.versions.gloas.SignedProposerPreferences;
+import tech.pegasys.teku.spec.datastructures.execution.versions.heze.SignedInclusionList;
 import tech.pegasys.teku.spec.datastructures.forkchoice.ForkChoicePayloadStatus;
 import tech.pegasys.teku.spec.datastructures.operations.Attestation;
 import tech.pegasys.teku.spec.datastructures.operations.AttesterSlashing;
@@ -56,6 +58,7 @@ import tech.pegasys.teku.spec.datastructures.operations.SignedBlsToExecutionChan
 import tech.pegasys.teku.spec.datastructures.operations.SignedVoluntaryExit;
 import tech.pegasys.teku.spec.datastructures.operations.versions.altair.SignedContributionAndProof;
 import tech.pegasys.teku.spec.datastructures.state.Checkpoint;
+import tech.pegasys.teku.spec.schemas.SchemaDefinitionCache;
 import tech.pegasys.teku.statetransition.block.ReceivedBlockEventsChannel;
 import tech.pegasys.teku.statetransition.execution.ReceivedExecutionPayloadBidEventsChannel;
 import tech.pegasys.teku.statetransition.execution.ReceivedExecutionPayloadEventsChannel;
@@ -78,14 +81,18 @@ public class EventSubscriptionManager
   private final Spec spec;
   private final ConfigProvider configProvider;
   private final ChainDataProvider provider;
+  private final NodeDataProvider nodeDataProvider;
   private final AsyncRunner asyncRunner;
   private final TimeProvider timeProvider;
   private final int maxPendingEvents;
   // collection of subscribers
   private final Collection<EventSubscriber> eventSubscribers;
+  private final SerializableTypeDefinition<InclusionListEvent.InclusionListEventData>
+      inclusionListEventDataType;
 
   public EventSubscriptionManager(
       final Spec spec,
+      final SchemaDefinitionCache schemaDefinitionCache,
       final NodeDataProvider nodeDataProvider,
       final ChainDataProvider chainDataProvider,
       final SyncDataProvider syncDataProvider,
@@ -96,11 +103,14 @@ public class EventSubscriptionManager
       final int maxPendingEvents) {
     this.spec = spec;
     this.provider = chainDataProvider;
+    this.nodeDataProvider = nodeDataProvider;
     this.asyncRunner = asyncRunner;
     this.timeProvider = timeProvider;
     this.maxPendingEvents = maxPendingEvents;
     this.eventSubscribers = new ConcurrentLinkedQueue<>();
     this.configProvider = configProvider;
+    this.inclusionListEventDataType =
+        BeaconRestApiTypes.getInclusionListEventDataType(schemaDefinitionCache);
     eventChannels.subscribe(ChainHeadChannel.class, this);
     eventChannels.subscribe(FinalizedCheckpointChannel.class, this);
     eventChannels.subscribe(ReceivedBlockEventsChannel.class, this);
@@ -120,6 +130,7 @@ public class EventSubscriptionManager
         (dataColumnSidecar, remoteOrigin) -> onNewDataColumnSidecar(dataColumnSidecar));
     nodeDataProvider.subscribeToPayloadAttestationMessages(this::onNewPayloadAttestationMessage);
     nodeDataProvider.subscribeToProposerPreferences(this::onNewProposerPreferences);
+    nodeDataProvider.subscribeToNewInclusionList(this::onNewInclusionList);
   }
 
   public void registerClient(final SseClient sseClient) {
@@ -152,20 +163,23 @@ public class EventSubscriptionManager
       final Bytes32 currentDutyDependentRoot,
       final Optional<ForkChoicePayloadStatus> payloadStatus,
       final Optional<ReorgContext> optionalReorgContext) {
-    optionalReorgContext.ifPresent(
-        context -> {
-          final ChainReorgEvent reorgEvent =
-              new ChainReorgEvent(
-                  slot,
-                  slot.minus(context.getCommonAncestorSlot()),
-                  context.getOldBestBlockRoot(),
-                  bestBlockRoot,
-                  context.getOldBestStateRoot(),
-                  stateRoot,
-                  configProvider.computeEpochAtSlot(slot),
-                  executionOptimistic);
-          notifySubscribersOfEvent(EventType.chain_reorg, reorgEvent);
-        });
+    // chain_reorg is a block reorg event; a payload reorg is reported through head_v2 only
+    optionalReorgContext
+        .filter(ReorgContext::isBlockReorg)
+        .ifPresent(
+            context -> {
+              final ChainReorgEvent reorgEvent =
+                  new ChainReorgEvent(
+                      slot,
+                      slot.minus(context.commonAncestorSlot()),
+                      context.oldBestBlockRoot(),
+                      bestBlockRoot,
+                      context.oldBestStateRoot(),
+                      stateRoot,
+                      configProvider.computeEpochAtSlot(slot),
+                      executionOptimistic);
+              notifySubscribersOfEvent(EventType.chain_reorg, reorgEvent);
+            });
 
     final HeadEvent headEvent =
         new HeadEvent(
@@ -335,16 +349,19 @@ public class EventSubscriptionManager
     forkChoiceUpdatedResultNotification
         .payloadAttributes()
         .ifPresent(
-            payloadAttributes -> {
-              final SpecMilestone milestone =
-                  spec.atSlot(payloadAttributes.proposalSlot()).getMilestone();
-              final PayloadAttributesEvent payloadAttributesEvent =
-                  PayloadAttributesEvent.create(
-                      milestone,
-                      payloadAttributes,
-                      forkChoiceUpdatedResultNotification.forkChoiceState());
-              notifySubscribersOfEvent(EventType.payload_attributes, payloadAttributesEvent);
-            });
+            payloadAttributes ->
+                PayloadAttributesEvent.create(
+                        spec,
+                        payloadAttributes,
+                        forkChoiceUpdatedResultNotification.forkChoiceState(),
+                        nodeDataProvider::getInclusionListBits)
+                    .finish(
+                        maybePayloadAttributesEvent ->
+                            maybePayloadAttributesEvent.ifPresent(
+                                payloadAttributesEvent ->
+                                    notifySubscribersOfEvent(
+                                        EventType.payload_attributes, payloadAttributesEvent)),
+                        error -> LOG.error("Failed to create payload attributes event", error)));
   }
 
   protected void onSyncStateChange(final SyncState syncState) {
@@ -389,6 +406,15 @@ public class EventSubscriptionManager
       notifySubscribersOfEvent(
           EventType.proposer_preferences, new ProposerPreferencesEvent(proposerPreferences));
     }
+  }
+
+  protected void onNewInclusionList(final SignedInclusionList signedInclusionList) {
+    final InclusionListEvent inclusionListEvent =
+        new InclusionListEvent(
+            signedInclusionList,
+            spec.atSlot(signedInclusionList.getMessage().getSlot()).getMilestone(),
+            inclusionListEventDataType);
+    notifySubscribersOfEvent(EventType.inclusion_list, inclusionListEvent);
   }
 
   private void notifySubscribersOfEvent(final EventType eventType, final Event<?> event) {

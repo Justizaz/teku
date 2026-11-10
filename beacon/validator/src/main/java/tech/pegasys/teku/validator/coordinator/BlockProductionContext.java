@@ -1,5 +1,5 @@
 /*
- * Copyright Consensys Software Inc., 2026
+ * Copyright (c) 2026 Consensys Incorporated. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with
  * the License. You may obtain a copy of the License at
@@ -33,10 +33,34 @@ public record BlockProductionContext(
     ForkChoiceNode parentForkChoiceNode,
     Bytes32 parentExecutionBlockHash,
     BLSSignature randaoReveal,
+    Optional<Bytes32> hashChainReveal,
     Optional<Bytes32> graffiti,
     boolean includePayload,
     Optional<BuilderConfig> builderConfig,
     BlockProductionPerformance blockProductionPerformance) {
+
+  public BlockProductionContext(
+      final UInt64 proposalSlot,
+      final BeaconState blockSlotState,
+      final ForkChoiceNode parentForkChoiceNode,
+      final Bytes32 parentExecutionBlockHash,
+      final BLSSignature randaoReveal,
+      final Optional<Bytes32> graffiti,
+      final boolean includePayload,
+      final Optional<BuilderConfig> builderConfig,
+      final BlockProductionPerformance blockProductionPerformance) {
+    this(
+        proposalSlot,
+        blockSlotState,
+        parentForkChoiceNode,
+        parentExecutionBlockHash,
+        randaoReveal,
+        Optional.empty(),
+        graffiti,
+        includePayload,
+        builderConfig,
+        blockProductionPerformance);
+  }
 
   public static BlockProductionContext create(
       final Spec spec,
@@ -44,6 +68,30 @@ public record BlockProductionContext(
       final BeaconState blockSlotState,
       final ChainHead parentChainHead,
       final BLSSignature randaoReveal,
+      final Optional<Bytes32> graffiti,
+      final boolean includePayload,
+      final Optional<BuilderConfig> builderConfig,
+      final BlockProductionPerformance blockProductionPerformance) {
+    return create(
+        spec,
+        proposalSlot,
+        blockSlotState,
+        parentChainHead,
+        randaoReveal,
+        Optional.empty(),
+        graffiti,
+        includePayload,
+        builderConfig,
+        blockProductionPerformance);
+  }
+
+  public static BlockProductionContext create(
+      final Spec spec,
+      final UInt64 proposalSlot,
+      final BeaconState blockSlotState,
+      final ChainHead parentChainHead,
+      final BLSSignature randaoReveal,
+      final Optional<Bytes32> hashChainReveal,
       final Optional<Bytes32> graffiti,
       final boolean includePayload,
       final Optional<BuilderConfig> builderConfig,
@@ -65,6 +113,7 @@ public record BlockProductionContext(
         parentChainHead.getForkChoiceNode(),
         parentChainHead.getExecutionBlockHash(),
         randaoReveal,
+        hashChainReveal,
         graffiti,
         includePayload,
         builderConfig,

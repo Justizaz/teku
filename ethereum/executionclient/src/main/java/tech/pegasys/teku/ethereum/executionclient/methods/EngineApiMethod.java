@@ -1,5 +1,5 @@
 /*
- * Copyright Consensys Software Inc., 2026
+ * Copyright (c) 2026 Consensys Incorporated. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with
  * the License. You may obtain a copy of the License at
@@ -17,7 +17,8 @@ public enum EngineApiMethod {
   ENGINE_NEW_PAYLOAD("engine_newPayload"),
   ENGINE_GET_PAYLOAD("engine_getPayload"),
   ENGINE_FORK_CHOICE_UPDATED("engine_forkchoiceUpdated"),
-  ENGINE_GET_PAYLOAD_BODIES_BY_HASH("engine_getPayloadBodiesByHash");
+  ENGINE_GET_PAYLOAD_BODIES_BY_HASH("engine_getPayloadBodiesByHash"),
+  ENGINE_GET_INCLUSION_LIST("engine_getInclusionList");
 
   private final String name;
 

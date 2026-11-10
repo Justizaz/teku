@@ -1,5 +1,5 @@
 /*
- * Copyright Consensys Software Inc., 2026
+ * Copyright (c) 2026 Consensys Incorporated. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with
  * the License. You may obtain a copy of the License at
@@ -54,13 +54,17 @@ import java.util.Optional;
 import java.util.concurrent.ExecutionException;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
+import org.apache.logging.log4j.Level;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.apache.tuweni.bytes.Bytes32;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestTemplate;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InOrder;
+import tech.pegasys.infrastructure.logging.LogCaptor;
 import tech.pegasys.teku.api.ChainDataProvider;
 import tech.pegasys.teku.api.NetworkDataProvider;
 import tech.pegasys.teku.api.NodeDataProvider;
@@ -93,7 +97,9 @@ import tech.pegasys.teku.networking.eth2.gossip.subnets.AttestationTopicSubscrib
 import tech.pegasys.teku.networking.eth2.gossip.subnets.SyncCommitteeSubscriptionManager;
 import tech.pegasys.teku.spec.Spec;
 import tech.pegasys.teku.spec.SpecMilestone;
+import tech.pegasys.teku.spec.TestSpecContext;
 import tech.pegasys.teku.spec.TestSpecFactory;
+import tech.pegasys.teku.spec.TestSpecInvocationContextProvider.SpecContext;
 import tech.pegasys.teku.spec.config.SpecConfigAltair;
 import tech.pegasys.teku.spec.datastructures.attestation.ValidatableAttestation;
 import tech.pegasys.teku.spec.datastructures.blocks.BeaconBlockAndState;
@@ -105,8 +111,12 @@ import tech.pegasys.teku.spec.datastructures.epbs.versions.gloas.ExecutionPayloa
 import tech.pegasys.teku.spec.datastructures.epbs.versions.gloas.PayloadAttestationData;
 import tech.pegasys.teku.spec.datastructures.epbs.versions.gloas.PayloadAttestationMessage;
 import tech.pegasys.teku.spec.datastructures.epbs.versions.gloas.SignedExecutionPayloadEnvelope;
+import tech.pegasys.teku.spec.datastructures.execution.Transaction;
+import tech.pegasys.teku.spec.datastructures.execution.versions.heze.InclusionList;
+import tech.pegasys.teku.spec.datastructures.execution.versions.heze.SignedInclusionList;
 import tech.pegasys.teku.spec.datastructures.forkchoice.ForkChoiceNode;
 import tech.pegasys.teku.spec.datastructures.forkchoice.ForkChoicePayloadStatus;
+import tech.pegasys.teku.spec.datastructures.forkchoice.ProtoNodeData;
 import tech.pegasys.teku.spec.datastructures.metadata.BlockContainerAndMetaData;
 import tech.pegasys.teku.spec.datastructures.metadata.ObjectAndMetaData;
 import tech.pegasys.teku.spec.datastructures.operations.Attestation;
@@ -137,24 +147,30 @@ import tech.pegasys.teku.statetransition.validation.InternalValidationResult;
 import tech.pegasys.teku.statetransition.validation.ValidationResultCode;
 import tech.pegasys.teku.storage.client.ChainHead;
 import tech.pegasys.teku.storage.client.CombinedChainDataClient;
+import tech.pegasys.teku.storage.protoarray.ForkChoiceStrategy;
 import tech.pegasys.teku.storage.store.UpdatableStore;
 import tech.pegasys.teku.validator.api.CommitteeSubscriptionRequest;
 import tech.pegasys.teku.validator.api.NodeSyncingException;
 import tech.pegasys.teku.validator.api.PublishSignedExecutionPayloadResult;
 import tech.pegasys.teku.validator.api.SendSignedBlockResult;
 import tech.pegasys.teku.validator.api.SubmitDataError;
+import tech.pegasys.teku.validator.coordinator.duties.InclusionListDutiesGenerator;
 import tech.pegasys.teku.validator.coordinator.performance.DefaultPerformanceTracker;
 import tech.pegasys.teku.validator.coordinator.publisher.BlockPublisher;
 import tech.pegasys.teku.validator.coordinator.publisher.ExecutionPayloadPublisher;
+import tech.pegasys.teku.validator.coordinator.publisher.SignedInclusionListPublisher;
 
 class ValidatorApiHandlerTest {
   private static final Logger LOG = LogManager.getLogger();
   private static final UInt64 EPOCH = UInt64.valueOf(13);
+  // ValidatorLogger's logger name (LoggingConfigurator.VALIDATOR_LOGGER_NAME is package-private)
+  private static final String VALIDATOR_LOG = "teku-validator-log";
   private static final UInt64 PREVIOUS_EPOCH = EPOCH.minus(ONE);
 
   private final CombinedChainDataClient chainDataClient = mock(CombinedChainDataClient.class);
   private final ChainHead chainHead = mock(ChainHead.class);
   private final UpdatableStore store = mock(UpdatableStore.class);
+  private final ForkChoiceStrategy forkChoiceStrategy = mock(ForkChoiceStrategy.class);
   private final SyncStateProvider syncStateProvider = mock(SyncStateProvider.class);
   private final BlockFactory blockFactory = mock(BlockFactory.class);
   private final AggregatingAttestationPool attestationPool = mock(AggregatingAttestationPool.class);
@@ -164,6 +180,9 @@ class ValidatorApiHandlerTest {
   private final ActiveValidatorTracker activeValidatorTracker = mock(ActiveValidatorTracker.class);
   private final BlockPublisher blockPublisher = mock(BlockPublisher.class);
   private final ExecutionProofManager executionProofManager = ExecutionProofManager.NOOP;
+  private final SignedInclusionListPublisher signedInclusionListPublisher =
+      mock(SignedInclusionListPublisher.class);
+  private final InclusionListFactory inclusionListFactory = mock(InclusionListFactory.class);
   private final DefaultPerformanceTracker performanceTracker =
       mock(DefaultPerformanceTracker.class);
   private final ChainDataProvider chainDataProvider = mock(ChainDataProvider.class);
@@ -216,7 +235,11 @@ class ValidatorApiHandlerTest {
 
   @BeforeEach
   public void setUp() {
-    this.spec = TestSpecFactory.createMinimalGloas();
+    setUp(TestSpecFactory.createMinimalGloas());
+  }
+
+  private void setUp(final Spec spec) {
+    this.spec = spec;
     this.epochStartSlot = spec.computeStartSlotAtEpoch(EPOCH);
     this.previousEpochStartSlot = spec.computeStartSlotAtEpoch(PREVIOUS_EPOCH);
     this.dataStructureUtil = new DataStructureUtil(spec);
@@ -252,17 +275,23 @@ class ValidatorApiHandlerTest {
             executionPayloadBidManager,
             proposerPreferencesManager,
             executionProofManager,
+            signedInclusionListPublisher,
+            inclusionListFactory,
             stakedBuilderClientProvider);
 
     doReturn(BlockProductionPerformance.NOOP)
         .when(blockProductionPerformanceFactory)
         .createForProduction(any());
     when(chainDataClient.getStore()).thenReturn(store);
+    // Gloas attestation data asks fork choice whether the block's payload is verified; the plain
+    // mock tracks no FULL node, so the attestation committee index stays 0.
+    when(store.getForkChoiceStrategy()).thenReturn(forkChoiceStrategy);
     when(syncStateProvider.getCurrentSyncState()).thenReturn(SyncState.IN_SYNC);
     when(forkChoiceTrigger.prepareForBlockProduction(any(), any()))
         .thenReturn(SafeFuture.completedFuture(chainHead));
     when(chainHead.getPayloadStatus()).thenReturn(PAYLOAD_STATUS_PENDING);
     when(chainDataClient.isOptimisticBlock(any())).thenReturn(false);
+    when(chainDataClient.getStore()).thenReturn(store);
     doAnswer(invocation -> SafeFuture.completedFuture(invocation.getArgument(0)))
         .when(blockFactory)
         .unblindSignedBlockIfBlinded(any(), any());
@@ -336,6 +365,221 @@ class ValidatorApiHandlerTest {
         validatorApiHandler.getAttestationDuties(EPOCH, IntList.of(1));
     assertThat(duties).isCompletedExceptionally();
     assertThatThrownBy(duties::get).hasRootCauseInstanceOf(NodeSyncingException.class);
+  }
+
+  @Test
+  public void getInclusionListDuties_shouldFailForPreHezeEpoch() {
+    final SafeFuture<?> duties = validatorApiHandler.getInclusionListDuties(EPOCH, IntList.of(1));
+
+    assertThat(duties).isCompletedExceptionally();
+    assertThatThrownBy(duties::get).hasRootCauseInstanceOf(IllegalArgumentException.class);
+  }
+
+  @Test
+  void getInclusionListDuties_shouldRejectEpochBeyondTolerance() {
+    setUp(TestSpecFactory.createMinimalHeze());
+    when(chainDataClient.getCurrentEpoch()).thenReturn(EPOCH);
+    when(chainDataClient.getStateAtSlotExact(any())).thenReturn(completedFuture(Optional.empty()));
+
+    assertThat(validatorApiHandler.getInclusionListDuties(EPOCH.plus(ONE), IntList.of(1)))
+        .isCompletedWithValue(Optional.empty());
+    assertThat(validatorApiHandler.getInclusionListDuties(EPOCH.plus(3), IntList.of(1)))
+        .isCompletedExceptionally();
+  }
+
+  @Test
+  void getInclusionListDuties_shouldAllowOneEpochTolerance() {
+    setUp(TestSpecFactory.createMinimalHeze());
+    final BeaconState state = createStateWithActiveValidators(previousEpochStartSlot);
+    when(chainDataClient.getCurrentEpoch()).thenReturn(EPOCH.minus(2));
+    when(chainDataClient.getStateAtSlotExact(previousEpochStartSlot))
+        .thenReturn(completedFuture(Optional.of(state)));
+
+    assertThatSafeFuture(validatorApiHandler.getInclusionListDuties(EPOCH, IntList.of(1)))
+        .isCompletedWithOptionalContaining(
+            new InclusionListDutiesGenerator(spec)
+                .getInclusionListDutiesFromIndicesAndState(state, EPOCH, IntList.of(1), false));
+    verify(chainDataClient).getStateAtSlotExact(previousEpochStartSlot);
+  }
+
+  @Test
+  void createInclusionList_shouldReturnInclusionListFromFactory() {
+    setUp(TestSpecFactory.createMinimalHeze());
+    final InclusionList inclusionList = dataStructureUtil.randomInclusionList();
+    final UInt64 slot = inclusionList.getSlot();
+    final UInt64 validatorIndex = inclusionList.getValidatorIndex();
+    when(inclusionListFactory.createInclusionList(slot, validatorIndex))
+        .thenReturn(completedFuture(Optional.of(inclusionList)));
+
+    assertThat(validatorApiHandler.createInclusionList(slot, validatorIndex))
+        .isCompletedWithValue(Optional.of(inclusionList));
+    verify(inclusionListFactory).createInclusionList(slot, validatorIndex);
+  }
+
+  @Test
+  void createInclusionList_shouldReturnEmptyWhenFactoryReturnsEmpty() {
+    setUp(TestSpecFactory.createMinimalHeze());
+    when(inclusionListFactory.createInclusionList(epochStartSlot, ONE))
+        .thenReturn(completedFuture(Optional.empty()));
+
+    assertThat(validatorApiHandler.createInclusionList(epochStartSlot, ONE))
+        .isCompletedWithValue(Optional.empty());
+  }
+
+  @Test
+  void createInclusionList_shouldPropagateFactoryFailureForPreHezeSlot() {
+    when(inclusionListFactory.createInclusionList(epochStartSlot, ONE))
+        .thenReturn(SafeFuture.failedFuture(new IllegalArgumentException("pre-Heze slot")));
+
+    final SafeFuture<Optional<InclusionList>> result =
+        validatorApiHandler.createInclusionList(epochStartSlot, ONE);
+
+    assertThatSafeFuture(result)
+        .isCompletedExceptionallyWith(IllegalArgumentException.class)
+        .hasMessage("pre-Heze slot");
+  }
+
+  @Test
+  void getInclusionList_shouldReturnTransactionsFromFactory() {
+    setUp(TestSpecFactory.createMinimalHeze());
+    final List<Transaction> transactions =
+        dataStructureUtil.randomInclusionList().getTransactions().asList();
+    when(inclusionListFactory.getInclusionList(epochStartSlot))
+        .thenReturn(completedFuture(Optional.of(transactions)));
+
+    assertThat(validatorApiHandler.getInclusionList(epochStartSlot))
+        .isCompletedWithValue(Optional.of(transactions));
+    verify(inclusionListFactory).getInclusionList(epochStartSlot);
+  }
+
+  @Test
+  void getInclusionList_shouldPropagateFactoryFailureForPreHezeSlot() {
+    when(inclusionListFactory.getInclusionList(epochStartSlot))
+        .thenReturn(SafeFuture.failedFuture(new IllegalArgumentException("pre-Heze slot")));
+
+    final SafeFuture<Optional<List<Transaction>>> result =
+        validatorApiHandler.getInclusionList(epochStartSlot);
+
+    assertThatSafeFuture(result)
+        .isCompletedExceptionallyWith(IllegalArgumentException.class)
+        .hasMessage("pre-Heze slot");
+  }
+
+  @Test
+  void sendSignedInclusionLists_shouldAllowEmptyRequest() {
+    assertThat(validatorApiHandler.sendSignedInclusionLists(emptyList()))
+        .isCompletedWithValue(emptyList());
+    verifyNoInteractions(signedInclusionListPublisher);
+  }
+
+  @Test
+  void sendSignedInclusionLists_shouldReturnNoErrorsWhenAllAccepted() {
+    setUp(TestSpecFactory.createMinimalHeze());
+    final SignedInclusionList inclusionList1 = dataStructureUtil.randomSignedInclusionList();
+    final SignedInclusionList inclusionList2 = dataStructureUtil.randomSignedInclusionList();
+    when(signedInclusionListPublisher.sendInclusionList(any()))
+        .thenReturn(completedFuture(InternalValidationResult.ACCEPT));
+
+    assertThat(
+            validatorApiHandler.sendSignedInclusionLists(List.of(inclusionList1, inclusionList2)))
+        .isCompletedWithValue(emptyList());
+    verify(signedInclusionListPublisher).sendInclusionList(inclusionList1);
+    verify(signedInclusionListPublisher).sendInclusionList(inclusionList2);
+  }
+
+  @Test
+  void sendSignedInclusionLists_shouldNotReportIgnoredOrDeferredInclusionListsAsErrors() {
+    setUp(TestSpecFactory.createMinimalHeze());
+    final SignedInclusionList ignored = dataStructureUtil.randomSignedInclusionList();
+    final SignedInclusionList deferred = dataStructureUtil.randomSignedInclusionList();
+    when(signedInclusionListPublisher.sendInclusionList(ignored))
+        .thenReturn(
+            completedFuture(InternalValidationResult.ignore("Inclusion List is not current")));
+    when(signedInclusionListPublisher.sendInclusionList(deferred))
+        .thenReturn(completedFuture(InternalValidationResult.SAVE_FOR_FUTURE));
+
+    try (final LogCaptor logCaptor = LogCaptor.forLoggerName(VALIDATOR_LOG, Level.ERROR)) {
+      assertThat(validatorApiHandler.sendSignedInclusionLists(List.of(ignored, deferred)))
+          .isCompletedWithValue(emptyList());
+      assertThat(logCaptor.getErrorLogs()).isEmpty();
+    }
+  }
+
+  @Test
+  void sendSignedInclusionLists_shouldReturnErrorAndLogWhenRejected() {
+    setUp(TestSpecFactory.createMinimalHeze());
+    final SignedInclusionList inclusionList = dataStructureUtil.randomSignedInclusionList();
+    when(signedInclusionListPublisher.sendInclusionList(inclusionList))
+        .thenReturn(completedFuture(InternalValidationResult.reject("Bad inclusion list")));
+
+    try (final LogCaptor logCaptor = LogCaptor.forLoggerName(VALIDATOR_LOG, Level.ERROR)) {
+      assertThat(validatorApiHandler.sendSignedInclusionLists(List.of(inclusionList)))
+          .isCompletedWithValue(List.of(new SubmitDataError(ZERO, "Bad inclusion list")));
+      logCaptor.assertErrorLog(
+          "Produced invalid inclusion list for slot "
+              + inclusionList.getMessage().getSlot()
+              + ": Bad inclusion list");
+    }
+  }
+
+  @Test
+  void sendSignedInclusionLists_shouldMapMixedResultsToCorrectIndices() {
+    setUp(TestSpecFactory.createMinimalHeze());
+    final SignedInclusionList accepted = dataStructureUtil.randomSignedInclusionList();
+    final SignedInclusionList rejected1 = dataStructureUtil.randomSignedInclusionList();
+    final SignedInclusionList ignored = dataStructureUtil.randomSignedInclusionList();
+    final SignedInclusionList rejected2 = dataStructureUtil.randomSignedInclusionList();
+    when(signedInclusionListPublisher.sendInclusionList(accepted))
+        .thenReturn(completedFuture(InternalValidationResult.ACCEPT));
+    when(signedInclusionListPublisher.sendInclusionList(rejected1))
+        .thenReturn(completedFuture(InternalValidationResult.reject("First reason")));
+    when(signedInclusionListPublisher.sendInclusionList(ignored))
+        .thenReturn(completedFuture(InternalValidationResult.IGNORE));
+    when(signedInclusionListPublisher.sendInclusionList(rejected2))
+        .thenReturn(completedFuture(InternalValidationResult.reject("Second reason")));
+
+    assertThat(
+            validatorApiHandler.sendSignedInclusionLists(
+                List.of(accepted, rejected1, ignored, rejected2)))
+        .isCompletedWithValue(
+            List.of(
+                new SubmitDataError(ONE, "First reason"),
+                new SubmitDataError(UInt64.valueOf(3), "Second reason")));
+  }
+
+  @Test
+  void sendSignedInclusionLists_shouldMapPublisherRejectionOfWrongForkToSubmitDataError() {
+    // ValidatorApiHandler does no fork check of its own: a rejection the publisher returns for an
+    // inclusion list that is not valid for the current fork is surfaced as a per-index error
+    setUp(TestSpecFactory.createMinimalHeze());
+    final SignedInclusionList inclusionList = dataStructureUtil.randomSignedInclusionList();
+    when(signedInclusionListPublisher.sendInclusionList(inclusionList))
+        .thenReturn(completedFuture(InternalValidationResult.reject("Incorrect spec milestone")));
+
+    assertThat(validatorApiHandler.sendSignedInclusionLists(List.of(inclusionList)))
+        .isCompletedWithValue(List.of(new SubmitDataError(ZERO, "Incorrect spec milestone")));
+  }
+
+  @Test
+  void sendSignedInclusionLists_shouldFailWholeRequestWhenPublisherFails() {
+    // Same as sendSignedAttestations / sendPayloadAttestationMessages: SafeFuture.collectAll
+    // fails the whole request rather than reporting a per-index error
+    setUp(TestSpecFactory.createMinimalHeze());
+    final SignedInclusionList accepted = dataStructureUtil.randomSignedInclusionList();
+    final SignedInclusionList failing = dataStructureUtil.randomSignedInclusionList();
+    when(signedInclusionListPublisher.sendInclusionList(accepted))
+        .thenReturn(completedFuture(InternalValidationResult.ACCEPT));
+    when(signedInclusionListPublisher.sendInclusionList(failing))
+        .thenReturn(SafeFuture.failedFuture(new IllegalStateException("Publisher failure")));
+
+    final SafeFuture<List<SubmitDataError>> result =
+        validatorApiHandler.sendSignedInclusionLists(List.of(accepted, failing));
+
+    assertThatSafeFuture(result)
+        .isCompletedExceptionallyWith(IllegalStateException.class)
+        .hasMessage("Publisher failure");
+    verify(signedInclusionListPublisher).sendInclusionList(accepted);
+    verify(signedInclusionListPublisher).sendInclusionList(failing);
   }
 
   @Test
@@ -549,6 +793,8 @@ class ValidatorApiHandlerTest {
             executionPayloadBidManager,
             proposerPreferencesManager,
             executionProofManager,
+            signedInclusionListPublisher,
+            inclusionListFactory,
             stakedBuilderClientProvider);
     dataStructureUtil = new DataStructureUtil(spec);
     // Best state is still in Phase0
@@ -749,13 +995,14 @@ class ValidatorApiHandlerTest {
     final SignedBlockAndState blockAndState =
         dataStructureUtil.randomSignedBlockAndState(epochStartSlot);
 
-    final SafeFuture<Optional<SignedBlockAndState>> blockAndStateResult =
-        completedFuture(Optional.of(blockAndState));
-    when(chainDataClient.getSignedBlockAndStateInEffectAtSlot(slot))
-        .thenReturn(blockAndStateResult);
+    when(chainDataClient.getChainHead()).thenReturn(Optional.of(chainHead));
+    when(chainHead.getSlot()).thenReturn(blockAndState.getSlot());
+    when(chainHead.getForkChoiceNode())
+        .thenReturn(ForkChoiceNode.createEmpty(blockAndState.getRoot()));
+    when(store.retrieveBlockAndState(blockAndState.getRoot()))
+        .thenReturn(completedFuture(Optional.of(blockAndState)));
     when(forkChoiceTrigger.prepareForAttestationProduction(slot)).thenReturn(SafeFuture.COMPLETE);
-
-    when(chainDataClient.isOptimisticBlock(blockAndState.getRoot())).thenReturn(true);
+    when(chainHead.isOptimistic()).thenReturn(true);
 
     final int committeeIndex = 0;
     final SafeFuture<Optional<AttestationData>> result =
@@ -772,12 +1019,13 @@ class ValidatorApiHandlerTest {
     final SignedBlockAndState blockAndState =
         dataStructureUtil.randomSignedBlockAndState(epochStartSlot);
 
-    final SafeFuture<Optional<SignedBlockAndState>> blockAndStateResult =
-        completedFuture(Optional.of(blockAndState));
-    when(chainDataClient.getSignedBlockAndStateInEffectAtSlot(slot))
-        .thenReturn(blockAndStateResult);
+    when(chainDataClient.getChainHead()).thenReturn(Optional.of(chainHead));
+    when(chainHead.getSlot()).thenReturn(blockAndState.getSlot());
+    when(chainHead.getForkChoiceNode())
+        .thenReturn(ForkChoiceNode.createEmpty(blockAndState.getRoot()));
+    when(store.retrieveBlockAndState(blockAndState.getRoot()))
+        .thenReturn(completedFuture(Optional.of(blockAndState)));
     when(forkChoiceTrigger.prepareForAttestationProduction(slot)).thenReturn(SafeFuture.COMPLETE);
-
     final int committeeIndex = 0;
     final SafeFuture<Optional<AttestationData>> result =
         validatorApiHandler.createAttestationData(slot, committeeIndex);
@@ -791,15 +1039,239 @@ class ValidatorApiHandlerTest {
             spec.getGenericAttestationData(
                 slot,
                 blockAndState.getState(),
-                blockAndState.getBlock().getMessage(),
+                blockAndState.getBlock(),
                 UInt64.valueOf(committeeIndex)));
     assertThat(attestationData.getIndex()).isEqualTo(ZERO);
     assertThat(attestationData.getSlot()).isEqualTo(slot);
-    final InOrder inOrder = inOrder(forkChoiceTrigger, chainDataClient);
+    final InOrder inOrder = inOrder(forkChoiceTrigger, store);
 
     // Ensure we prepare for attestation production prior to getting the block to attest to
     inOrder.verify(forkChoiceTrigger).prepareForAttestationProduction(slot);
-    inOrder.verify(chainDataClient).getSignedBlockAndStateInEffectAtSlot(slot);
+    inOrder.verify(store).retrieveBlockAndState(blockAndState.getRoot());
+  }
+
+  @Nested
+  @TestSpecContext(milestone = {SpecMilestone.GLOAS, SpecMilestone.HEZE})
+  class CanonicalPayloadVariantAttestationDataTest {
+
+    @BeforeEach
+    void setUpForMilestone(final SpecContext specContext) {
+      setUp(specContext.getSpec());
+    }
+
+    @TestTemplate
+    void shouldUseCurrentEmptyPayloadVariant() {
+      assertCanonicalPayloadVariant(ForkChoicePayloadStatus.PAYLOAD_STATUS_EMPTY, false, ZERO);
+    }
+
+    @TestTemplate
+    void shouldUseCurrentFullPayloadVariant() {
+      assertCanonicalPayloadVariant(PAYLOAD_STATUS_FULL, false, ONE);
+    }
+
+    @TestTemplate
+    void shouldUsePastSlotEmptyPayloadVariant() {
+      assertCanonicalPayloadVariant(ForkChoicePayloadStatus.PAYLOAD_STATUS_EMPTY, true, ZERO);
+    }
+
+    @TestTemplate
+    void shouldUsePastSlotFullPayloadVariant() {
+      assertCanonicalPayloadVariant(PAYLOAD_STATUS_FULL, true, ONE);
+    }
+
+    @TestTemplate
+    void shouldRejectOptimisticFullPayloadVariant() {
+      final UInt64 slot = epochStartSlot.increment();
+      final SignedBlockAndState blockAndState =
+          dataStructureUtil.randomSignedBlockAndState(epochStartSlot);
+      final ForkChoiceNode selectedNode = ForkChoiceNode.createFull(blockAndState.getRoot());
+      when(chainDataClient.getCurrentSlot()).thenReturn(slot);
+      when(forkChoiceTrigger.prepareForAttestationProduction(slot)).thenReturn(SafeFuture.COMPLETE);
+      when(chainDataClient.getChainHead()).thenReturn(Optional.of(chainHead));
+      when(chainHead.getSlot()).thenReturn(blockAndState.getSlot());
+      when(chainHead.getForkChoiceNode()).thenReturn(selectedNode);
+      when(chainHead.isOptimistic()).thenReturn(true);
+      when(chainDataClient.isOptimisticBlock(blockAndState.getRoot())).thenReturn(false);
+      when(store.retrieveBlockAndState(blockAndState.getRoot()))
+          .thenReturn(completedFuture(Optional.of(blockAndState)));
+
+      assertThatSafeFuture(validatorApiHandler.createAttestationData(slot, 0))
+          .isCompletedExceptionallyWith(NodeSyncingException.class);
+      verify(chainDataClient, never()).isOptimisticBlock(blockAndState.getRoot());
+    }
+
+    @TestTemplate
+    void shouldRejectOptimisticHistoricalFullPayloadVariant() {
+      final UInt64 slot = epochStartSlot.increment();
+      final SignedBlockAndState blockAndState =
+          dataStructureUtil.randomSignedBlockAndState(epochStartSlot);
+      final ForkChoiceNode newerHead = ForkChoiceNode.createFull(dataStructureUtil.randomBytes32());
+      final ProtoNodeData ancestorData = mock(ProtoNodeData.class);
+      when(ancestorData.getRoot()).thenReturn(blockAndState.getRoot());
+      when(ancestorData.getPayloadStatus()).thenReturn(PAYLOAD_STATUS_FULL);
+      when(ancestorData.isOptimistic()).thenReturn(true);
+      when(chainDataClient.getCurrentSlot()).thenReturn(slot.increment());
+      when(forkChoiceTrigger.prepareForAttestationProduction(slot)).thenReturn(SafeFuture.COMPLETE);
+      when(chainDataClient.getChainHead()).thenReturn(Optional.of(chainHead));
+      when(chainHead.getSlot()).thenReturn(slot.increment());
+      when(chainHead.getForkChoiceNode()).thenReturn(newerHead);
+      when(store.getForkChoiceStrategy()).thenReturn(forkChoiceStrategy);
+      when(forkChoiceStrategy.getAncestorNodeData(newerHead, slot))
+          .thenReturn(Optional.of(ancestorData));
+      when(store.retrieveBlockAndState(blockAndState.getRoot()))
+          .thenReturn(completedFuture(Optional.of(blockAndState)));
+
+      assertThatSafeFuture(validatorApiHandler.createAttestationData(slot, 0))
+          .isCompletedExceptionallyWith(NodeSyncingException.class);
+      verify(chainDataClient, never()).isOptimisticBlock(blockAndState.getRoot());
+    }
+
+    @TestTemplate
+    void shouldReturnEmptyWhenCanonicalAncestorIsUnavailable() {
+      final UInt64 slot = epochStartSlot.increment();
+      when(chainDataClient.getCurrentSlot()).thenReturn(slot.increment());
+      when(forkChoiceTrigger.prepareForAttestationProduction(slot)).thenReturn(SafeFuture.COMPLETE);
+      when(chainDataClient.getChainHead()).thenReturn(Optional.of(chainHead));
+      when(chainHead.getSlot()).thenReturn(slot.increment());
+      when(chainHead.getForkChoiceNode())
+          .thenReturn(ForkChoiceNode.createFull(dataStructureUtil.randomBytes32()));
+      when(store.getForkChoiceStrategy()).thenReturn(forkChoiceStrategy);
+
+      assertThatSafeFuture(validatorApiHandler.createAttestationData(slot, 0))
+          .isCompletedWithEmptyOptional();
+    }
+
+    @TestTemplate
+    void shouldRetainCapturedEmptyVariantWhileLoadingState() {
+      final UInt64 slot = epochStartSlot.increment();
+      final SignedBlockAndState blockAndState =
+          dataStructureUtil.randomSignedBlockAndState(epochStartSlot);
+      final SafeFuture<Optional<SignedBlockAndState>> pendingBlockAndState = new SafeFuture<>();
+      when(chainDataClient.getCurrentSlot()).thenReturn(slot);
+      when(forkChoiceTrigger.prepareForAttestationProduction(slot)).thenReturn(SafeFuture.COMPLETE);
+      when(chainDataClient.getChainHead()).thenReturn(Optional.of(chainHead));
+      when(chainHead.getSlot()).thenReturn(blockAndState.getSlot());
+      when(chainHead.getForkChoiceNode())
+          .thenReturn(ForkChoiceNode.createEmpty(blockAndState.getRoot()));
+      when(store.retrieveBlockAndState(blockAndState.getRoot())).thenReturn(pendingBlockAndState);
+
+      final SafeFuture<Optional<AttestationData>> result =
+          validatorApiHandler.createAttestationData(slot, 0);
+      when(chainDataClient.getChainHead()).thenReturn(Optional.of(mock(ChainHead.class)));
+      pendingBlockAndState.complete(Optional.of(blockAndState));
+
+      assertThat(safeJoin(result).orElseThrow().getIndex()).isEqualTo(ZERO);
+    }
+
+    private void assertCanonicalPayloadVariant(
+        final ForkChoicePayloadStatus payloadStatus,
+        final boolean pastSlot,
+        final UInt64 expectedIndex) {
+      final UInt64 slot = epochStartSlot.increment();
+      final SignedBlockAndState blockAndState =
+          dataStructureUtil.randomSignedBlockAndState(epochStartSlot);
+      when(chainDataClient.getCurrentSlot()).thenReturn(pastSlot ? slot.increment() : slot);
+      when(store.retrieveBlockAndState(blockAndState.getRoot()))
+          .thenReturn(completedFuture(Optional.of(blockAndState)));
+      when(forkChoiceTrigger.prepareForAttestationProduction(slot)).thenReturn(SafeFuture.COMPLETE);
+      when(chainDataClient.getChainHead()).thenReturn(Optional.of(chainHead));
+      when(chainHead.getSlot()).thenReturn(blockAndState.getSlot());
+      when(chainHead.getForkChoiceNode())
+          .thenReturn(new ForkChoiceNode(blockAndState.getRoot(), payloadStatus));
+      if (pastSlot) {
+        final ForkChoiceNode newerHead =
+            ForkChoiceNode.createFull(dataStructureUtil.randomBytes32());
+        when(chainHead.getSlot()).thenReturn(slot.increment());
+        when(chainHead.getForkChoiceNode()).thenReturn(newerHead);
+        when(store.getForkChoiceStrategy()).thenReturn(forkChoiceStrategy);
+        final ProtoNodeData ancestorData = mock(ProtoNodeData.class);
+        when(ancestorData.getRoot()).thenReturn(blockAndState.getRoot());
+        when(ancestorData.getPayloadStatus()).thenReturn(payloadStatus);
+        when(forkChoiceStrategy.getAncestorNodeData(newerHead, slot))
+            .thenReturn(Optional.of(ancestorData));
+      }
+
+      final AttestationData data =
+          safeJoin(validatorApiHandler.createAttestationData(slot, 0)).orElseThrow();
+
+      assertThat(data.getBeaconBlockRoot()).isEqualTo(blockAndState.getRoot());
+      assertThat(data.getIndex()).isEqualTo(expectedIndex);
+    }
+  }
+
+  @Nested
+  @TestSpecContext(milestone = SpecMilestone.FULU)
+  class PreGloasAttestationDataTest {
+
+    @BeforeEach
+    void setUpForMilestone(final SpecContext specContext) {
+      setUp(specContext.getSpec());
+    }
+
+    @TestTemplate
+    void shouldUseBlockAndStateInEffectAtSlot() {
+      final UInt64 slot = epochStartSlot.increment();
+      final SignedBlockAndState blockAndState =
+          dataStructureUtil.randomSignedBlockAndState(epochStartSlot);
+      when(chainDataClient.getCurrentSlot()).thenReturn(slot);
+      when(forkChoiceTrigger.prepareForAttestationProduction(slot)).thenReturn(SafeFuture.COMPLETE);
+      when(chainDataClient.getSignedBlockAndStateInEffectAtSlot(slot))
+          .thenReturn(completedFuture(Optional.of(blockAndState)));
+
+      final AttestationData data =
+          safeJoin(validatorApiHandler.createAttestationData(slot, 0)).orElseThrow();
+
+      assertThat(data.getBeaconBlockRoot()).isEqualTo(blockAndState.getRoot());
+      verify(chainDataClient).getSignedBlockAndStateInEffectAtSlot(slot);
+      verify(chainDataClient, never()).getChainHead();
+    }
+  }
+
+  @Nested
+  @TestSpecContext(milestone = {SpecMilestone.FULU, SpecMilestone.GLOAS})
+  class LocallyVerifiedPayloadAttestationDataTest {
+
+    @BeforeEach
+    void setUpForMilestone(final SpecContext specContext) {
+      setUp(specContext.getSpec());
+    }
+
+    @TestTemplate
+    void shouldNotSetIndexFromLocalPayloadWhenForkChoiceHeadIsEmpty(final SpecContext specContext) {
+      final UInt64 slot = epochStartSlot.increment();
+      final SignedBlockAndState blockAndState =
+          dataStructureUtil.randomSignedBlockAndState(epochStartSlot);
+      when(chainDataClient.getCurrentSlot()).thenReturn(slot);
+      when(forkChoiceTrigger.prepareForAttestationProduction(slot)).thenReturn(SafeFuture.COMPLETE);
+      when(chainDataClient.getSignedBlockAndStateInEffectAtSlot(slot))
+          .thenReturn(completedFuture(Optional.of(blockAndState)));
+      when(store.retrieveBlockAndState(blockAndState.getRoot()))
+          .thenReturn(completedFuture(Optional.of(blockAndState)));
+      if (specContext.getSpecMilestone().isGreaterThanOrEqualTo(SpecMilestone.GLOAS)) {
+        // The payload has been received and verified locally...
+        when(store.getExecutionPayloadIfAvailable(blockAndState.getRoot()))
+            .thenReturn(Optional.of(dataStructureUtil.randomSignedExecutionPayloadEnvelope(5)));
+      }
+      // ...but fork choice selected the EMPTY variant (e.g. PTC voted it not timely)
+      when(chainDataClient.getChainHead()).thenReturn(Optional.of(chainHead));
+      when(chainHead.getSlot()).thenReturn(blockAndState.getSlot());
+      when(chainHead.getForkChoiceNode())
+          .thenReturn(ForkChoiceNode.createEmpty(blockAndState.getRoot()));
+
+      final AttestationData data =
+          safeJoin(validatorApiHandler.createAttestationData(slot, 0)).orElseThrow();
+
+      assertThat(data.getBeaconBlockRoot()).isEqualTo(blockAndState.getRoot());
+      assertThat(data.getIndex()).isEqualTo(ZERO);
+      if (specContext.getSpecMilestone().isLessThan(SpecMilestone.GLOAS)) {
+        // Pre-Gloas attestation production is unchanged
+        assertThat(data)
+            .isEqualTo(
+                spec.getGenericAttestationData(
+                    slot, blockAndState.getState(), blockAndState.getBlock().getMessage(), ZERO));
+        verify(chainDataClient, never()).getChainHead();
+      }
+    }
   }
 
   @Test
@@ -825,11 +1297,12 @@ class ValidatorApiHandlerTest {
     final SignedBlockAndState blockAndState =
         dataStructureUtil.randomSignedBlockAndState(blockSlot);
     final SignedBeaconBlock block = blockAndState.getBlock();
+    when(chainDataClient.getChainHead()).thenReturn(Optional.of(chainHead));
+    when(chainHead.getSlot()).thenReturn(blockSlot);
+    when(chainHead.getForkChoiceNode()).thenReturn(ForkChoiceNode.createEmpty(block.getRoot()));
 
-    final SafeFuture<Optional<SignedBlockAndState>> blockAndStateResult =
-        completedFuture(Optional.of(blockAndState));
-    when(chainDataClient.getSignedBlockAndStateInEffectAtSlot(slot))
-        .thenReturn(blockAndStateResult);
+    when(store.retrieveBlockAndState(blockAndState.getRoot()))
+        .thenReturn(completedFuture(Optional.of(blockAndState)));
 
     when(chainDataClient.getCheckpointState(EPOCH, blockAndState))
         .thenReturn(
@@ -950,6 +1423,9 @@ class ValidatorApiHandlerTest {
 
     verify(syncCommitteeSubscriptionManager).subscribe(0, unsubscribeSlotSubscription2);
     verify(syncCommitteeSubscriptionManager).subscribe(1, unsubscribeSlotSubscription2);
+
+    verify(syncCommitteeSubscriptionManager).recordDuty(1, unsubscribeSlotSubscription1);
+    verify(syncCommitteeSubscriptionManager).recordDuty(1, unsubscribeSlotSubscription2);
     verifyNoMoreInteractions(syncCommitteeSubscriptionManager);
   }
 

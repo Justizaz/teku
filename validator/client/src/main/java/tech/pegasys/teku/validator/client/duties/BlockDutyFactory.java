@@ -1,5 +1,5 @@
 /*
- * Copyright Consensys Software Inc., 2026
+ * Copyright (c) 2026 Consensys Incorporated. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with
  * the License. You may obtain a copy of the License at
@@ -13,6 +13,7 @@
 
 package tech.pegasys.teku.validator.client.duties;
 
+import java.util.Optional;
 import tech.pegasys.teku.infrastructure.unsigned.UInt64;
 import tech.pegasys.teku.spec.Spec;
 import tech.pegasys.teku.validator.api.ValidatorApiChannel;
@@ -20,6 +21,7 @@ import tech.pegasys.teku.validator.client.BuilderConfigProvider;
 import tech.pegasys.teku.validator.client.ForkProvider;
 import tech.pegasys.teku.validator.client.Validator;
 import tech.pegasys.teku.validator.client.duties.execution.ExecutionPayloadBidEventsChannel;
+import tech.pegasys.teku.validator.client.hashchain.HashChainStore;
 import tech.pegasys.teku.validator.client.signer.BlockContainerSigner;
 
 public class BlockDutyFactory implements DutyFactory<BlockProductionDuty, Duty> {
@@ -31,6 +33,7 @@ public class BlockDutyFactory implements DutyFactory<BlockProductionDuty, Duty> 
   private final ValidatorDutyMetrics validatorDutyMetrics;
   private final ExecutionPayloadBidEventsChannel executionPayloadBidEventsChannelPublisher;
   private final BuilderConfigProvider builderConfigProvider;
+  private final Optional<HashChainStore> hashChainStore;
 
   public BlockDutyFactory(
       final ForkProvider forkProvider,
@@ -40,6 +43,26 @@ public class BlockDutyFactory implements DutyFactory<BlockProductionDuty, Duty> 
       final ValidatorDutyMetrics validatorDutyMetrics,
       final ExecutionPayloadBidEventsChannel executionPayloadBidEventsChannelPublisher,
       final BuilderConfigProvider builderConfigProvider) {
+    this(
+        forkProvider,
+        validatorApiChannel,
+        blockContainerSigner,
+        spec,
+        validatorDutyMetrics,
+        executionPayloadBidEventsChannelPublisher,
+        builderConfigProvider,
+        Optional.empty());
+  }
+
+  public BlockDutyFactory(
+      final ForkProvider forkProvider,
+      final ValidatorApiChannel validatorApiChannel,
+      final BlockContainerSigner blockContainerSigner,
+      final Spec spec,
+      final ValidatorDutyMetrics validatorDutyMetrics,
+      final ExecutionPayloadBidEventsChannel executionPayloadBidEventsChannelPublisher,
+      final BuilderConfigProvider builderConfigProvider,
+      final Optional<HashChainStore> hashChainStore) {
     this.forkProvider = forkProvider;
     this.validatorApiChannel = validatorApiChannel;
     this.blockContainerSigner = blockContainerSigner;
@@ -47,6 +70,7 @@ public class BlockDutyFactory implements DutyFactory<BlockProductionDuty, Duty> 
     this.validatorDutyMetrics = validatorDutyMetrics;
     this.executionPayloadBidEventsChannelPublisher = executionPayloadBidEventsChannelPublisher;
     this.builderConfigProvider = builderConfigProvider;
+    this.hashChainStore = hashChainStore;
   }
 
   @Override
@@ -60,7 +84,8 @@ public class BlockDutyFactory implements DutyFactory<BlockProductionDuty, Duty> 
         spec,
         validatorDutyMetrics,
         executionPayloadBidEventsChannelPublisher,
-        builderConfigProvider);
+        builderConfigProvider,
+        hashChainStore);
   }
 
   @Override

@@ -1,5 +1,5 @@
 /*
- * Copyright Consensys Software Inc., 2026
+ * Copyright (c) 2026 Consensys Incorporated. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with
  * the License. You may obtain a copy of the License at
@@ -54,6 +54,7 @@ class StoreTransactionUpdatesFactory {
   private final Map<Bytes32, SignedBlockAndState> hotBlockAndStates;
   private final Map<SlotAndBlockRoot, List<BlobSidecar>> blobSidecars;
   private final Optional<UInt64> maybeEarliestBlobSidecarSlot;
+  private final Optional<Bytes32> maybeUnsatisfiedInclusionListBlockRoot;
   private final Optional<Bytes32> maybeLatestCanonicalBlockRoot;
   private final Optional<UInt64> maybeCustodyGroupCount;
   private final Map<Bytes32, SlotAndBlockRoot> stateRoots;
@@ -83,6 +84,7 @@ class StoreTransactionUpdatesFactory {
     maybeLatestCanonicalBlockRoot = tx.maybeLatestCanonicalBlockRoot;
     maybeCustodyGroupCount = tx.maybeCustodyGroupCount;
     hotExecutionPayloads = new ConcurrentHashMap<>(tx.executionPayloadData);
+    maybeUnsatisfiedInclusionListBlockRoot = tx.maybeUnsatisfiedInclusionListBlockRoot;
   }
 
   public static StoreTransactionUpdates create(
@@ -281,6 +283,7 @@ class StoreTransactionUpdatesFactory {
         maybeEarliestBlobSidecarSlot,
         prunedHotBlockRoots,
         stateRoots,
+        maybeUnsatisfiedInclusionListBlockRoot,
         optimisticTransitionBlockRootSet,
         optimisticTransitionBlockRoot,
         maybeLatestCanonicalBlockRoot,

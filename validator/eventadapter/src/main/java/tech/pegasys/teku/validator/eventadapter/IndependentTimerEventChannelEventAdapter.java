@@ -1,5 +1,5 @@
 /*
- * Copyright Consensys Software Inc., 2026
+ * Copyright (c) 2026 Consensys Incorporated. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with
  * the License. You may obtain a copy of the License at
@@ -18,6 +18,8 @@ import org.apache.tuweni.bytes.Bytes32;
 import tech.pegasys.teku.infrastructure.async.SafeFuture;
 import tech.pegasys.teku.infrastructure.events.EventChannels;
 import tech.pegasys.teku.infrastructure.unsigned.UInt64;
+import tech.pegasys.teku.spec.Spec;
+import tech.pegasys.teku.spec.SpecMilestone;
 import tech.pegasys.teku.spec.datastructures.forkchoice.ForkChoicePayloadStatus;
 import tech.pegasys.teku.storage.api.ChainHeadChannel;
 import tech.pegasys.teku.storage.api.ReorgContext;
@@ -31,16 +33,19 @@ public class IndependentTimerEventChannelEventAdapter
   private final boolean generateEarlyAttestations;
   private final ValidatorTimingChannel validatorTimingChannel;
   private final EventChannels eventChannels;
+  private final Spec spec;
 
   public IndependentTimerEventChannelEventAdapter(
       final EventChannels eventChannels,
       final boolean generateEarlyAttestations,
       final BeaconChainEventAdapter timeBasedEventAdapter,
-      final ValidatorTimingChannel validatorTimingChannel) {
+      final ValidatorTimingChannel validatorTimingChannel,
+      final Spec spec) {
     this.eventChannels = eventChannels;
     this.timeBasedEventAdapter = timeBasedEventAdapter;
     this.validatorTimingChannel = validatorTimingChannel;
     this.generateEarlyAttestations = generateEarlyAttestations;
+    this.spec = spec;
   }
 
   @Override
@@ -70,6 +75,10 @@ public class IndependentTimerEventChannelEventAdapter
         slot, previousDutyDependentRoot, currentDutyDependentRoot, bestBlockRoot);
     if (generateEarlyAttestations) {
       validatorTimingChannel.onAttestationCreationDue(slot);
+      // Build the inclusion list on the slot's block as soon as it's head
+      if (spec.atSlot(slot).getMilestone().isGreaterThanOrEqualTo(SpecMilestone.HEZE)) {
+        validatorTimingChannel.onInclusionListCreationDue(slot);
+      }
     }
   }
 }

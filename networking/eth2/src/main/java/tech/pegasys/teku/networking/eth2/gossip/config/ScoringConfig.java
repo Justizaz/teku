@@ -1,5 +1,5 @@
 /*
- * Copyright Consensys Software Inc., 2026
+ * Copyright (c) 2026 Consensys Incorporated. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with
  * the License. You may obtain a copy of the License at
@@ -58,6 +58,8 @@ class ScoringConfig {
     this.genesisSpec = spec.getGenesisSpec();
     this.d = d;
 
+    // Scoring parameters are fixed when the gossip router starts, so they keep using the genesis
+    // slot duration after an EIP-8198 slot duration change at Heze.
     this.slotDuration = Duration.ofSeconds(this.genesisConfig.getSecondsPerSlot());
     this.epochDuration = slotDuration.multipliedBy(this.genesisConfig.getSlotsPerEpoch());
     this.decayInterval = slotDuration;

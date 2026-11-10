@@ -1,5 +1,5 @@
 /*
- * Copyright Consensys Software Inc., 2026
+ * Copyright (c) 2026 Consensys Incorporated. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with
  * the License. You may obtain a copy of the License at
@@ -22,9 +22,11 @@ import static org.mockito.Mockito.when;
 import static tech.pegasys.teku.infrastructure.async.SafeFutureAssert.assertThatSafeFuture;
 import static tech.pegasys.teku.infrastructure.async.SafeFutureAssert.safeJoin;
 import static tech.pegasys.teku.spec.SpecMilestone.GLOAS;
+import static tech.pegasys.teku.spec.SpecMilestone.HEZE;
 
 import java.util.List;
 import java.util.Optional;
+import org.apache.tuweni.bytes.Bytes;
 import org.apache.tuweni.bytes.Bytes32;
 import org.hyperledger.besu.metrics.noop.NoOpMetricsSystem;
 import org.junit.jupiter.api.BeforeEach;
@@ -35,13 +37,18 @@ import tech.pegasys.teku.infrastructure.async.eventthread.InlineEventThread;
 import tech.pegasys.teku.infrastructure.unsigned.UInt64;
 import tech.pegasys.teku.spec.Spec;
 import tech.pegasys.teku.spec.TestSpecContext;
+import tech.pegasys.teku.spec.TestSpecFactory;
 import tech.pegasys.teku.spec.TestSpecInvocationContextProvider.SpecContext;
 import tech.pegasys.teku.spec.datastructures.blocks.SlotAndBlockRoot;
 import tech.pegasys.teku.spec.datastructures.epbs.versions.gloas.ExecutionPayloadBid;
 import tech.pegasys.teku.spec.datastructures.epbs.versions.gloas.SignedBlindedExecutionPayloadEnvelope;
+import tech.pegasys.teku.spec.datastructures.epbs.versions.gloas.SignedProposerPreferences;
 import tech.pegasys.teku.spec.datastructures.execution.ExecutionRequests;
 import tech.pegasys.teku.spec.datastructures.execution.versions.capella.Withdrawal;
+import tech.pegasys.teku.spec.datastructures.execution.versions.heze.InclusionList;
 import tech.pegasys.teku.spec.datastructures.forkchoice.ForkChoiceNode;
+import tech.pegasys.teku.spec.datastructures.forkchoice.InclusionListStore;
+import tech.pegasys.teku.spec.datastructures.forkchoice.ReadOnlyForkChoiceStrategy;
 import tech.pegasys.teku.spec.datastructures.state.beaconstate.BeaconState;
 import tech.pegasys.teku.spec.datastructures.state.beaconstate.versions.gloas.BeaconStateGloas;
 import tech.pegasys.teku.spec.datastructures.state.beaconstate.versions.gloas.BeaconStateSchemaGloas;
@@ -51,10 +58,12 @@ import tech.pegasys.teku.spec.executionlayer.ExecutionLayerChannel;
 import tech.pegasys.teku.spec.executionlayer.ForkChoiceState;
 import tech.pegasys.teku.spec.executionlayer.PayloadBuildingAttributes;
 import tech.pegasys.teku.spec.schemas.SchemaDefinitionsGloas;
+import tech.pegasys.teku.spec.schemas.SchemaDefinitionsHeze;
 import tech.pegasys.teku.spec.util.DataStructureUtil;
+import tech.pegasys.teku.statetransition.execution.ProposerPreferencesManager;
 import tech.pegasys.teku.storage.client.RecentChainData;
 
-@TestSpecContext(milestone = GLOAS)
+@TestSpecContext(milestone = {GLOAS, HEZE})
 class ProposersDataManagerGloasTest {
 
   private RecentChainData recentChainData;
@@ -62,7 +71,9 @@ class ProposersDataManagerGloasTest {
   private DataStructureUtil data;
   private InlineEventThread eventThread;
   private ProposersDataManager manager;
+  private ProposerPreferencesManager proposerPreferencesManager;
   private Eth1Address defaultFeeRecipient;
+  private final InclusionListStore inclusionListStore = new InclusionListStore(4);
 
   @BeforeEach
   void setUp(final SpecContext specContext) {
@@ -71,6 +82,9 @@ class ProposersDataManagerGloasTest {
     recentChainData = mock(RecentChainData.class);
     eventThread = new InlineEventThread();
     defaultFeeRecipient = data.randomEth1Address();
+    proposerPreferencesManager = mock(ProposerPreferencesManager.class);
+    when(proposerPreferencesManager.getProposerPreferences(any(), any()))
+        .thenReturn(Optional.empty());
     manager =
         new ProposersDataManager(
             eventThread,
@@ -79,8 +93,99 @@ class ProposersDataManagerGloasTest {
             ExecutionLayerChannel.NOOP,
             recentChainData,
             Optional.of(defaultFeeRecipient),
-            false);
+            false,
+            proposerPreferencesManager,
+            inclusionListStore);
     when(recentChainData.isJustifiedCheckpointFullyValidated()).thenReturn(true);
+  }
+
+  @TestTemplate
+  void calculatePayloadBuildingAttributes_shouldSelectInclusionListsForReplacementParent() {
+    final UInt64 blockSlot = UInt64.valueOf(24);
+    final UInt64 inclusionListSlot = blockSlot.decrement();
+    final Bytes32 initialParentRoot = data.randomBytes32();
+    final Bytes32 replacementParentRoot = data.randomBytes32();
+    final Bytes32 dependentRoot = data.randomBytes32();
+    final Bytes32 replacementDependentRoot = data.randomBytes32();
+    final BeaconState state = data.randomBeaconState(blockSlot);
+    final ReadOnlyForkChoiceStrategy forkChoiceStrategy = mock(ReadOnlyForkChoiceStrategy.class);
+    when(recentChainData.getForkChoiceStrategy()).thenReturn(Optional.of(forkChoiceStrategy));
+    // Slot 23 depends on slot 7, while the proposal at slot 24 depends on slot 15.
+    when(forkChoiceStrategy.getAncestor(initialParentRoot, UInt64.valueOf(7)))
+        .thenReturn(Optional.of(dependentRoot));
+    when(forkChoiceStrategy.getAncestor(replacementParentRoot, UInt64.valueOf(7)))
+        .thenReturn(Optional.of(dependentRoot));
+    when(recentChainData.retrieveBlockState(new SlotAndBlockRoot(blockSlot, initialParentRoot)))
+        .thenReturn(SafeFuture.completedFuture(Optional.of(state)));
+    when(recentChainData.retrieveBlockState(new SlotAndBlockRoot(blockSlot, replacementParentRoot)))
+        .thenReturn(SafeFuture.completedFuture(Optional.of(state)));
+    storeInclusionList(inclusionListSlot, dependentRoot, 0, false, Bytes.of(1), Bytes.of(2));
+    storeInclusionList(inclusionListSlot, dependentRoot, 1, true, Bytes.of(2));
+    storeInclusionList(inclusionListSlot, dependentRoot, 2, true, Bytes.of(3));
+    storeInclusionList(inclusionListSlot, dependentRoot, 2, true, Bytes.of(4));
+    storeInclusionList(inclusionListSlot, replacementDependentRoot, 0, true, Bytes.of(5));
+    storeInclusionList(inclusionListSlot.decrement(), dependentRoot, 0, true, Bytes.of(6));
+
+    final ForkChoiceUpdateData initialForkChoiceUpdateData =
+        forkChoiceUpdateData(ForkChoiceNode.createEmpty(initialParentRoot), blockSlot);
+    final PayloadBuildingAttributes initialAttributes =
+        safeJoin(calculate(blockSlot, initialForkChoiceUpdateData)).orElseThrow();
+    final ForkChoiceUpdateData replacementForkChoiceUpdateData =
+        initialForkChoiceUpdateData
+            .withPayloadBuildingAttributes(Optional.of(initialAttributes))
+            .withFreshForkChoiceState(
+                forkChoiceUpdateData(ForkChoiceNode.createEmpty(replacementParentRoot), blockSlot)
+                    .getForkChoiceState());
+
+    final PayloadBuildingAttributes replacementAttributes =
+        safeJoin(calculate(blockSlot, replacementForkChoiceUpdateData)).orElseThrow();
+
+    final List<Bytes> expectedTransactions =
+        spec.isInclusionListAvailableAtSlot(blockSlot)
+            ? List.of(Bytes.of(1), Bytes.of(2))
+            : List.of();
+    assertThat(initialAttributes.inclusionListTransactions())
+        .containsExactlyInAnyOrderElementsOf(expectedTransactions);
+    assertThat(replacementAttributes.inclusionListTransactions())
+        .containsExactlyInAnyOrderElementsOf(expectedTransactions);
+    assertThat(replacementAttributes.parentBeaconBlock())
+        .isEqualTo(ForkChoiceNode.createEmpty(replacementParentRoot));
+
+    when(forkChoiceStrategy.getAncestor(replacementParentRoot, UInt64.valueOf(7)))
+        .thenReturn(Optional.of(replacementDependentRoot));
+    final PayloadBuildingAttributes differentForkAttributes =
+        safeJoin(calculate(blockSlot, replacementForkChoiceUpdateData)).orElseThrow();
+    assertThat(differentForkAttributes.inclusionListTransactions())
+        .containsExactlyElementsOf(
+            spec.isInclusionListAvailableAtSlot(blockSlot) ? List.of(Bytes.of(5)) : List.of());
+  }
+
+  private void storeInclusionList(
+      final UInt64 slot,
+      final Bytes32 dependentRoot,
+      final int validatorIndex,
+      final boolean timely,
+      final Bytes... transactions) {
+    final SchemaDefinitionsHeze schemaDefinitions =
+        SchemaDefinitionsHeze.required(
+            TestSpecFactory.createMinimalHeze().getGenesisSchemaDefinitions());
+    final InclusionList inclusionList =
+        schemaDefinitions
+            .getInclusionListSchema()
+            .create(
+                slot,
+                UInt64.valueOf(validatorIndex),
+                dependentRoot,
+                List.of(transactions).stream()
+                    .map(
+                        schemaDefinitions.getInclusionListSchema().getTransactionSchema()
+                            ::fromBytes)
+                    .toList());
+    inclusionListStore.processInclusionList(
+        schemaDefinitions
+            .getSignedInclusionListSchema()
+            .create(inclusionList, data.randomSignature()),
+        timely);
   }
 
   @TestTemplate
@@ -246,12 +351,177 @@ class ProposersDataManagerGloasTest {
         .hasMessageContaining("Execution Requests for parent root");
   }
 
+  @TestTemplate
+  void updatePreparedProposers_shouldUseFeeRecipientFromAcceptedProposerPreferences() {
+    final UInt64 blockSlot = UInt64.valueOf(16);
+    final Bytes32 dependentRoot = data.randomBytes32();
+    final BeaconState state = data.randomBeaconState(blockSlot);
+    final UInt64 proposerIndex = UInt64.valueOf(spec.getBeaconProposerIndex(state, blockSlot));
+    final Eth1Address feeRecipient = data.randomEth1Address();
+    assertThat(feeRecipient).isNotEqualTo(defaultFeeRecipient);
+    final SignedProposerPreferences preferences =
+        signedProposerPreferences(blockSlot, dependentRoot, proposerIndex, feeRecipient);
+    when(proposerPreferencesManager.getProposerPreferences(blockSlot, dependentRoot))
+        .thenReturn(Optional.of(preferences.getMessage()));
+    withShufflingDependentRoot(dependentRoot);
+
+    manager.updatePreparedProposersFromProposerPreferences(List.of(preferences), blockSlot);
+
+    assertThat(manager.isValidatorConnected(proposerIndex.intValue(), blockSlot)).isTrue();
+    // not mandatory: the accepted preferences are what makes this our proposal
+    assertThat(feeRecipientFor(state, blockSlot, false)).isEqualTo(feeRecipient);
+  }
+
+  @TestTemplate
+  void calculatePayloadBuildingAttributes_shouldSkipOurProposerWithoutAcceptedPreferences() {
+    final UInt64 blockSlot = UInt64.valueOf(16);
+    final Bytes32 dependentRoot = data.randomBytes32();
+    final BeaconState state = data.randomBeaconState(blockSlot);
+    final UInt64 proposerIndex = UInt64.valueOf(spec.getBeaconProposerIndex(state, blockSlot));
+    final SignedProposerPreferences preferences =
+        signedProposerPreferences(
+            blockSlot, dependentRoot, proposerIndex, data.randomEth1Address());
+    when(proposerPreferencesManager.getProposerPreferences(blockSlot, dependentRoot))
+        .thenReturn(Optional.of(preferences.getMessage()));
+    manager.updatePreparedProposersFromProposerPreferences(List.of(preferences), blockSlot);
+    assertThat(manager.isValidatorConnected(proposerIndex.intValue(), blockSlot)).isTrue();
+    // a reorg changed the shuffling dependent root after the preferences were accepted
+    withShufflingDependentRoot(data.randomBytes32());
+    final Bytes32 parentRoot = data.randomBytes32();
+    when(recentChainData.retrieveBlockState(new SlotAndBlockRoot(blockSlot, parentRoot)))
+        .thenReturn(SafeFuture.completedFuture(Optional.of(state)));
+
+    assertThat(
+            safeJoin(
+                calculate(
+                    blockSlot,
+                    forkChoiceUpdateData(ForkChoiceNode.createBase(parentRoot), blockSlot),
+                    false)))
+        .isEmpty();
+  }
+
+  @TestTemplate
+  void updatePreparedProposers_shouldNotUseFeeRecipientAcceptedForAnotherDependentRoot() {
+    final UInt64 blockSlot = UInt64.valueOf(16);
+    final Bytes32 dependentRoot = data.randomBytes32();
+    final BeaconState state = data.randomBeaconState(blockSlot);
+    final UInt64 proposerIndex = UInt64.valueOf(spec.getBeaconProposerIndex(state, blockSlot));
+    final Eth1Address feeRecipient = data.randomEth1Address();
+    assertThat(feeRecipient).isNotEqualTo(defaultFeeRecipient);
+    final SignedProposerPreferences preferences =
+        signedProposerPreferences(blockSlot, dependentRoot, proposerIndex, feeRecipient);
+    when(proposerPreferencesManager.getProposerPreferences(blockSlot, dependentRoot))
+        .thenReturn(Optional.of(preferences.getMessage()));
+    // a reorg changed the shuffling dependent root after the preferences were accepted
+    withShufflingDependentRoot(data.randomBytes32());
+
+    manager.updatePreparedProposersFromProposerPreferences(List.of(preferences), blockSlot);
+
+    assertThat(feeRecipientFor(state, blockSlot)).isEqualTo(defaultFeeRecipient);
+  }
+
+  @TestTemplate
+  void updatePreparedProposers_shouldIgnoreProposerPreferencesWhichWereNotAccepted() {
+    final UInt64 blockSlot = UInt64.valueOf(16);
+    final Bytes32 dependentRoot = data.randomBytes32();
+    final BeaconState state = data.randomBeaconState(blockSlot);
+    final UInt64 proposerIndex = UInt64.valueOf(spec.getBeaconProposerIndex(state, blockSlot));
+    final SignedProposerPreferences preferences =
+        signedProposerPreferences(
+            blockSlot, dependentRoot, proposerIndex, data.randomEth1Address());
+
+    manager.updatePreparedProposersFromProposerPreferences(List.of(preferences), blockSlot);
+
+    assertThat(manager.isValidatorConnected(proposerIndex.intValue(), blockSlot)).isFalse();
+  }
+
+  @TestTemplate
+  void updatePreparedProposers_shouldIgnoreProposerPreferencesWhichDifferFromTheAcceptedOnes() {
+    final UInt64 blockSlot = UInt64.valueOf(16);
+    final Bytes32 dependentRoot = data.randomBytes32();
+    final BeaconState state = data.randomBeaconState(blockSlot);
+    final UInt64 proposerIndex = UInt64.valueOf(spec.getBeaconProposerIndex(state, blockSlot));
+    final SignedProposerPreferences accepted =
+        signedProposerPreferences(
+            blockSlot, dependentRoot, proposerIndex, data.randomEth1Address());
+    // same proposal slot and dependent root, so the submission is only ignored as already seen
+    final SignedProposerPreferences submitted =
+        signedProposerPreferences(
+            blockSlot, dependentRoot, proposerIndex, data.randomEth1Address());
+    when(proposerPreferencesManager.getProposerPreferences(blockSlot, dependentRoot))
+        .thenReturn(Optional.of(accepted.getMessage()));
+
+    manager.updatePreparedProposersFromProposerPreferences(List.of(submitted), blockSlot);
+
+    assertThat(manager.isValidatorConnected(proposerIndex.intValue(), blockSlot)).isFalse();
+  }
+
+  @TestTemplate
+  void updatePreparedProposers_shouldIgnorePrepareBeaconProposerAfterGloas() {
+    final UInt64 blockSlot = UInt64.valueOf(16);
+    final BeaconState state = data.randomBeaconState(blockSlot);
+    final UInt64 proposerIndex = UInt64.valueOf(spec.getBeaconProposerIndex(state, blockSlot));
+    final Eth1Address feeRecipient = data.randomEth1Address();
+    assertThat(feeRecipient).isNotEqualTo(defaultFeeRecipient);
+
+    manager.updatePreparedProposersFromPrepareBeaconProposer(
+        List.of(new BeaconPreparableProposer(proposerIndex, feeRecipient)), blockSlot);
+
+    assertThat(feeRecipientFor(state, blockSlot)).isEqualTo(defaultFeeRecipient);
+  }
+
+  private Eth1Address feeRecipientFor(final BeaconState state, final UInt64 blockSlot) {
+    return feeRecipientFor(state, blockSlot, true);
+  }
+
+  private Eth1Address feeRecipientFor(
+      final BeaconState state, final UInt64 blockSlot, final boolean mandatory) {
+    final Bytes32 parentRoot = data.randomBytes32();
+    final ForkChoiceUpdateData forkChoiceUpdateData =
+        forkChoiceUpdateData(ForkChoiceNode.createBase(parentRoot), blockSlot);
+    when(recentChainData.retrieveBlockState(new SlotAndBlockRoot(blockSlot, parentRoot)))
+        .thenReturn(SafeFuture.completedFuture(Optional.of(state)));
+    return safeJoin(calculate(blockSlot, forkChoiceUpdateData, mandatory))
+        .orElseThrow()
+        .feeRecipient();
+  }
+
+  private void withShufflingDependentRoot(final Bytes32 dependentRoot) {
+    final ReadOnlyForkChoiceStrategy forkChoiceStrategy = mock(ReadOnlyForkChoiceStrategy.class);
+    when(forkChoiceStrategy.getAncestor(any(), any())).thenReturn(Optional.of(dependentRoot));
+    when(recentChainData.getForkChoiceStrategy()).thenReturn(Optional.of(forkChoiceStrategy));
+  }
+
+  private SignedProposerPreferences signedProposerPreferences(
+      final UInt64 proposalSlot,
+      final Bytes32 dependentRoot,
+      final UInt64 validatorIndex,
+      final Eth1Address feeRecipient) {
+    final SchemaDefinitionsGloas schemaDefinitions =
+        SchemaDefinitionsGloas.required(spec.atSlot(proposalSlot).getSchemaDefinitions());
+    return schemaDefinitions
+        .getSignedProposerPreferencesSchema()
+        .create(
+            schemaDefinitions
+                .getProposerPreferencesSchema()
+                .create(
+                    dependentRoot, proposalSlot, validatorIndex, feeRecipient, data.randomUInt64()),
+            data.randomSignature());
+  }
+
   private SafeFuture<Optional<PayloadBuildingAttributes>> calculate(
       final UInt64 blockSlot, final ForkChoiceUpdateData forkChoiceUpdateData) {
+    return calculate(blockSlot, forkChoiceUpdateData, true);
+  }
+
+  private SafeFuture<Optional<PayloadBuildingAttributes>> calculate(
+      final UInt64 blockSlot,
+      final ForkChoiceUpdateData forkChoiceUpdateData,
+      final boolean mandatory) {
     return eventThread.executeFuture(
         () ->
             manager.calculatePayloadBuildingAttributes(
-                blockSlot, true, forkChoiceUpdateData, true));
+                blockSlot, true, forkChoiceUpdateData, mandatory));
   }
 
   private void prepareLocalProposer(final BeaconState state, final UInt64 blockSlot) {

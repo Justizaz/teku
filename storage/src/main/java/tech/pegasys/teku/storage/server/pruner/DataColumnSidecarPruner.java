@@ -1,5 +1,5 @@
 /*
- * Copyright Consensys Software Inc., 2026
+ * Copyright (c) 2026 Consensys Incorporated. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with
  * the License. You may obtain a copy of the License at
@@ -30,6 +30,7 @@ import tech.pegasys.teku.infrastructure.unsigned.UInt64;
 import tech.pegasys.teku.service.serviceutils.Service;
 import tech.pegasys.teku.spec.Spec;
 import tech.pegasys.teku.spec.config.SpecConfigFulu;
+import tech.pegasys.teku.spec.logic.versions.fulu.helpers.MiscHelpersFulu;
 import tech.pegasys.teku.storage.server.Database;
 
 public class DataColumnSidecarPruner extends Service {
@@ -182,10 +183,16 @@ public class DataColumnSidecarPruner extends Service {
             .toVersionFulu()
             .map(SpecConfigFulu::getMinEpochsForDataColumnSidecarsRequests)
             .orElse(0);
-    if (custodyPeriodEpochs == 0) {
+    final Optional<MiscHelpersFulu> maybeMiscHelpersFulu =
+        spec.atEpoch(currentEpoch).miscHelpers().toVersionFulu();
+    if (custodyPeriodEpochs == 0 || maybeMiscHelpersFulu.isEmpty()) {
       return currentSlot;
     } else {
-      final UInt64 minCustodyEpoch = currentEpoch.minusMinZero(custodyPeriodEpochs + 1);
+      final UInt64 minCustodyEpoch =
+          maybeMiscHelpersFulu
+              .get()
+              .computeDataColumnSidecarRetentionStartEpoch(currentEpoch)
+              .minusMinZero(1);
       return spec.computeStartSlotAtEpoch(minCustodyEpoch);
     }
   }

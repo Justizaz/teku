@@ -1,5 +1,5 @@
 /*
- * Copyright Consensys Software Inc., 2026
+ * Copyright (c) 2026 Consensys Incorporated. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with
  * the License. You may obtain a copy of the License at
@@ -22,6 +22,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import tech.pegasys.teku.beaconrestapi.AbstractDataBackedRestAPIIntegrationTest;
 import tech.pegasys.teku.infrastructure.restapi.OpenApiTestUtil;
+import tech.pegasys.teku.spec.SpecMilestone;
 
 public class OpenApiIntegrationTest extends AbstractDataBackedRestAPIIntegrationTest {
   private JsonNode currentJsonNodes;
@@ -30,7 +31,7 @@ public class OpenApiIntegrationTest extends AbstractDataBackedRestAPIIntegration
 
   @BeforeEach
   public void setup() throws IOException {
-    startRestAPIAtGenesisWithHighestSupportedMilestone();
+    startRestAPIAtGenesis(SpecMilestone.GLOAS);
     currentJsonNodes = util.parseSwagger(getOpenApiDoc().body().string());
   }
 

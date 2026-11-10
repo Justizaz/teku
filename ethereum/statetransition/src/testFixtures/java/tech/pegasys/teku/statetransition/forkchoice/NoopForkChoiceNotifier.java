@@ -1,5 +1,5 @@
 /*
- * Copyright Consensys Software Inc., 2026
+ * Copyright (c) 2026 Consensys Incorporated. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with
  * the License. You may obtain a copy of the License at
@@ -44,6 +44,12 @@ public class NoopForkChoiceNotifier implements ForkChoiceNotifier {
   public SafeFuture<Optional<ExecutionPayloadContext>> getPayloadId(
       final ForkChoiceNode parentBeaconBlock, final UInt64 blockSlot) {
     return null;
+  }
+
+  @Override
+  public SafeFuture<Optional<ExecutionPayloadContext>> preparePayloadAttributes(
+      final ForkChoiceNode parentBeaconBlock, final UInt64 blockSlot) {
+    return getPayloadId(parentBeaconBlock, blockSlot);
   }
 
   @Override

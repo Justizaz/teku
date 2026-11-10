@@ -1,5 +1,5 @@
 /*
- * Copyright Consensys Software Inc., 2026
+ * Copyright (c) 2026 Consensys Incorporated. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with
  * the License. You may obtain a copy of the License at
@@ -38,6 +38,7 @@ import tech.pegasys.teku.spec.Spec;
 import tech.pegasys.teku.spec.SpecMilestone;
 import tech.pegasys.teku.spec.config.SpecConfig;
 import tech.pegasys.teku.spec.config.SpecConfigCapella;
+import tech.pegasys.teku.spec.config.SpecConfigEip8321;
 import tech.pegasys.teku.spec.config.SpecConfigElectra;
 import tech.pegasys.teku.spec.config.SpecConfigFulu;
 import tech.pegasys.teku.spec.datastructures.blobs.BlobKzgCommitmentsSchema;
@@ -70,6 +71,7 @@ import tech.pegasys.teku.spec.datastructures.operations.Attestation;
 import tech.pegasys.teku.spec.datastructures.operations.AttesterSlashing;
 import tech.pegasys.teku.spec.datastructures.operations.ProposerSlashing;
 import tech.pegasys.teku.spec.datastructures.operations.SignedBlsToExecutionChange;
+import tech.pegasys.teku.spec.datastructures.operations.SignedRandaoCommitmentRegistration;
 import tech.pegasys.teku.spec.datastructures.operations.SignedVoluntaryExit;
 import tech.pegasys.teku.spec.datastructures.state.beaconstate.BeaconState;
 import tech.pegasys.teku.spec.datastructures.state.beaconstate.BeaconStateCache;
@@ -99,6 +101,7 @@ public class BlockOperationSelectorFactory {
   private final OperationPool<ProposerSlashing> proposerSlashingPool;
   private final OperationPool<SignedVoluntaryExit> voluntaryExitPool;
   private final OperationPool<SignedBlsToExecutionChange> blsToExecutionChangePool;
+  private final OperationPool<SignedRandaoCommitmentRegistration> randaoCommitmentRegistrationPool;
   private final SyncCommitteeContributionPool contributionPool;
   private final PayloadAttestationPool payloadAttestationPool;
 
@@ -118,6 +121,7 @@ public class BlockOperationSelectorFactory {
       final OperationPool<ProposerSlashing> proposerSlashingPool,
       final OperationPool<SignedVoluntaryExit> voluntaryExitPool,
       final OperationPool<SignedBlsToExecutionChange> blsToExecutionChangePool,
+      final OperationPool<SignedRandaoCommitmentRegistration> randaoCommitmentRegistrationPool,
       final SyncCommitteeContributionPool contributionPool,
       final PayloadAttestationPool payloadAttestationPool,
       final DepositProvider depositProvider,
@@ -135,6 +139,7 @@ public class BlockOperationSelectorFactory {
     this.proposerSlashingPool = proposerSlashingPool;
     this.voluntaryExitPool = voluntaryExitPool;
     this.blsToExecutionChangePool = blsToExecutionChangePool;
+    this.randaoCommitmentRegistrationPool = randaoCommitmentRegistrationPool;
     this.contributionPool = contributionPool;
     this.payloadAttestationPool = payloadAttestationPool;
     this.depositProvider = depositProvider;
@@ -202,8 +207,6 @@ public class BlockOperationSelectorFactory {
       } else {
         setExecutionPayloadBid = COMPLETE;
       }
-
-      final Eth1Data eth1Data = eth1DataCache.getEth1Vote(blockSlotState);
 
       final BeaconState attestationRewardState =
           spec.getStateForAttestationRewardCalculation(
@@ -292,12 +295,22 @@ public class BlockOperationSelectorFactory {
 
       bodyBuilder
           .randaoReveal(blockProductionContext.randaoReveal())
-          .eth1Data(eth1Data)
           .graffiti(graffitiBuilder.buildGraffiti(blockProductionContext.graffiti()))
           .attestations(attestations)
           .proposerSlashings(proposerSlashings)
-          .attesterSlashings(attesterSlashings)
-          .deposits(depositProvider.getDeposits(blockSlotState, eth1Data));
+          .attesterSlashings(attesterSlashings);
+
+      if (bodyBuilder.supportsHashChainReveal()) {
+        blockProductionContext.hashChainReveal().ifPresent(bodyBuilder::hashChainReveal);
+      }
+
+      // Pre-Heze: Eth1 data vote and deposits (removed by EIP-8015)
+      if (bodyBuilder.supportsEth1DataAndDeposits()) {
+        final Eth1Data eth1Data = eth1DataCache.getEth1Vote(blockSlotState);
+        bodyBuilder
+            .eth1Data(eth1Data)
+            .deposits(depositProvider.getDeposits(blockSlotState, eth1Data));
+      }
 
       // Optional fields introduced in later forks
 
@@ -313,6 +326,14 @@ public class BlockOperationSelectorFactory {
             blsToExecutionChangePool.getItemsForBlock(
                 blockSlotState,
                 SpecConfigCapella.required(specConfig).getMaxBlsToExecutionChanges()));
+      }
+
+      // Post-EIP-8321: RANDAO commitment registration
+      if (bodyBuilder.supportsRandaoCommitmentRegistrations()) {
+        bodyBuilder.randaoCommitmentRegistrations(
+            randaoCommitmentRegistrationPool.getItemsForBlock(
+                blockSlotState,
+                SpecConfigEip8321.required(specConfig).getMaxRandaoCommitmentRegistrations()));
       }
 
       // Post-Gloas: Payload Attestations

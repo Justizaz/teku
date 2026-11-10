@@ -1,5 +1,5 @@
 /*
- * Copyright Consensys Software Inc., 2026
+ * Copyright (c) 2026 Consensys Incorporated. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with
  * the License. You may obtain a copy of the License at
@@ -37,6 +37,7 @@ import tech.pegasys.teku.spec.config.builder.CapellaBuilder;
 import tech.pegasys.teku.spec.config.builder.DenebBuilder;
 import tech.pegasys.teku.spec.config.builder.ElectraBuilder;
 import tech.pegasys.teku.spec.config.builder.FuluBuilder;
+import tech.pegasys.teku.spec.config.builder.HezeBuilder;
 import tech.pegasys.teku.spec.config.builder.SpecConfigBuilder;
 import tech.pegasys.teku.spec.datastructures.util.ForkAndSpecMilestone;
 import tech.pegasys.teku.spec.util.DataStructureUtil;
@@ -53,7 +54,8 @@ class SpecConfigBuilderTest {
           CapellaBuilder.class,
           DenebBuilder.class,
           ElectraBuilder.class,
-          FuluBuilder.class);
+          FuluBuilder.class,
+          HezeBuilder.class);
 
   /**
    * Ensures Builders have actually non-primitive setters, because primitive setters are silently

@@ -1,5 +1,5 @@
 /*
- * Copyright Consensys Software Inc., 2026
+ * Copyright (c) 2026 Consensys Incorporated. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with
  * the License. You may obtain a copy of the License at
@@ -18,6 +18,7 @@ import tech.pegasys.teku.spec.datastructures.operations.AttestationData;
 import tech.pegasys.teku.spec.datastructures.operations.AttesterSlashing;
 import tech.pegasys.teku.spec.datastructures.operations.BlsToExecutionChange;
 import tech.pegasys.teku.spec.datastructures.operations.ProposerSlashing;
+import tech.pegasys.teku.spec.datastructures.operations.RandaoCommitmentRegistration;
 import tech.pegasys.teku.spec.datastructures.operations.SignedVoluntaryExit;
 import tech.pegasys.teku.spec.datastructures.state.Fork;
 import tech.pegasys.teku.spec.datastructures.state.beaconstate.BeaconState;
@@ -47,4 +48,11 @@ public interface OperationValidator {
 
   Optional<OperationInvalidReason> validateBlsToExecutionChange(
       Fork fork, BeaconState state, BlsToExecutionChange blsToExecutionChange);
+
+  default Optional<OperationInvalidReason> validateRandaoCommitmentRegistration(
+      final Fork fork,
+      final BeaconState state,
+      final RandaoCommitmentRegistration randaoCommitmentRegistration) {
+    return Optional.of(() -> "Randao commitment registrations are not valid before EIP-8321 fork");
+  }
 }

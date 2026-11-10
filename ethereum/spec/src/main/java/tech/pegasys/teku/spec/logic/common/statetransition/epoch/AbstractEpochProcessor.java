@@ -1,5 +1,5 @@
 /*
- * Copyright Consensys Software Inc., 2026
+ * Copyright (c) 2026 Consensys Incorporated. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with
  * the License. You may obtain a copy of the License at
@@ -124,6 +124,7 @@ public abstract class AbstractEpochProcessor implements EpochProcessor {
     processInactivityUpdates(state, validatorStatuses);
     processRewardsAndPenalties(state, validatorStatuses);
     processRegistryUpdates(state, validatorStatuses.getStatuses());
+    processPendingRandaoCommitments(state);
     processSlashings(state, validatorStatuses);
     processEth1DataReset(state);
     processPendingDeposits(state);
@@ -568,6 +569,11 @@ public abstract class AbstractEpochProcessor implements EpochProcessor {
     state
         .getRandaoMixes()
         .setElement(randaoIndex, beaconStateAccessors.getRandaoMix(state, currentEpoch));
+  }
+
+  @Override
+  public void processPendingRandaoCommitments(final MutableBeaconState state) {
+    // Default implementation does nothing
   }
 
   @Override

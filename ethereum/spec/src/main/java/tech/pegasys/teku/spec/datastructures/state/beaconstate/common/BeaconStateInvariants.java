@@ -1,5 +1,5 @@
 /*
- * Copyright Consensys Software Inc., 2026
+ * Copyright (c) 2026 Consensys Incorporated. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with
  * the License. You may obtain a copy of the License at
@@ -104,18 +104,23 @@ public class BeaconStateInvariants {
             .add("latest_block_header", state.getLatestBlockHeader())
             .add("block_roots", state.getBlockRoots())
             .add("state_roots", state.getStateRoots())
-            .add("historical_roots", state.getHistoricalRoots())
-            .add("eth1_data", state.getEth1Data())
-            .add("eth1_data_votes", state.getEth1DataVotes())
-            .add("eth1_deposit_index", state.getEth1DepositIndex())
-            .add("validators", state.getValidators())
-            .add("balances", state.getBalances())
-            .add("randao_mixes", state.getRandaoMixes())
-            .add("slashings", state.getSlashings())
-            .add("justification_bits", state.getJustificationBits())
-            .add("previous_justified_checkpoint", state.getPreviousJustifiedCheckpoint())
-            .add("current_justified_checkpoint", state.getCurrentJustifiedCheckpoint())
-            .add("finalized_checkpoint", state.getFinalizedCheckpoint());
+            .add("historical_roots", state.getHistoricalRoots());
+    // The Eth1 fields were removed in Heze (EIP-8015)
+    if (state.getSchema().getFieldIndex(BeaconStateFields.ETH1_DATA) >= 0) {
+      builder
+          .add("eth1_data", state.getEth1Data())
+          .add("eth1_data_votes", state.getEth1DataVotes())
+          .add("eth1_deposit_index", state.getEth1DepositIndex());
+    }
+    builder
+        .add("validators", state.getValidators())
+        .add("balances", state.getBalances())
+        .add("randao_mixes", state.getRandaoMixes())
+        .add("slashings", state.getSlashings())
+        .add("justification_bits", state.getJustificationBits())
+        .add("previous_justified_checkpoint", state.getPreviousJustifiedCheckpoint())
+        .add("current_justified_checkpoint", state.getCurrentJustifiedCheckpoint())
+        .add("finalized_checkpoint", state.getFinalizedCheckpoint());
 
     modifier.accept(builder);
     return builder.toString();

@@ -1,5 +1,5 @@
 /*
- * Copyright Consensys Software Inc., 2026
+ * Copyright (c) 2026 Consensys Incorporated. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with
  * the License. You may obtain a copy of the License at
@@ -43,9 +43,13 @@ import tech.pegasys.teku.spec.datastructures.epbs.versions.gloas.SignedExecution
 import tech.pegasys.teku.spec.datastructures.epbs.versions.gloas.SignedExecutionPayloadEnvelope;
 import tech.pegasys.teku.spec.datastructures.epbs.versions.gloas.SignedProposerPreferences;
 import tech.pegasys.teku.spec.datastructures.execution.ExecutionProof;
+import tech.pegasys.teku.spec.datastructures.execution.versions.heze.SignedInclusionList;
+import tech.pegasys.teku.spec.datastructures.lightclient.LightClientFinalityUpdate;
+import tech.pegasys.teku.spec.datastructures.lightclient.LightClientOptimisticUpdate;
 import tech.pegasys.teku.spec.datastructures.operations.AttesterSlashing;
 import tech.pegasys.teku.spec.datastructures.operations.ProposerSlashing;
 import tech.pegasys.teku.spec.datastructures.operations.SignedBlsToExecutionChange;
+import tech.pegasys.teku.spec.datastructures.operations.SignedRandaoCommitmentRegistration;
 import tech.pegasys.teku.spec.datastructures.operations.SignedVoluntaryExit;
 import tech.pegasys.teku.spec.datastructures.operations.versions.altair.SignedContributionAndProof;
 import tech.pegasys.teku.spec.datastructures.operations.versions.altair.ValidatableSyncCommitteeMessage;
@@ -266,6 +270,14 @@ public class GossipForkManager {
         GossipForkSubscriptions::publishSignedBlsToExecutionChangeMessage);
   }
 
+  public void publishRandaoCommitmentRegistration(final SignedRandaoCommitmentRegistration message) {
+    publishMessage(
+            spec.computeStartSlotAtEpoch(currentEpoch.orElseThrow()),
+            message,
+            "RANDAO commitment registration",
+            GossipForkSubscriptions::publishRandaoCommitmentRegistration);
+  }
+
   public void publishPayloadAttestationMessage(final PayloadAttestationMessage message) {
     publishMessage(
         message.getData().getSlot(),
@@ -288,6 +300,30 @@ public class GossipForkManager {
         message,
         "proposer preferences",
         GossipForkSubscriptions::publishProposerPreferences);
+  }
+
+  public void publishInclusionList(final SignedInclusionList signedInclusionList) {
+    publishMessage(
+        signedInclusionList.getMessage().getSlot(),
+        signedInclusionList,
+        "inclusion list",
+        GossipForkSubscriptions::publishSignedInclusionList);
+  }
+
+  public void publishLightClientFinalityUpdate(final LightClientFinalityUpdate message) {
+    publishMessage(
+        message.getAttestedHeader().getBeacon().getSlot(),
+        message,
+        "light client finality update",
+        GossipForkSubscriptions::publishLightClientFinalityUpdate);
+  }
+
+  public void publishLightClientOptimisticUpdate(final LightClientOptimisticUpdate message) {
+    publishMessage(
+        message.getAttestedHeader().getBeacon().getSlot(),
+        message,
+        "light client optimistic update",
+        GossipForkSubscriptions::publishLightClientOptimisticUpdate);
   }
 
   private synchronized <T> void publishMessage(

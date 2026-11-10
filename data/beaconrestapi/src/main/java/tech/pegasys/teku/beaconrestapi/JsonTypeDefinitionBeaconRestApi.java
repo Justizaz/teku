@@ -1,5 +1,5 @@
 /*
- * Copyright Consensys Software Inc., 2026
+ * Copyright (c) 2026 Consensys Incorporated. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with
  * the License. You may obtain a copy of the License at
@@ -26,6 +26,7 @@ import tech.pegasys.teku.beaconrestapi.addon.CapellaRestApiBuilderAddon;
 import tech.pegasys.teku.beaconrestapi.addon.DenebRestApiBuilderAddon;
 import tech.pegasys.teku.beaconrestapi.addon.FuluRestApiBuilderAddon;
 import tech.pegasys.teku.beaconrestapi.addon.GloasRestApiBuilderAddon;
+import tech.pegasys.teku.beaconrestapi.addon.HezeRestApiBuilderAddon;
 import tech.pegasys.teku.beaconrestapi.addon.LightClientRestApiBuilderAddon;
 import tech.pegasys.teku.beaconrestapi.handlers.tekuv1.admin.AddPeer;
 import tech.pegasys.teku.beaconrestapi.handlers.tekuv1.admin.Liveness;
@@ -74,6 +75,7 @@ import tech.pegasys.teku.beaconrestapi.handlers.v1.beacon.PostAttesterSlashing;
 import tech.pegasys.teku.beaconrestapi.handlers.v1.beacon.PostBlindedBlock;
 import tech.pegasys.teku.beaconrestapi.handlers.v1.beacon.PostBlock;
 import tech.pegasys.teku.beaconrestapi.handlers.v1.beacon.PostProposerSlashing;
+import tech.pegasys.teku.beaconrestapi.handlers.v1.beacon.PostSignedRandaoCommitmentRegistration;
 import tech.pegasys.teku.beaconrestapi.handlers.v1.beacon.PostStateValidatorBalances;
 import tech.pegasys.teku.beaconrestapi.handlers.v1.beacon.PostStateValidatorIdentities;
 import tech.pegasys.teku.beaconrestapi.handlers.v1.beacon.PostStateValidators;
@@ -259,6 +261,7 @@ public class JsonTypeDefinitionBeaconRestApi implements BeaconRestApi {
             .endpoint(new GetAttestationsV2(dataProvider, schemaCache))
             .endpoint(new PostAttestation(dataProvider, schemaCache))
             .endpoint(new PostAttestationsV2(dataProvider, spec, schemaCache))
+            .endpoint(new PostSignedRandaoCommitmentRegistration(dataProvider))
             .endpoint(new GetAttesterSlashings(dataProvider, schemaCache))
             .endpoint(new GetAttesterSlashingsV2(dataProvider, schemaCache))
             .endpoint(new PostAttesterSlashing(dataProvider, schemaCache))
@@ -277,6 +280,7 @@ public class JsonTypeDefinitionBeaconRestApi implements BeaconRestApi {
             .endpoint(
                 new GetEvents(
                     spec,
+                    schemaCache,
                     dataProvider,
                     eventChannels,
                     asyncRunner,
@@ -363,6 +367,7 @@ public class JsonTypeDefinitionBeaconRestApi implements BeaconRestApi {
             new DenebRestApiBuilderAddon(spec, dataProvider, schemaCache),
             new FuluRestApiBuilderAddon(spec, dataProvider, schemaCache),
             new GloasRestApiBuilderAddon(spec, dataProvider, schemaCache),
+            new HezeRestApiBuilderAddon(spec, dataProvider, schemaCache),
             new LightClientRestApiBuilderAddon(config, dataProvider, schemaCache));
 
     RestApiBuilder builderUpdated = builder;

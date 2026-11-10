@@ -1,5 +1,5 @@
 /*
- * Copyright Consensys Software Inc., 2026
+ * Copyright (c) 2026 Consensys Incorporated. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with
  * the License. You may obtain a copy of the License at
@@ -41,6 +41,7 @@ import tech.pegasys.teku.spec.logic.common.util.ValidatorsUtil;
 import tech.pegasys.teku.spec.logic.common.weaksubjectivity.WeakSubjectivityCalculator;
 import tech.pegasys.teku.spec.logic.common.withdrawals.WithdrawalsHelpers;
 import tech.pegasys.teku.spec.logic.versions.bellatrix.helpers.BellatrixTransitionHelpers;
+import tech.pegasys.teku.spec.logic.versions.heze.util.InclusionListUtil;
 
 public class DelegatingSpecLogic implements SpecLogic {
   private final SpecLogic specLogic;
@@ -97,6 +98,11 @@ public class DelegatingSpecLogic implements SpecLogic {
   @Override
   public Optional<BlindBlockUtil> getBlindBlockUtil() {
     return specLogic.getBlindBlockUtil();
+  }
+
+  @Override
+  public Optional<InclusionListUtil> getInclusionListUtil() {
+    return specLogic.getInclusionListUtil();
   }
 
   @Override

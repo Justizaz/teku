@@ -1,5 +1,5 @@
 /*
- * Copyright Consensys Software Inc., 2026
+ * Copyright (c) 2026 Consensys Incorporated. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with
  * the License. You may obtain a copy of the License at
@@ -15,6 +15,7 @@ package tech.pegasys.teku.spec.logic.common.helpers;
 
 import static com.google.common.base.Preconditions.checkArgument;
 import static tech.pegasys.teku.infrastructure.crypto.Hash.getSha256Instance;
+import static tech.pegasys.teku.infrastructure.time.TimeUtilities.millisToSeconds;
 import static tech.pegasys.teku.infrastructure.time.TimeUtilities.secondsToMillis;
 import static tech.pegasys.teku.spec.config.SpecConfig.FAR_FUTURE_EPOCH;
 import static tech.pegasys.teku.spec.logic.common.helpers.MathHelpers.bytesToUInt64;
@@ -58,6 +59,7 @@ import tech.pegasys.teku.spec.logic.versions.deneb.types.VersionedHash;
 import tech.pegasys.teku.spec.logic.versions.electra.helpers.MiscHelpersElectra;
 import tech.pegasys.teku.spec.logic.versions.fulu.helpers.MiscHelpersFulu;
 import tech.pegasys.teku.spec.logic.versions.gloas.helpers.MiscHelpersGloas;
+import tech.pegasys.teku.spec.logic.versions.heze.helpers.MiscHelpersHeze;
 
 public class MiscHelpers {
 
@@ -74,7 +76,9 @@ public class MiscHelpers {
 
   // compute_fork_version
   public Bytes4 computeForkVersion(final UInt64 epoch) {
-    if (epoch.isGreaterThanOrEqualTo(specConfig.getHezeForkEpoch())) {
+    if (epoch.isGreaterThanOrEqualTo(specConfig.getEip8321ForkEpoch())) {
+      return specConfig.getEip8321ForkVersion();
+    } else if (epoch.isGreaterThanOrEqualTo(specConfig.getHezeForkEpoch())) {
       return specConfig.getHezeForkVersion();
     } else if (epoch.isGreaterThanOrEqualTo(specConfig.getGloasForkEpoch())) {
       return specConfig.getGloasForkVersion();
@@ -174,32 +178,76 @@ public class MiscHelpers {
     return computeStartSlotAtEpoch(epoch.plus(1)).minusMinZero(1);
   }
 
-  // this doesn't appear to be in spec, but named consistently with compute_timestamp_at_slot
+  // get_slot_duration_ms
+  public int getSlotDurationMillis(final UInt64 epoch) {
+    final UInt64 hezeForkEpoch = specConfig.getHezeForkEpoch();
+    if (!hezeForkEpoch.equals(FAR_FUTURE_EPOCH) && epoch.isGreaterThanOrEqualTo(hezeForkEpoch)) {
+      return specConfig.getSlotDurationMsHeze();
+    }
+    return specConfig.getSlotDurationMillis();
+  }
+
+  /**
+   * EIP-8198: whether the slot duration changes at the Heze fork. When it does not, every slot has
+   * the same duration and the time conversions below are linear from genesis.
+   */
+  private boolean hasSlotDurationChange() {
+    return !specConfig.getHezeForkEpoch().equals(FAR_FUTURE_EPOCH)
+        && specConfig.getSlotDurationMsHeze() != specConfig.getSlotDurationMillis();
+  }
+
+  // compute_slot_at_time
   public UInt64 computeSlotAtTime(final UInt64 genesisTime, final UInt64 currentTime) {
     if (currentTime.isLessThan(genesisTime)) {
       return UInt64.ZERO;
     }
+    if (hasSlotDurationChange()) {
+      return computeSlotAtTimeMillis(secondsToMillis(genesisTime), secondsToMillis(currentTime));
+    }
     return currentTime.minusMinZero(genesisTime).dividedBy(specConfig.getSecondsPerSlot());
   }
 
+  // compute_slot_at_time_ms
   public UInt64 computeSlotAtTimeMillis(
       final UInt64 genesisTimeMillis, final UInt64 currentTimeMillis) {
     if (currentTimeMillis.isLessThan(genesisTimeMillis)) {
       return UInt64.ZERO;
     }
-    return currentTimeMillis.minus(genesisTimeMillis).dividedBy(specConfig.getSlotDurationMillis());
+    final UInt64 elapsedMillis = currentTimeMillis.minus(genesisTimeMillis);
+    if (!hasSlotDurationChange()) {
+      return elapsedMillis.dividedBy(specConfig.getSlotDurationMillis());
+    }
+    final UInt64 forkSlot = computeStartSlotAtEpoch(specConfig.getHezeForkEpoch());
+    final UInt64 forkOffsetMillis = forkSlot.times(specConfig.getSlotDurationMillis());
+    if (elapsedMillis.isLessThan(forkOffsetMillis)) {
+      return elapsedMillis.dividedBy(specConfig.getSlotDurationMillis());
+    }
+    return forkSlot.plus(
+        elapsedMillis.minus(forkOffsetMillis).dividedBy(specConfig.getSlotDurationMsHeze()));
   }
 
   // compute_time_at_slot, spec function takes state, but otherwise the same.
   public UInt64 computeTimeAtSlot(final UInt64 genesisTime, final UInt64 slot) {
+    if (hasSlotDurationChange()) {
+      return millisToSeconds(computeTimeMillisAtSlot(secondsToMillis(genesisTime), slot));
+    }
     final UInt64 slotsSinceGenesis = slot.minus(SpecConfig.GENESIS_SLOT);
     return genesisTime.plus(slotsSinceGenesis.times(specConfig.getSecondsPerSlot()));
   }
 
-  // compute_time_at_slot - milliseconds version
+  // compute_time_at_slot_ms
   public UInt64 computeTimeMillisAtSlot(final UInt64 genesisTimeMillis, final UInt64 slot) {
     final UInt64 slotsSinceGenesis = slot.minus(SpecConfig.GENESIS_SLOT);
-    return genesisTimeMillis.plus(slotsSinceGenesis.times(specConfig.getSlotDurationMillis()));
+    if (!hasSlotDurationChange()) {
+      return genesisTimeMillis.plus(slotsSinceGenesis.times(specConfig.getSlotDurationMillis()));
+    }
+    final UInt64 forkSlot = computeStartSlotAtEpoch(specConfig.getHezeForkEpoch());
+    if (slotsSinceGenesis.isLessThanOrEqualTo(forkSlot)) {
+      return genesisTimeMillis.plus(slotsSinceGenesis.times(specConfig.getSlotDurationMillis()));
+    }
+    return genesisTimeMillis
+        .plus(forkSlot.times(specConfig.getSlotDurationMillis()))
+        .plus(slotsSinceGenesis.minus(forkSlot).times(specConfig.getSlotDurationMsHeze()));
   }
 
   /**
@@ -538,6 +586,10 @@ public class MiscHelpers {
     return false;
   }
 
+  public boolean isInclusionListAvailable() {
+    return false;
+  }
+
   // Methods used by the SlotProcessor to determine if it needs to increase the node slot
   public boolean shouldIncrementNodeSlotWhenAttestationsAreDue() {
     return true;
@@ -564,6 +616,10 @@ public class MiscHelpers {
   }
 
   public Optional<MiscHelpersGloas> toVersionGloas() {
+    return Optional.empty();
+  }
+
+  public Optional<MiscHelpersHeze> toVersionHeze() {
     return Optional.empty();
   }
 }

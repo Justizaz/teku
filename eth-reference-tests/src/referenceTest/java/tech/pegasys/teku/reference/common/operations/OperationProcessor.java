@@ -1,5 +1,5 @@
 /*
- * Copyright Consensys Software Inc., 2026
+ * Copyright (c) 2026 Consensys Incorporated. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with
  * the License. You may obtain a copy of the License at
@@ -27,11 +27,13 @@ import tech.pegasys.teku.spec.datastructures.execution.versions.electra.DepositR
 import tech.pegasys.teku.spec.datastructures.execution.versions.electra.WithdrawalRequest;
 import tech.pegasys.teku.spec.datastructures.execution.versions.gloas.BuilderDepositRequest;
 import tech.pegasys.teku.spec.datastructures.execution.versions.gloas.BuilderExitRequest;
+import tech.pegasys.teku.spec.datastructures.execution.versions.heze.InclusionList;
 import tech.pegasys.teku.spec.datastructures.operations.Attestation;
 import tech.pegasys.teku.spec.datastructures.operations.AttesterSlashing;
 import tech.pegasys.teku.spec.datastructures.operations.Deposit;
 import tech.pegasys.teku.spec.datastructures.operations.ProposerSlashing;
 import tech.pegasys.teku.spec.datastructures.operations.SignedBlsToExecutionChange;
+import tech.pegasys.teku.spec.datastructures.operations.SignedRandaoCommitmentRegistration;
 import tech.pegasys.teku.spec.datastructures.operations.SignedVoluntaryExit;
 import tech.pegasys.teku.spec.datastructures.state.beaconstate.MutableBeaconState;
 import tech.pegasys.teku.spec.logic.common.statetransition.exceptions.BlockProcessingException;
@@ -62,7 +64,8 @@ public interface OperationProcessor {
   void processExecutionPayload(
       MutableBeaconState state,
       BeaconBlockBody beaconBlockBody,
-      Optional<? extends OptimisticExecutionPayloadExecutor> payloadExecutor)
+      Optional<? extends OptimisticExecutionPayloadExecutor> payloadExecutor,
+      Optional<List<InclusionList>> inclusionLists)
       throws BlockProcessingException;
 
   void processBlsToExecutionChange(
@@ -95,4 +98,12 @@ public interface OperationProcessor {
       MutableBeaconState state, List<BuilderDepositRequest> depositRequest);
 
   void processBuilderExitRequest(MutableBeaconState state, List<BuilderExitRequest> depositRequest);
+
+  void processRandaoCommitmentRegistration(
+      MutableBeaconState state, SignedRandaoCommitmentRegistration registration)
+      throws BlockProcessingException;
+
+  void processRandao(
+      MutableBeaconState state, BeaconBlock block)
+      throws BlockProcessingException;
 }

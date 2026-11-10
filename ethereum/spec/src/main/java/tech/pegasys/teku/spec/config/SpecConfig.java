@@ -1,5 +1,5 @@
 /*
- * Copyright Consensys Software Inc., 2026
+ * Copyright (c) 2026 Consensys Incorporated. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with
  * the License. You may obtain a copy of the License at
@@ -77,6 +77,10 @@ public interface SpecConfig extends NetworkingSpecConfig {
 
   UInt64 getHezeForkEpoch();
 
+  Bytes4 getEip8321ForkVersion();
+
+  UInt64 getEip8321ForkEpoch();
+
   // Config: Time parameters
   int getSecondsPerSlot();
 
@@ -87,6 +91,9 @@ public interface SpecConfig extends NetworkingSpecConfig {
   int getAggregateDueBps();
 
   int getSlotDurationMillis();
+
+  /** EIP-8198: the slot duration from {@link #getHezeForkEpoch()}. */
+  int getSlotDurationMsHeze();
 
   int getSecondsPerEth1Block();
 
@@ -244,6 +251,10 @@ public interface SpecConfig extends NetworkingSpecConfig {
   }
 
   default Optional<SpecConfigHeze> toVersionHeze() {
+    return Optional.empty();
+  }
+
+  default Optional<SpecConfigEip8321> toVersionEip8321() {
     return Optional.empty();
   }
 

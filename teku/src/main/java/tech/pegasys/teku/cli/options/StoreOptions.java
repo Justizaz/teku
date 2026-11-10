@@ -1,5 +1,5 @@
 /*
- * Copyright Consensys Software Inc., 2026
+ * Copyright (c) 2026 Consensys Incorporated. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with
  * the License. You may obtain a copy of the License at
@@ -38,6 +38,14 @@ public class StoreOptions {
 
   @Option(
       hidden = true,
+      names = {"--Xstore-inclusion-list-cache-size"},
+      paramLabel = "<INTEGER>",
+      description = "Number of inclusion lists to cache in memory",
+      arity = "1")
+  private int inclusionListCacheSize = StoreConfig.DEFAULT_INCLUSION_LIST_CACHE_SIZE;
+
+  @Option(
+      hidden = true,
       names = {"--Xstore-state-cache-size"},
       paramLabel = "<INTEGER>",
       description = "Number of states to cache in memory",
@@ -73,6 +81,7 @@ public class StoreOptions {
         b ->
             b.hotStatePersistenceFrequencyInEpochs(hotStatePersistenceFrequencyInEpochs)
                 .blockCacheSize(blockCacheSize)
+                .inclusionListCacheSize(inclusionListCacheSize)
                 .stateCacheSize(stateCacheSize)
                 .epochStateCacheSize(epochStateCacheSize)
                 .checkpointStateCacheSize(checkpointStateCacheSize)

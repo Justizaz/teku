@@ -1,5 +1,5 @@
 /*
- * Copyright Consensys Software Inc., 2026
+ * Copyright (c) 2026 Consensys Incorporated. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with
  * the License. You may obtain a copy of the License at
@@ -33,14 +33,17 @@ import tech.pegasys.teku.infrastructure.restapi.StubRestApiRequest;
 import tech.pegasys.teku.infrastructure.time.StubTimeProvider;
 import tech.pegasys.teku.spec.Spec;
 import tech.pegasys.teku.spec.TestSpecFactory;
+import tech.pegasys.teku.spec.schemas.SchemaDefinitionCache;
 
 class GetEventsTest {
 
   private final Spec spec = TestSpecFactory.createDefault();
+  private final SchemaDefinitionCache schemaDefinitionCache = new SchemaDefinitionCache(spec);
 
   private final GetEvents handler =
       new GetEvents(
           spec,
+          schemaDefinitionCache,
           mock(NodeDataProvider.class),
           mock(ChainDataProvider.class),
           mock(SyncDataProvider.class),

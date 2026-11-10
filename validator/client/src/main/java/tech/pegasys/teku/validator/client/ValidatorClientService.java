@@ -1,5 +1,5 @@
 /*
- * Copyright Consensys Software Inc., 2026
+ * Copyright (c) 2026 Consensys Incorporated. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with
  * the License. You may obtain a copy of the License at
@@ -68,9 +68,11 @@ import tech.pegasys.teku.validator.client.duties.attestations.AttestationDutyFac
 import tech.pegasys.teku.validator.client.duties.attestations.AttestationProductionDuty;
 import tech.pegasys.teku.validator.client.duties.execution.ExecutionPayloadBidEventsChannel;
 import tech.pegasys.teku.validator.client.duties.execution.ExecutionPayloadDuty;
+import tech.pegasys.teku.validator.client.duties.inclusionlists.InclusionListDutyFactory;
 import tech.pegasys.teku.validator.client.duties.payloadattestations.PayloadAttestationDutyFactory;
 import tech.pegasys.teku.validator.client.duties.synccommittee.ChainHeadTracker;
 import tech.pegasys.teku.validator.client.duties.synccommittee.SyncCommitteeScheduledDuties;
+import tech.pegasys.teku.validator.client.hashchain.HashChainStore;
 import tech.pegasys.teku.validator.client.loader.HttpClientExternalSignerFactory;
 import tech.pegasys.teku.validator.client.loader.OwnedValidators;
 import tech.pegasys.teku.validator.client.loader.PublicKeyLoader;
@@ -300,7 +302,10 @@ public class ValidatorClientService extends Service {
                   .runAsync(
                       () ->
                           validatorClientService.scheduleValidatorsDuties(
-                              config, validatorApiChannel, asyncRunner))
+                              services.getDataDirLayout(),
+                              config,
+                              validatorApiChannel,
+                              asyncRunner))
                   .propagateTo(validatorClientService.initializationComplete);
               return SafeFuture.COMPLETE;
             })
@@ -463,6 +468,7 @@ public class ValidatorClientService extends Service {
   }
 
   private void scheduleValidatorsDuties(
+      final DataDirLayout dataDirLayout,
       final ValidatorClientConfiguration config,
       final ValidatorApiChannel validatorApiChannel,
       final AsyncRunner asyncRunner) {
@@ -470,9 +476,17 @@ public class ValidatorClientService extends Service {
     final OwnedValidators validators = validatorLoader.getOwnedValidators();
     final BlockContainerSigner blockContainerSigner = new MilestoneBasedBlockContainerSigner(spec);
     final ValidatorDutyMetrics validatorDutyMetrics = ValidatorDutyMetrics.create(metricsSystem);
-    final BuilderConfigProvider builderConfigProvider =
-        new BuilderConfigProvider(spec, config.getValidatorConfig());
-    validatorTimingChannels.add(builderConfigProvider);
+    final BuilderConfigProvider builderConfigProvider;
+    if (spec.isMilestoneSupported(SpecMilestone.GLOAS)) {
+      final DefaultBuilderConfigProvider builderConfigProviderImpl =
+          new DefaultBuilderConfigProvider(spec, proposerConfigManager.orElseThrow());
+      validatorTimingChannels.add(builderConfigProviderImpl);
+      builderConfigProvider = builderConfigProviderImpl;
+    } else {
+      builderConfigProvider = BuilderConfigProvider.NOOP;
+    }
+    final Optional<HashChainStore> hashChainStore =
+        Optional.of(HashChainStore.fromDataDirLayout(dataDirLayout));
     final BlockDutyFactory blockDutyFactory =
         new BlockDutyFactory(
             forkProvider,
@@ -481,7 +495,8 @@ public class ValidatorClientService extends Service {
             spec,
             validatorDutyMetrics,
             eventChannels.getPublisher(ExecutionPayloadBidEventsChannel.class),
-            builderConfigProvider);
+            builderConfigProvider,
+            hashChainStore);
     final boolean dvtSelectionsEndpointEnabled =
         config.getValidatorConfig().isDvtSelectionsEndpointEnabled();
     final AttestationDutyFactory attestationDutyFactory =
@@ -585,6 +600,27 @@ public class ValidatorClientService extends Service {
       validatorRegistrator.ifPresent(validatorTimingChannels::add);
     }
 
+    if (spec.isMilestoneSupported(SpecMilestone.HEZE)) {
+      final InclusionListDutyFactory inclusionListDutyFactory =
+          new InclusionListDutyFactory(
+              spec, forkProvider, validatorApiChannel, validatorDutyMetrics);
+      final DutyLoader<?> inclusionListDutyLoader =
+          new RetryingDutyLoader<>(
+              asyncRunner,
+              timeProvider,
+              new InclusionListDutyLoader(
+                  validatorApiChannel,
+                  dependentRoot ->
+                      new SlotBasedScheduledDuties<>(
+                          inclusionListDutyFactory,
+                          dependentRoot,
+                          validatorDutyMetrics::performDutyWithMetrics),
+                  validators,
+                  validatorIndexProvider));
+      validatorTimingChannels.add(
+          new InclusionListDutyScheduler(metricsSystem, inclusionListDutyLoader, spec));
+    }
+
     if (spec.isMilestoneSupported(SpecMilestone.GLOAS)) {
       final ExecutionPayloadDuty executionPayloadDuty =
           new ExecutionPayloadDuty(spec, asyncRunner, validatorApiChannel, VALIDATOR_LOGGER);
@@ -618,7 +654,11 @@ public class ValidatorClientService extends Service {
       validatorTimingChannels.add(proposerPreferencesPublisher);
       final BuilderPreferencesPublisher builderPreferencesPublisher =
           new BuilderPreferencesPublisher(
-              validators, spec, validatorApiChannel, builderConfigProvider);
+              validators,
+              spec,
+              validatorApiChannel,
+              proposerConfigManager.orElseThrow(),
+              builderConfigProvider);
       validatorTimingChannels.add(builderPreferencesPublisher);
     }
 
@@ -630,6 +670,10 @@ public class ValidatorClientService extends Service {
 
   public static Path getSlashingProtectionPath(final DataDirLayout dataDirLayout) {
     return dataDirLayout.getValidatorDataDirectory().resolve("slashprotection");
+  }
+
+  public static Path getHashChainStoragePath(final DataDirLayout dataDirLayout) {
+    return dataDirLayout.getValidatorDataDirectory().resolve("hash-chains");
   }
 
   public static Path getManagedLocalKeystorePath(final DataDirLayout dataDirLayout) {

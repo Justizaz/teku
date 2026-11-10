@@ -59,6 +59,8 @@
               "$ref" : "#/components/schemas/SignedBlockContentsFulu"
             }, {
               "$ref" : "#/components/schemas/SignedBeaconBlockGloas"
+            }, {
+              "$ref" : "#/components/schemas/SignedBeaconBlockHeze"
             } ]
           }
         }

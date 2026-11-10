@@ -1,5 +1,5 @@
 /*
- * Copyright Consensys Software Inc., 2026
+ * Copyright (c) 2026 Consensys Incorporated. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with
  * the License. You may obtain a copy of the License at
@@ -189,6 +189,16 @@ public class TekuNodeConfigBuilder {
     specConfigModifier =
         specConfigModifier.andThen(
             specConfigBuilder -> specConfigBuilder.hezeForkEpoch(hezeForkEpoch));
+    return this;
+  }
+
+  public TekuNodeConfigBuilder withEip8321Epoch(final UInt64 eip8321ForkEpoch) {
+    mustBe(NodeType.BEACON_NODE);
+    LOG.debug("Xnetwork-eip8321-fork-epoch={}", eip8321ForkEpoch);
+    configMap.put("Xnetwork-eip8321-fork-epoch", eip8321ForkEpoch.toString());
+    specConfigModifier =
+        specConfigModifier.andThen(
+            specConfigBuilder -> specConfigBuilder.eip8321ForkEpoch(eip8321ForkEpoch));
     return this;
   }
 

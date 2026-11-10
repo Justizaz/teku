@@ -1,5 +1,5 @@
 /*
- * Copyright Consensys Software Inc., 2026
+ * Copyright (c) 2026 Consensys Incorporated. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with
  * the License. You may obtain a copy of the License at
@@ -25,11 +25,13 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.apache.tuweni.bytes.Bytes32;
 import tech.pegasys.teku.api.migrated.ValidatorLivenessAtEpoch;
+import tech.pegasys.teku.bls.BLSPublicKey;
 import tech.pegasys.teku.bls.BLSSignature;
 import tech.pegasys.teku.ethereum.json.types.beacon.StateValidatorData;
 import tech.pegasys.teku.ethereum.json.types.node.PeerCount;
 import tech.pegasys.teku.ethereum.json.types.validator.AttesterDuties;
 import tech.pegasys.teku.ethereum.json.types.validator.BeaconCommitteeSelectionProof;
+import tech.pegasys.teku.ethereum.json.types.validator.InclusionListDuties;
 import tech.pegasys.teku.ethereum.json.types.validator.PayloadTimelinessCommitteeDuties;
 import tech.pegasys.teku.ethereum.json.types.validator.ProposerDuties;
 import tech.pegasys.teku.ethereum.json.types.validator.SyncCommitteeDuties;
@@ -50,11 +52,15 @@ import tech.pegasys.teku.spec.datastructures.epbs.versions.gloas.SignedExecution
 import tech.pegasys.teku.spec.datastructures.epbs.versions.gloas.SignedExecutionPayloadEnvelope;
 import tech.pegasys.teku.spec.datastructures.epbs.versions.gloas.SignedExecutionPayloadEnvelopeContents;
 import tech.pegasys.teku.spec.datastructures.epbs.versions.gloas.SignedProposerPreferences;
+import tech.pegasys.teku.spec.datastructures.execution.Transaction;
+import tech.pegasys.teku.spec.datastructures.execution.versions.heze.InclusionList;
+import tech.pegasys.teku.spec.datastructures.execution.versions.heze.SignedInclusionList;
 import tech.pegasys.teku.spec.datastructures.metadata.BlockContainerAndMetaData;
 import tech.pegasys.teku.spec.datastructures.metadata.ObjectAndMetaData;
 import tech.pegasys.teku.spec.datastructures.operations.Attestation;
 import tech.pegasys.teku.spec.datastructures.operations.AttestationData;
 import tech.pegasys.teku.spec.datastructures.operations.SignedAggregateAndProof;
+import tech.pegasys.teku.spec.datastructures.operations.SignedRandaoCommitmentRegistration;
 import tech.pegasys.teku.spec.datastructures.operations.versions.altair.SignedContributionAndProof;
 import tech.pegasys.teku.spec.datastructures.operations.versions.altair.SyncCommitteeContribution;
 import tech.pegasys.teku.spec.datastructures.operations.versions.altair.SyncCommitteeMessage;
@@ -73,13 +79,16 @@ import tech.pegasys.teku.validator.remote.typedef.handlers.CreateAttestationData
 import tech.pegasys.teku.validator.remote.typedef.handlers.CreatePayloadAttestationDataRequest;
 import tech.pegasys.teku.validator.remote.typedef.handlers.CreateSyncCommitteeContributionRequest;
 import tech.pegasys.teku.validator.remote.typedef.handlers.GetExecutionPayloadEnvelopeRequest;
+import tech.pegasys.teku.validator.remote.typedef.handlers.GetInclusionListRequest;
 import tech.pegasys.teku.validator.remote.typedef.handlers.GetPeerCountRequest;
 import tech.pegasys.teku.validator.remote.typedef.handlers.GetProposerDutiesRequest;
 import tech.pegasys.teku.validator.remote.typedef.handlers.GetProposerDutiesV2Request;
 import tech.pegasys.teku.validator.remote.typedef.handlers.GetStateValidatorsRequest;
 import tech.pegasys.teku.validator.remote.typedef.handlers.GetSyncingStatusRequest;
 import tech.pegasys.teku.validator.remote.typedef.handlers.PostAttesterDutiesRequest;
+import tech.pegasys.teku.validator.remote.typedef.handlers.PostInclusionListDutiesRequest;
 import tech.pegasys.teku.validator.remote.typedef.handlers.PostPayloadTimelinessCommitteeDutiesRequest;
+import tech.pegasys.teku.validator.remote.typedef.handlers.PostRandaoCommitmentRegistrationRequest;
 import tech.pegasys.teku.validator.remote.typedef.handlers.PostSyncDutiesRequest;
 import tech.pegasys.teku.validator.remote.typedef.handlers.PrepareBeaconProposersRequest;
 import tech.pegasys.teku.validator.remote.typedef.handlers.ProduceBlockRequest;
@@ -92,6 +101,7 @@ import tech.pegasys.teku.validator.remote.typedef.handlers.SendContributionAndPr
 import tech.pegasys.teku.validator.remote.typedef.handlers.SendPayloadAttestationMessagesRequest;
 import tech.pegasys.teku.validator.remote.typedef.handlers.SendSignedAttestationsRequest;
 import tech.pegasys.teku.validator.remote.typedef.handlers.SendSignedBlockRequest;
+import tech.pegasys.teku.validator.remote.typedef.handlers.SendSignedInclusionListsRequest;
 import tech.pegasys.teku.validator.remote.typedef.handlers.SendSignedProposerPreferencesRequest;
 import tech.pegasys.teku.validator.remote.typedef.handlers.SendSubscribeToSyncCommitteeSubnetsRequest;
 import tech.pegasys.teku.validator.remote.typedef.handlers.SendSyncCommitteeMessagesRequest;
@@ -254,6 +264,44 @@ public class OkHttpValidatorTypeDefClient extends OkHttpValidatorMinimalTypeDefC
     return syncCommitteeSelectionsRequest.submit(validatorsPartialProofs);
   }
 
+  public Optional<List<Transaction>> getInclusionList(final UInt64 slot) {
+    final GetInclusionListRequest inclusionListRequest =
+        new GetInclusionListRequest(spec, getBaseEndpoint(), getOkHttpClient());
+    return inclusionListRequest.submit(slot);
+  }
+
+  public Optional<InclusionListDuties> postInclusionListDuties(
+      final UInt64 epoch, final Collection<Integer> validatorIndices) {
+    final PostInclusionListDutiesRequest postInclusionListDutiesRequest =
+        new PostInclusionListDutiesRequest(getBaseEndpoint(), getOkHttpClient());
+    return postInclusionListDutiesRequest.submit(epoch, validatorIndices);
+  }
+
+  public Optional<InclusionList> createInclusionList(
+      final UInt64 slot, final UInt64 validatorIndex) {
+    return postInclusionListDuties(
+            spec.computeEpochAtSlot(slot), List.of(validatorIndex.intValue()))
+        .flatMap(
+            duties ->
+                getInclusionList(slot)
+                    .map(
+                        transactions ->
+                            spec.atSlot(slot)
+                                .getSchemaDefinitions()
+                                .toVersionHeze()
+                                .orElseThrow()
+                                .getInclusionListSchema()
+                                .create(
+                                    slot, validatorIndex, duties.dependentRoot(), transactions)));
+  }
+
+  public List<SubmitDataError> sendSignedInclusionLists(
+      final List<SignedInclusionList> signedInclusionLists) {
+    final SendSignedInclusionListsRequest sendSignedInclusionListsRequest =
+        new SendSignedInclusionListsRequest(spec, getBaseEndpoint(), getOkHttpClient());
+    return sendSignedInclusionListsRequest.submit(signedInclusionLists);
+  }
+
   public void subscribeToSyncCommitteeSubnets(
       final Collection<SyncCommitteeSubnetSubscription> subscriptions) {
     LOG.debug("Subscribing to sync committee subnets {}", subscriptions);
@@ -352,7 +400,7 @@ public class OkHttpValidatorTypeDefClient extends OkHttpValidatorMinimalTypeDefC
   public List<SubmitDataError> sendPayloadAttestationMessages(
       final List<PayloadAttestationMessage> payloadAttestationMessages) {
     final SendPayloadAttestationMessagesRequest sendPayloadAttestationMessagesRequest =
-        new SendPayloadAttestationMessagesRequest(getBaseEndpoint(), getOkHttpClient());
+        new SendPayloadAttestationMessagesRequest(spec, getBaseEndpoint(), getOkHttpClient());
     return sendPayloadAttestationMessagesRequest.submit(payloadAttestationMessages);
   }
 
@@ -393,5 +441,16 @@ public class OkHttpValidatorTypeDefClient extends OkHttpValidatorMinimalTypeDefC
     final PublishSignedExecutionPayloadBidRequest publishSignedExecutionPayloadBidRequest =
         new PublishSignedExecutionPayloadBidRequest(spec, getBaseEndpoint(), getOkHttpClient());
     publishSignedExecutionPayloadBidRequest.submit(signedExecutionPayloadBid);
+  }
+
+  public void sendSignedRandaoCommitmentRegistration(
+      final SignedRandaoCommitmentRegistration registration) {
+    final PostRandaoCommitmentRegistrationRequest postRandaoCommitmentRegistrationRequest =
+        new PostRandaoCommitmentRegistrationRequest(getBaseEndpoint(), getOkHttpClient());
+    postRandaoCommitmentRegistrationRequest.submit(registration);
+  }
+
+  public Optional<Bytes32> getValidatorRandaoCommitment(final BLSPublicKey publicKey) {
+    return Optional.empty();
   }
 }

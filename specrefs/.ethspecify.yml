@@ -1,4 +1,4 @@
-version: v1.7.0-beta.2
+version: v1.7.0-beta.4
 style: full
 
 specrefs:
@@ -14,9 +14,7 @@ specrefs:
     - presets.yml
 
   exceptions:
-    configs:
-      # Not implemented: heze
-      - MIN_SLOTS_FOR_INCLUSION_LISTS_REQUESTS#heze
+    configs: []
 
     constants:
       # Not defined as a constant, unnecessary
@@ -24,9 +22,6 @@ specrefs:
       - DOMAIN_APPLICATION_MASK
       - ENDIANNESS
       - EMPTY_BLOCK_HASH#bellatrix # tuweni library is used instead
-
-      # No light client support
-      - MAX_REQUEST_LIGHT_CLIENT_UPDATES
 
       # Constant in the KZG library
       - G2_POINT_AT_INFINITY
@@ -56,14 +51,6 @@ specrefs:
       # Not implemented yet: EIP-7688 progressive SSZ transition
       - Attestation#gloas
       - IndexedAttestation#gloas
-
-      # Not implemented: heze
-      - BeaconState#heze
-      - ExecutionPayloadBid#heze
-      - SignedExecutionPayloadBid#heze
-      - InclusionListBits#heze
-      - InclusionListCommittee#heze
-      - SignedInclusionLists#heze
 
       # alpha.14 promoted pyspec List/Vector/BitList/BitVector/ByteList/Progressive*
       # type aliases to named ssz_objects. Teku models these as generic SSZ schema
@@ -164,6 +151,7 @@ specrefs:
       - SignedBeaconBlocks#phase0
       - SignedBeaconBlocks#deneb
       - SignedExecutionPayloadEnvelopes#gloas
+      - SignedInclusionLists#heze
       - Slashings#phase0
       - StateRoots#phase0
       - SyncCommitteeBits#altair
@@ -201,15 +189,20 @@ specrefs:
       - Seen#gloas
       - Seen#heze
 
-      # Not implemented: heze
-      - GetInclusionListResponse#heze
-      - InclusionListStore#heze
-      - PayloadAttributes#heze
-      - InclusionListEntry#heze
-
     functions:
       # Unnecessary
       - xor#phase0
+
+      # Not implemented: the restart-resilient confirmed root (consensus-specs #5673) needs a
+      # confirmed root persisted across restarts, which Teku's FastConfirmationStore does not
+      # hold. block_should_be_finalized exists only to serve this function.
+      - get_restart_resilient_confirmed_root#phase0
+      - block_should_be_finalized#phase0
+
+      # Implemented differently: Teku derives the time into a slot from a message's arrival
+      # timestamp where it is needed (BlockTimelinessTracker), rather than reading it off the
+      # store, so there is no store-based accessor to anchor to
+      - get_time_into_slot_ms#phase0
 
       # Will not implement: Deprecated
       - get_pow_block_at_terminal_total_difficulty#bellatrix
@@ -267,6 +260,10 @@ specrefs:
       # Not implemented: gloas
       - validate_partial_data_column_sidecar_gossip#gloas
       - compute_max_partial_data_column_sidecar_size#gloas
+      # Not implemented: Teku computes MIN_EPOCHS_FOR_BLOCK_REQUESTS with the pre-Gloas formula
+      # (SpecConfigBuilder#computeMinEpochsForBlockRequests); the EIP-8061 churn-based formula
+      # has not been adopted
+      - compute_min_epochs_for_block_requests#gloas
 
       # Not implemented yet: EIP-7688 progressive SSZ transition
       - upgrade_attestation_to_gloas#gloas
@@ -278,33 +275,9 @@ specrefs:
       # (MiscHelpersFulu#computeCustodyColumnIndices), not the bitvector form (alpha.14)
       - get_custody_column_bits#gloas
 
-      # Not implemented: heze
-      - get_forkchoice_store#heze
-      - get_inclusion_list_bits#heze
-      - get_inclusion_list_committee#heze
-      - get_inclusion_list_committee_assignment#heze
-      - get_inclusion_list_signature#heze
-      - get_inclusion_list_store#heze
-      - get_inclusion_list_transactions#heze
-      - is_inclusion_list_bits_inclusive#heze
-      - is_payload_inclusion_list_satisfied#heze
-      - is_valid_inclusion_list_signature#heze
-      - on_execution_payload_envelope#heze
-      - on_inclusion_list#heze
-      - prepare_execution_payload#heze
-      - process_inclusion_list#heze
-      - record_payload_inclusion_list_satisfaction#heze
-      - should_extend_payload#heze
-      - upgrade_to_heze#heze
-      - get_inclusion_list_due_ms#heze
-      - get_signed_inclusion_list#heze
-      - validate_execution_payload_bid_gossip#heze
-      - validate_inclusion_list_gossip#heze
-
     presets:
       # Not implemented yet: EIP-7688 progressive SSZ sizing work
       - MAX_ATTESTER_SLASHING_SIZE#gloas
       - MAX_SIGNED_AGGREGATE_AND_PROOF_SIZE#gloas
       - MAX_SIGNED_EXECUTION_PAYLOAD_BID_SIZE#gloas
       - MAX_SIGNED_EXECUTION_PAYLOAD_BID_SIZE_HEZE#heze
-      - MAX_SIGNED_INCLUSION_LIST_SIZE#heze

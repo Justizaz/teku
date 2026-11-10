@@ -1,5 +1,5 @@
 /*
- * Copyright Consensys Software Inc., 2026
+ * Copyright (c) 2026 Consensys Incorporated. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with
  * the License. You may obtain a copy of the License at
@@ -36,6 +36,8 @@ import tech.pegasys.teku.spec.datastructures.blobs.DataColumnSidecar;
 import tech.pegasys.teku.spec.datastructures.blobs.versions.deneb.BlobSidecar;
 import tech.pegasys.teku.spec.datastructures.blocks.SignedBeaconBlock;
 import tech.pegasys.teku.spec.datastructures.epbs.versions.gloas.SignedExecutionPayloadEnvelope;
+import tech.pegasys.teku.spec.datastructures.execution.versions.heze.SignedInclusionList;
+import tech.pegasys.teku.spec.datastructures.lightclient.LightClientUpdate;
 import tech.pegasys.teku.spec.datastructures.networking.libp2p.rpc.BlobIdentifier;
 import tech.pegasys.teku.spec.datastructures.networking.libp2p.rpc.DataColumnsByRootIdentifier;
 import tech.pegasys.teku.spec.datastructures.networking.libp2p.rpc.RpcRequest;
@@ -59,6 +61,8 @@ public interface Eth2Peer extends Peer, SyncSource {
       final RateTracker blobSidecarsRequestTracker,
       final RateTracker dataColumnSidecarsRequestTracker,
       final RateTracker executionPayloadEnvelopesRequestTracker,
+      final RateTracker lightClientUpdatesRequestTracker,
+      final RateTracker inclusionListRequestTracker,
       final RateTracker requestTracker,
       final MetricsSystem metricsSystem,
       final TimeProvider timeProvider,
@@ -76,6 +80,8 @@ public interface Eth2Peer extends Peer, SyncSource {
         blobSidecarsRequestTracker,
         dataColumnSidecarsRequestTracker,
         executionPayloadEnvelopesRequestTracker,
+        lightClientUpdatesRequestTracker,
+        inclusionListRequestTracker,
         requestTracker,
         metricsSystem,
         timeProvider,
@@ -190,7 +196,29 @@ public interface Eth2Peer extends Peer, SyncSource {
         returnedExecutionPayloadEnvelopesCount);
   }
 
+  default Optional<RequestKey> approveLightClientUpdatesRequest(
+      final ResponseCallback<LightClientUpdate> callback, final long lightClientUpdatesCount) {
+    return approveObjectsRequest(
+        RequestObject.LIGHT_CLIENT_UPDATE, callback, lightClientUpdatesCount);
+  }
+
+  default void adjustLightClientUpdatesRequest(
+      final RequestKey requestKey, final long returnedLightClientUpdatesCount) {
+    adjustObjectsRequest(
+        RequestObject.LIGHT_CLIENT_UPDATE, requestKey, returnedLightClientUpdatesCount);
+  }
+
   long getAvailableDataColumnSidecarsRequestCount();
+
+  default Optional<RequestKey> approveInclusionListsRequest(
+      final ResponseCallback<SignedInclusionList> callback, final long inclusionListsCount) {
+    return approveObjectsRequest(RequestObject.INCLUSION_LIST, callback, inclusionListsCount);
+  }
+
+  default void adjustInclusionListsRequest(
+      final RequestKey requestKey, final long returnedInclusionListsCount) {
+    adjustObjectsRequest(RequestObject.INCLUSION_LIST, requestKey, returnedInclusionListsCount);
+  }
 
   boolean approveRequest();
 

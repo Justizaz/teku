@@ -1,5 +1,5 @@
 /*
- * Copyright Consensys Software Inc., 2026
+ * Copyright (c) 2026 Consensys Incorporated. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with
  * the License. You may obtain a copy of the License at
@@ -14,6 +14,7 @@
 package tech.pegasys.teku.statetransition.forkchoice;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
@@ -46,6 +47,7 @@ import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
+import org.apache.tuweni.bytes.Bytes;
 import org.apache.tuweni.bytes.Bytes32;
 import org.hyperledger.besu.plugin.services.MetricsSystem;
 import org.junit.jupiter.api.BeforeEach;
@@ -53,6 +55,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.stubbing.Answer;
 import org.mockito.stubbing.Stubber;
@@ -74,27 +77,40 @@ import tech.pegasys.teku.spec.Spec;
 import tech.pegasys.teku.spec.SpecMilestone;
 import tech.pegasys.teku.spec.TestSpecFactory;
 import tech.pegasys.teku.spec.config.SpecConfigGloas;
+import tech.pegasys.teku.spec.config.SpecConfigHeze;
 import tech.pegasys.teku.spec.datastructures.attestation.ValidatableAttestation;
 import tech.pegasys.teku.spec.datastructures.blobs.versions.deneb.BlobSidecar;
 import tech.pegasys.teku.spec.datastructures.blocks.Eth1Data;
 import tech.pegasys.teku.spec.datastructures.blocks.MinimalBeaconBlockSummary;
 import tech.pegasys.teku.spec.datastructures.blocks.SignedBlockAndState;
+import tech.pegasys.teku.spec.datastructures.blocks.SlotAndBlockRoot;
+import tech.pegasys.teku.spec.datastructures.blocks.blockbody.versions.gloas.BeaconBlockBodyGloas;
+import tech.pegasys.teku.spec.datastructures.blocks.blockbody.versions.gloas.BeaconBlockBodySchemaGloas;
 import tech.pegasys.teku.spec.datastructures.epbs.versions.gloas.PayloadAttestation;
 import tech.pegasys.teku.spec.datastructures.epbs.versions.gloas.PayloadAttestationData;
 import tech.pegasys.teku.spec.datastructures.epbs.versions.gloas.SignedExecutionPayloadEnvelope;
 import tech.pegasys.teku.spec.datastructures.execution.ExecutionPayload;
+import tech.pegasys.teku.spec.datastructures.execution.NewPayloadRequest;
 import tech.pegasys.teku.spec.datastructures.execution.PowBlock;
+import tech.pegasys.teku.spec.datastructures.execution.Transaction;
+import tech.pegasys.teku.spec.datastructures.execution.versions.heze.InclusionList;
+import tech.pegasys.teku.spec.datastructures.execution.versions.heze.SignedInclusionList;
 import tech.pegasys.teku.spec.datastructures.forkchoice.FastConfirmationStore;
 import tech.pegasys.teku.spec.datastructures.forkchoice.ForkChoiceNode;
 import tech.pegasys.teku.spec.datastructures.forkchoice.ForkChoicePayloadStatus;
+import tech.pegasys.teku.spec.datastructures.forkchoice.InclusionListStore;
+import tech.pegasys.teku.spec.datastructures.forkchoice.ProtoNodeData;
+import tech.pegasys.teku.spec.datastructures.forkchoice.ProtoNodeValidationStatus;
 import tech.pegasys.teku.spec.datastructures.forkchoice.ReadOnlyForkChoiceStrategy;
 import tech.pegasys.teku.spec.datastructures.forkchoice.SlotAndForkChoiceNode;
 import tech.pegasys.teku.spec.datastructures.operations.Attestation;
 import tech.pegasys.teku.spec.datastructures.operations.AttestationData;
 import tech.pegasys.teku.spec.datastructures.operations.AttestationSchema;
 import tech.pegasys.teku.spec.datastructures.operations.IndexedAttestationLight;
+import tech.pegasys.teku.spec.datastructures.state.AnchorPoint;
 import tech.pegasys.teku.spec.datastructures.state.Checkpoint;
 import tech.pegasys.teku.spec.datastructures.state.beaconstate.BeaconState;
+import tech.pegasys.teku.spec.datastructures.state.beaconstate.versions.gloas.BeaconStateGloas;
 import tech.pegasys.teku.spec.datastructures.util.AttestationProcessingResult;
 import tech.pegasys.teku.spec.executionlayer.ExecutionLayerChannelStub;
 import tech.pegasys.teku.spec.executionlayer.ExecutionPayloadStatus;
@@ -111,8 +127,10 @@ import tech.pegasys.teku.spec.logic.common.statetransition.exceptions.StateTrans
 import tech.pegasys.teku.spec.logic.common.statetransition.results.BlockImportResult;
 import tech.pegasys.teku.spec.logic.common.statetransition.results.BlockImportResult.FailureReason;
 import tech.pegasys.teku.spec.logic.common.statetransition.results.ExecutionPayloadImportResult;
+import tech.pegasys.teku.spec.logic.common.statetransition.results.InclusionListImportResult;
 import tech.pegasys.teku.spec.logic.common.util.AsyncBLSSignatureVerifier;
 import tech.pegasys.teku.spec.schemas.SchemaDefinitionsGloas;
+import tech.pegasys.teku.spec.schemas.SchemaDefinitionsHeze;
 import tech.pegasys.teku.spec.util.DataStructureUtil;
 import tech.pegasys.teku.statetransition.datacolumns.DataAvailabilitySampler;
 import tech.pegasys.teku.statetransition.execution.ReceivedExecutionPayloadEventsChannel;
@@ -133,6 +151,7 @@ import tech.pegasys.teku.storage.protoarray.ForkChoiceStrategy;
 import tech.pegasys.teku.storage.server.StateStorageMode;
 import tech.pegasys.teku.storage.storageSystem.InMemoryStorageSystemBuilder;
 import tech.pegasys.teku.storage.storageSystem.StorageSystem;
+import tech.pegasys.teku.storage.store.StoreConfig;
 import tech.pegasys.teku.storage.store.UpdatableStore.StoreTransaction;
 
 class ForkChoiceTest {
@@ -160,6 +179,8 @@ class ForkChoiceTest {
   private final MergeTransitionBlockValidator transitionBlockValidator =
       mock(MergeTransitionBlockValidator.class);
   private final DebugDataDumper debugDataDumper = mock(DebugDataDumper.class);
+  private final InclusionListStore inclusionListStore =
+      new InclusionListStore(StoreConfig.DEFAULT_INCLUSION_LIST_CACHE_SIZE);
 
   private final InlineEventThread eventThread = new InlineEventThread();
 
@@ -171,6 +192,19 @@ class ForkChoiceTest {
   }
 
   private void setupWithSpec(final Spec unmockedSpec) {
+    setupWithSpec(unmockedSpec, StoreConfig.createDefault());
+  }
+
+  private void setupWithSpec(final Spec unmockedSpec, final StoreConfig storeConfig) {
+    setupWithSpec(unmockedSpec, storeConfig, true);
+  }
+
+  private void setupWithSpec(final Spec unmockedSpec, final boolean initializeGenesis) {
+    setupWithSpec(unmockedSpec, StoreConfig.createDefault(), initializeGenesis);
+  }
+
+  private void setupWithSpec(
+      final Spec unmockedSpec, final StoreConfig storeConfig, final boolean initializeGenesis) {
     unmockedSpec.reinitializeForTesting(
         (block) -> blobSidecarsAvailabilityChecker,
         AvailabilityCheckerFactory.NOOP_DATACOLUMN_SIDECAR,
@@ -183,6 +217,7 @@ class ForkChoiceTest {
         InMemoryStorageSystemBuilder.create()
             .storageMode(StateStorageMode.PRUNE)
             .specProvider(spec)
+            .storeConfig(storeConfig)
             .numberOfValidators(16)
             .build();
     this.chainBuilder = storageSystem.chainBuilder();
@@ -194,6 +229,7 @@ class ForkChoiceTest {
             spec,
             eventThread,
             recentChainData,
+            inclusionListStore,
             forkChoiceNotifier,
             new ForkChoiceStateProvider(eventThread, recentChainData),
             new TickProcessor(spec, recentChainData),
@@ -209,7 +245,9 @@ class ForkChoiceTest {
     when(transitionBlockValidator.verifyAncestorTransitionBlock(any()))
         .thenReturn(SafeFuture.completedFuture(PayloadValidationResult.VALID));
     setForkChoiceNotifierForkChoiceUpdatedResult(PayloadStatus.VALID);
-    recentChainData.initializeFromGenesis(genesis.getState(), UInt64.ZERO);
+    if (initializeGenesis) {
+      recentChainData.initializeFromGenesis(genesis.getState(), UInt64.ZERO);
+    }
     reset(
         forkChoiceNotifier,
         transitionBlockValidator); // Clear any notifications from setting genesis
@@ -378,6 +416,8 @@ class ForkChoiceTest {
     final DataAvailabilitySampler dataAvailabilitySampler = mock(DataAvailabilitySampler.class);
     when(dataAvailabilitySampler.checkSamplingEligibility(any()))
         .thenReturn(DataAvailabilitySampler.SamplingEligibilityStatus.REQUIRED);
+    when(dataAvailabilitySampler.checkSamplingEligibility(any(), anyBoolean()))
+        .thenReturn(DataAvailabilitySampler.SamplingEligibilityStatus.REQUIRED);
     when(dataAvailabilitySampler.checkDataAvailability(any(), any()))
         .thenReturn(new SafeFuture<>());
     doReturn(true).when(spec).isAvailabilityOfDataColumnSidecarsRequiredAtSlot(any(), any());
@@ -460,7 +500,7 @@ class ForkChoiceTest {
     final BlockProcessor blockProcessor = mock(BlockProcessor.class);
     when(spec.getBlockProcessor(blockAndState.getSlot())).thenReturn(blockProcessor);
     final Exception blockException = new StateTransitionException("error!");
-    when(blockProcessor.processAndValidateBlock(any(), any(), any(), any()))
+    when(blockProcessor.processAndValidateBlock(any(), any(), any(), any(), any()))
         .thenThrow(blockException);
 
     importBlockAndAssertFailure(blockAndState, FailureReason.FAILED_STATE_TRANSITION);
@@ -573,6 +613,7 @@ class ForkChoiceTest {
             spec,
             eventThread,
             recentChainData,
+            inclusionListStore,
             forkChoiceNotifier,
             new ForkChoiceStateProvider(eventThread, recentChainData),
             new TickProcessor(spec, recentChainData),
@@ -722,6 +763,57 @@ class ForkChoiceTest {
     assertThat(
             messages.get(0).calculatePayloadTimelinessCommitteePositions(spec, attestedBlockState))
         .isEqualTo(IntSet.of(0, 2, 4));
+  }
+
+  @ParameterizedTest
+  @ValueSource(ints = {2, 3})
+  void payloadAttestationsFromBlock_shouldOnlyCountVotesForParentSlotWhenStateIsEvicted(
+      final int childSlot) {
+    setupWithSpec(
+        TestSpecFactory.createMinimalGloas(
+            builder -> builder.blsSignatureVerifier(BLSSignatureVerifier.NOOP)),
+        StoreConfig.builder().stateCacheSize(1).build());
+
+    final SignedBlockAndState parent = chainBuilder.generateBlockAtSlot(ONE);
+    importBlock(parent);
+    importPayload(parent);
+
+    final SchemaDefinitionsGloas schemas =
+        SchemaDefinitionsGloas.required(spec.atSlot(ONE).getSchemaDefinitions());
+    final UInt64 attestationSlot = UInt64.valueOf(childSlot - 1);
+    final PayloadAttestation payloadAttestation =
+        schemas
+            .getPayloadAttestationSchema()
+            .create(
+                schemas.getPayloadAttestationSchema().getAggregationBitsSchema().ofBits(0),
+                schemas
+                    .getPayloadAttestationDataSchema()
+                    .create(parent.getRoot(), attestationSlot, true, true),
+                BLSSignature.empty());
+    final SignedBlockAndState child =
+        chainBuilder.generateBlockAtSlot(
+            UInt64.valueOf(childSlot),
+            BlockOptions.create()
+                .setPayloadAttestations(
+                    BeaconBlockBodySchemaGloas.required(
+                            spec.atSlot(UInt64.valueOf(childSlot))
+                                .getSchemaDefinitions()
+                                .getBeaconBlockBodySchema())
+                        .getPayloadAttestationsSchema()
+                        .of(payloadAttestation)));
+
+    importBlock(child);
+
+    assertThat(recentChainData.getStore().getBlockStateIfAvailable(parent.getRoot())).isEmpty();
+    final IntList ptc = spec.getPtc(child.getState(), attestationSlot);
+    final long matchingPositions = ptc.intStream().filter(index -> index == ptc.getInt(0)).count();
+    assertThat(matchingPositions).isPositive();
+    assertThat(
+            recentChainData
+                .getUpdatableForkChoiceStrategy()
+                .orElseThrow()
+                .getPayloadAttesterCount(parent.getRoot()))
+        .isEqualTo(UInt64.valueOf(childSlot == 2 ? matchingPositions : 0));
   }
 
   @Test
@@ -1224,6 +1316,7 @@ class ForkChoiceTest {
             spec,
             eventThread,
             recentChainData,
+            inclusionListStore,
             forkChoiceNotifier,
             new ForkChoiceStateProvider(eventThread, recentChainData),
             new TickProcessor(spec, recentChainData),
@@ -1269,6 +1362,7 @@ class ForkChoiceTest {
             spec,
             eventThread,
             recentChainData,
+            inclusionListStore,
             forkChoiceNotifier,
             new ForkChoiceStateProvider(eventThread, recentChainData),
             new TickProcessor(spec, recentChainData),
@@ -1761,11 +1855,493 @@ class ForkChoiceTest {
   }
 
   @Test
+  void onExecutionPayloadEnvelope_shouldReturnUnknownRootBeforeStoreInitialization() {
+    setupWithSpec(TestSpecFactory.createMinimalGloas(), false);
+    final SignedExecutionPayloadEnvelope envelope =
+        dataStructureUtil.randomSignedExecutionPayloadEnvelope(1);
+
+    assertThat(forkChoice.onExecutionPayloadEnvelope(envelope, executionLayer))
+        .isCompletedWithValue(ExecutionPayloadImportResult.FAILED_UNKNOWN_BEACON_BLOCK_ROOT);
+  }
+
+  @ParameterizedTest
+  @ValueSource(booleans = {false, true})
+  void onBlock_shouldRecoverFullParentFromStateOnlyCheckpoint(final boolean skippedSlot)
+      throws Exception {
+    setupWithSpec(
+        TestSpecFactory.createMinimalGloas(
+            builder -> builder.blsSignatureVerifier(BLSSignatureVerifier.NOOP)),
+        false);
+    final UInt64 checkpointSlot = spec.computeStartSlotAtEpoch(ONE);
+    chainBuilder.generateBlocksUpToSlot(skippedSlot ? checkpointSlot.minus(1) : checkpointSlot);
+    final SignedBlockAndState anchorBlock = chainBuilder.getLatestBlockAndState();
+    final BeaconState checkpointState =
+        skippedSlot
+            ? spec.processSlots(anchorBlock.getState(), checkpointSlot)
+            : anchorBlock.getState();
+    final AnchorPoint anchor = AnchorPoint.fromInitialState(spec, checkpointState);
+    recentChainData.initializeFromAnchorPoint(anchor, ZERO);
+    final UInt64 childSlot = checkpointSlot.plus(1);
+    final SignedExecutionPayloadEnvelope envelope =
+        chainBuilder.getExecutionPayloadAtSlot(anchorBlock.getSlot()).orElseThrow();
+    final SignedBlockAndState child =
+        chainBuilder.generateBlockAtSlot(
+            childSlot,
+            BlockOptions.create()
+                .setExecutionPayload(
+                    dataStructureUtil.randomExecutionPayload(
+                        childSlot,
+                        builder ->
+                            builder
+                                .parentHash(envelope.getMessage().getPayload().getBlockHash())
+                                .prevRandao(
+                                    spec.atSlot(childSlot)
+                                        .beaconStateAccessors()
+                                        .getRandaoMix(
+                                            checkpointState,
+                                            spec.computeEpochAtSlot(checkpointSlot))))));
+    storageSystem.chainUpdater().advanceCurrentSlotToAtLeast(childSlot);
+
+    assertThat(recentChainData.getStore().getBlockIfAvailable(anchor.getRoot())).isEmpty();
+    assertThat(
+            forkChoice.onBlock(
+                child.getBlock(), Optional.empty(), BlockBroadcastValidator.NOOP, executionLayer))
+        .isCompletedWithValue(BlockImportResult.FAILED_UNKNOWN_PARENT_EXECUTION_PAYLOAD);
+    assertThat(recentChainData.getStore().containsBlock(child.getRoot())).isFalse();
+
+    final SignedExecutionPayloadEnvelope invalidEnvelope =
+        dataStructureUtil.randomSignedExecutionPayloadEnvelopeForBlock(anchorBlock.getBlock());
+    assertThat(forkChoice.onExecutionPayloadEnvelope(invalidEnvelope, executionLayer))
+        .isCompletedWithValueMatching(result -> !result.isSuccessful());
+    assertThat(recentChainData.getStore().getExecutionPayloadIfAvailable(anchor.getRoot()))
+        .isEmpty();
+
+    assertThat(forkChoice.onExecutionPayloadEnvelope(envelope, executionLayer))
+        .isCompletedWithValueMatching(ExecutionPayloadImportResult::isSuccessful);
+    assertThat(recentChainData.getStore().getBlockIfAvailable(anchor.getRoot())).isEmpty();
+    assertThat(recentChainData.retrieveSignedExecutionPayloadByBlockRoot(anchor.getRoot()))
+        .isCompletedWithValue(Optional.of(envelope));
+    importBlock(child);
+    final ReadOnlyForkChoiceStrategy strategy =
+        recentChainData.getForkChoiceStrategy().orElseThrow();
+    assertThat(strategy.getBlockData(anchor.getRoot(), ForkChoicePayloadStatus.PAYLOAD_STATUS_FULL))
+        .isPresent();
+    assertThat(strategy.getBlockData(child.getRoot()).orElseThrow().getExecutionBlockHash())
+        .isEqualTo(envelope.getMessage().getPayload().getBlockHash());
+    assertThat(strategy.getParentBeaconBlockNode(ForkChoiceNode.createBase(child.getRoot())))
+        .contains(ForkChoiceNode.createFull(anchor.getRoot()));
+  }
+
+  @Test
+  void onBlock_gloasGenesisChildShouldBuildOnEmptyGenesisWithoutGenesisPayload() {
+    setupWithSpec(
+        TestSpecFactory.createMinimalGloas(
+            builder -> builder.blsSignatureVerifier(BLSSignatureVerifier.NOOP)));
+    final BeaconStateGloas genesisState = BeaconStateGloas.required(genesis.getState());
+    final Bytes32 genesisExecutionBlockHash = genesisState.getLatestBlockHash();
+    // The genesis bid names the EL genesis block as its parent and commits to no payload, so the
+    // genesis block is EMPTY and no payload is ever known for it
+    assertThat(genesisState.getLatestExecutionPayloadBid().getParentBlockHash())
+        .isEqualTo(genesisExecutionBlockHash);
+    assertThat(genesisState.getLatestExecutionPayloadBid().getBlockHash()).isEqualTo(Bytes32.ZERO);
+    assertThat(recentChainData.getStore().getExecutionPayloadIfAvailable(genesis.getRoot()))
+        .isEmpty();
+    final ReadOnlyForkChoiceStrategy strategy =
+        recentChainData.getForkChoiceStrategy().orElseThrow();
+    assertThat(
+            strategy.getBlockData(genesis.getRoot(), ForkChoicePayloadStatus.PAYLOAD_STATUS_FULL))
+        .isEmpty();
+    assertThat(
+            strategy
+                .getBlockData(genesis.getRoot(), ForkChoicePayloadStatus.PAYLOAD_STATUS_EMPTY)
+                .map(ProtoNodeData::getExecutionBlockHash))
+        .contains(genesisExecutionBlockHash);
+
+    final SignedBlockAndState child = chainBuilder.generateBlockAtSlot(ONE);
+    // The first block builds on EMPTY(genesis), whose execution head is the EL genesis block
+    assertThat(getExecutionPayloadBidParentBlockHash(child)).isEqualTo(genesisExecutionBlockHash);
+    storageSystem.chainUpdater().advanceCurrentSlotToAtLeast(child.getSlot());
+
+    final SafeFuture<BlockImportResult> result =
+        forkChoice.onBlock(
+            child.getBlock(), Optional.empty(), BlockBroadcastValidator.NOOP, executionLayer);
+
+    assertBlockImportedSuccessfully(result, false);
+    assertThat(strategy.getParentBeaconBlockNode(ForkChoiceNode.createBase(child.getRoot())))
+        .contains(ForkChoiceNode.createEmpty(genesis.getRoot()));
+    assertThat(strategy.getBlockData(child.getRoot()).orElseThrow().getExecutionBlockHash())
+        .isEqualTo(genesisExecutionBlockHash);
+  }
+
+  @Test
+  void gloasAttestationTargetingGenesisShouldReportNoPayload() {
+    setupWithSpec(
+        TestSpecFactory.createMinimalGloas(
+            builder -> builder.blsSignatureVerifier(BLSSignatureVerifier.NOOP)));
+    // Fork choice selects the head before attestations are produced for a slot
+    storageSystem.chainUpdater().advanceCurrentSlotToAtLeast(ONE);
+    processHead(ONE);
+    final ChainHead head = recentChainData.getChainHead().orElseThrow();
+    assertThat(head.getForkChoiceNode()).isEqualTo(ForkChoiceNode.createEmpty(genesis.getRoot()));
+
+    // An attestation produced after slot 0 while genesis is still the head votes for the EMPTY
+    // variant: index 0 (payload absent), where the former FULL genesis gave 1
+    assertThat(
+            spec.atSlot(ONE)
+                .getForkChoiceUtil()
+                .computeCommitteeIndexForAttestation(
+                    ONE, genesis.getBlock().getMessage(), 0, Optional.of(head.getForkChoiceNode())))
+        .isZero();
+  }
+
+  @Test
+  void onBlock_gloasShouldImportOnEmptyGenesisAfterRestartWhileGenesisIsHot() {
+    setupWithSpec(
+        TestSpecFactory.createMinimalGloas(
+            builder -> builder.blsSignatureVerifier(BLSSignatureVerifier.NOOP)));
+    final Bytes32 genesisExecutionBlockHash =
+        BeaconStateGloas.required(genesis.getState()).getLatestBlockHash();
+    final SignedBlockAndState block1 = chainBuilder.generateBlockAtSlot(ONE);
+    storageSystem.chainUpdater().advanceCurrentSlotToAtLeast(block1.getSlot());
+    assertBlockImportedSuccessfully(
+        forkChoice.onBlock(
+            block1.getBlock(), Optional.empty(), blockBroadcastValidator, executionLayer),
+        false);
+    importPayload(block1);
+
+    // The genesis block is still hot: the store is rebuilt from the database, with no envelope for
+    // genesis
+    final StorageSystem restartedStorageSystem = storageSystem.restarted();
+    final RecentChainData restartedRecentChainData = restartedStorageSystem.recentChainData();
+    final ForkChoice restartedForkChoice = createForkChoice(restartedRecentChainData);
+    assertThat(restartedRecentChainData.getStore().getLatestFinalized().getRoot())
+        .isEqualTo(genesis.getRoot());
+    assertThat(
+            restartedStorageSystem.database().getBlindedExecutionPayloadEnvelope(genesis.getRoot()))
+        .isEmpty();
+    final ReadOnlyForkChoiceStrategy strategy =
+        restartedRecentChainData.getForkChoiceStrategy().orElseThrow();
+    assertThat(
+            strategy.getBlockData(genesis.getRoot(), ForkChoicePayloadStatus.PAYLOAD_STATUS_FULL))
+        .isEmpty();
+    assertThat(strategy.getParentBeaconBlockNode(ForkChoiceNode.createBase(block1.getRoot())))
+        .contains(ForkChoiceNode.createEmpty(genesis.getRoot()));
+    assertThat(strategy.getBlockData(block1.getRoot()).orElseThrow().getExecutionBlockHash())
+        .isEqualTo(genesisExecutionBlockHash);
+
+    final SignedBlockAndState block2 = chainBuilder.generateBlockAtSlot(UInt64.valueOf(2));
+    restartedStorageSystem.chainUpdater().advanceCurrentSlotToAtLeast(block2.getSlot());
+    assertBlockImportedSuccessfully(
+        restartedForkChoice.onBlock(
+            block2.getBlock(), Optional.empty(), blockBroadcastValidator, executionLayer),
+        false);
+    assertThatCode(restartedStorageSystem::restarted).doesNotThrowAnyException();
+  }
+
+  @Test
+  void onBlock_shouldNotRequireEnvelopeForPreGloasCheckpoint() throws Exception {
+    setupWithSpec(TestSpecFactory.createMinimalWithGloasForkEpoch(ONE), false);
+    final UInt64 forkSlot = spec.computeStartSlotAtEpoch(ONE);
+    chainBuilder.generateBlocksUpToSlot(forkSlot.minus(1));
+    final SignedBlockAndState anchorBlock = chainBuilder.getLatestBlockAndState();
+    final BeaconState checkpointState = spec.processSlots(anchorBlock.getState(), forkSlot);
+    recentChainData.initializeFromAnchorPoint(
+        AnchorPoint.fromInitialState(spec, checkpointState), ZERO);
+    final SignedBlockAndState child = chainBuilder.generateBlockAtSlot(forkSlot.plus(1));
+    storageSystem.chainUpdater().advanceCurrentSlotToAtLeast(child.getSlot());
+
+    assertThat(
+            spec.atSlot(child.getSlot())
+                .getForkChoiceUtil()
+                .checkOnBlockConditions(
+                    child.getBlock(),
+                    spec.processSlots(checkpointState, child.getSlot()),
+                    recentChainData.getStore()))
+        .matches(BlockImportResult::isSuccessful);
+  }
+
+  @Test
+  void onBlock_gloasShouldReportUnknownParentPayloadBeforeCheckingAncestry() {
+    // A block building on a parent payload that has not arrived yet is queued for that payload,
+    // not rejected: the finalized ancestry walk starts from FULL(parent), which does not exist yet.
+    setupWithSpec(
+        TestSpecFactory.createMinimalGloas(
+            builder -> builder.blsSignatureVerifier(BLSSignatureVerifier.NOOP)));
+
+    final SignedBlockAndState parent = chainBuilder.generateBlockAtSlot(ONE);
+    importBlock(parent);
+    final SignedBlockAndState child = chainBuilder.generateBlockAtSlot(2);
+    assertThat(getExecutionPayloadBidParentBlockHash(child))
+        .isEqualTo(
+            chainBuilder
+                .getExecutionPayloadAtSlot(ONE)
+                .orElseThrow()
+                .getMessage()
+                .getPayload()
+                .getBlockHash());
+
+    importBlockAndAssertFailure(child, FailureReason.UNKNOWN_PARENT_EXECUTION_PAYLOAD);
+    assertThat(recentChainData.containsBlock(child.getRoot())).isFalse();
+  }
+
+  @Test
+  void onBlock_gloasShouldRejectBlockBuildingOnInvalidatedParentPayload() {
+    // The child names the parent's payload, which is invalidated before the child arrives through
+    // the sync/RPC path (ForkChoice.onBlock, no gossip validation)
+    setupWithSpec(
+        TestSpecFactory.createMinimalGloas(
+            builder -> builder.blsSignatureVerifier(BLSSignatureVerifier.NOOP)));
+    final ReadOnlyForkChoiceStrategy forkChoiceStrategy =
+        recentChainData.getForkChoiceStrategy().orElseThrow();
+
+    final SignedBlockAndState parent = chainBuilder.generateBlockAtSlot(ONE);
+    importBlock(parent);
+    final SignedExecutionPayloadEnvelope parentPayload = importPayloadOptimistically(parent);
+    // The child builds on FULL(parent)
+    final SignedBlockAndState child = chainBuilder.generateBlockAtSlot(2);
+    assertThat(getExecutionPayloadBidParentBlockHash(child))
+        .isEqualTo(parentPayload.getMessage().getPayload().getBlockHash());
+
+    invalidateExecutionPayload(parent, parentPayload);
+    assertThat(
+            forkChoiceStrategy.getBlockData(
+                parent.getRoot(), ForkChoicePayloadStatus.PAYLOAD_STATUS_FULL))
+        .isEmpty();
+    assertThat(
+            forkChoiceStrategy
+                .getBlockData(parent.getRoot(), ForkChoicePayloadStatus.PAYLOAD_STATUS_EMPTY)
+                .map(ProtoNodeData::isOptimistic))
+        .contains(false);
+
+    executionLayer.setPayloadStatus(PayloadStatus.VALID);
+    importBlockAndAssertFailure(child, FailureReason.DOES_NOT_DESCEND_FROM_LATEST_FINALIZED);
+
+    assertThat(recentChainData.containsBlock(child.getRoot())).isFalse();
+    assertThat(forkChoiceStrategy.getBlockData(child.getRoot())).isEmpty();
+    assertThat(forkChoice.processHead()).isCompleted();
+    assertThat(recentChainData.getChainHead().map(ChainHead::getForkChoiceNode))
+        .contains(ForkChoiceNode.createEmpty(parent.getRoot()));
+  }
+
+  @Test
+  void onBlock_gloasShouldRejectBlockBuildingOnInvalidatedParentPayloadWhenParentNotCached() {
+    // The parent block has been evicted from the store's bounded block cache, so the variant the
+    // block builds on has to come from the pre-state: otherwise the finality checks pass through
+    // the parent's base node and the block only fails inside the store commit
+    setupWithSpec(
+        TestSpecFactory.createMinimalGloas(
+            builder -> builder.blsSignatureVerifier(BLSSignatureVerifier.NOOP)),
+        StoreConfig.builder().blockCacheSize(1).build());
+
+    final SignedBlockAndState parent = chainBuilder.generateBlockAtSlot(ONE);
+    importBlock(parent);
+    final SignedExecutionPayloadEnvelope parentPayload = importPayloadOptimistically(parent);
+    final ChainBuilder siblingChain = chainBuilder.fork();
+    final SignedBlockAndState child = chainBuilder.generateBlockAtSlot(3);
+    // importing another child of the parent evicts the parent from the single-entry block cache
+    importBlock(siblingChain.generateBlockAtSlot(2));
+    assertThat(recentChainData.getStore().getBlockIfAvailable(parent.getRoot())).isEmpty();
+
+    invalidateExecutionPayload(parent, parentPayload);
+    executionLayer.setPayloadStatus(PayloadStatus.VALID);
+    importBlockAndAssertFailure(child, FailureReason.DOES_NOT_DESCEND_FROM_LATEST_FINALIZED);
+    assertThat(recentChainData.containsBlock(child.getRoot())).isFalse();
+  }
+
+  @Test
+  void onBlock_gloasShouldImportBlockBuildingOnEmptyParentAfterParentPayloadInvalidated() {
+    // A block that builds on EMPTY(parent) is unaffected by the invalidation of the parent's
+    // payload
+    setupWithSpec(
+        TestSpecFactory.createMinimalGloas(
+            builder -> builder.blsSignatureVerifier(BLSSignatureVerifier.NOOP)));
+    final ReadOnlyForkChoiceStrategy forkChoiceStrategy =
+        recentChainData.getForkChoiceStrategy().orElseThrow();
+
+    final SignedBlockAndState parent = chainBuilder.generateBlockAtSlot(ONE);
+    importBlock(parent);
+    final SignedExecutionPayloadEnvelope parentPayload = importPayloadOptimistically(parent);
+    final SignedBlockAndState child =
+        chainBuilder.generateBlockAtSlot(
+            UInt64.valueOf(2), BlockOptions.create().setBuildOnEmptyParent(true));
+    assertThat(getExecutionPayloadBidParentBlockHash(child))
+        .isNotEqualTo(parentPayload.getMessage().getPayload().getBlockHash());
+
+    invalidateExecutionPayload(parent, parentPayload);
+    executionLayer.setPayloadStatus(PayloadStatus.VALID);
+    importBlock(child);
+
+    assertThat(
+            forkChoiceStrategy.getParentBeaconBlockNode(ForkChoiceNode.createBase(child.getRoot())))
+        .contains(ForkChoiceNode.createEmpty(parent.getRoot()));
+    assertThat(forkChoice.processHead()).isCompleted();
+    assertThat(recentChainData.getChainHead().map(ChainHead::getForkChoiceNode))
+        .contains(ForkChoiceNode.createEmpty(child.getRoot()));
+  }
+
+  @Test
+  void onBlock_gloasShouldImportBlockBuildingOnParentPayloadEvictedFromStoreCache() {
+    // The store keeps execution payloads in a bounded cache. A parent payload that fork choice
+    // still tracks as FULL(parent) must count as verified after eviction, otherwise the child is
+    // reported as waiting for a payload the block manager can see and gets re-imported in a loop
+    setupWithSpec(
+        TestSpecFactory.createMinimalGloas(
+            builder -> builder.blsSignatureVerifier(BLSSignatureVerifier.NOOP)),
+        StoreConfig.builder().blockCacheSize(1).build());
+    final ReadOnlyForkChoiceStrategy forkChoiceStrategy =
+        recentChainData.getForkChoiceStrategy().orElseThrow();
+
+    final SignedBlockAndState parent = chainBuilder.generateBlockAtSlot(ONE);
+    importBlock(parent);
+    importPayload(parent);
+    final ChainBuilder siblingChain = chainBuilder.fork();
+    final SignedBlockAndState child = chainBuilder.generateBlockAtSlot(3);
+    // importing another child of the parent and its payload evicts the parent's payload
+    final SignedBlockAndState sibling = siblingChain.generateBlockAtSlot(2);
+    importBlock(sibling);
+    assertThat(
+            forkChoice.onExecutionPayloadEnvelope(
+                siblingChain.getExecutionPayloadAtSlot(sibling.getSlot()).orElseThrow(),
+                executionLayer,
+                Optional.of(mock(ReceivedExecutionPayloadEventsChannel.class))))
+        .isCompletedWithValueMatching(ExecutionPayloadImportResult::isSuccessful);
+    assertThat(recentChainData.getStore().getExecutionPayloadIfAvailable(parent.getRoot()))
+        .isEmpty();
+    assertThat(
+            forkChoiceStrategy.getBlockData(
+                parent.getRoot(), ForkChoicePayloadStatus.PAYLOAD_STATUS_FULL))
+        .isPresent();
+
+    importBlock(child);
+
+    assertThat(
+            forkChoiceStrategy.getParentBeaconBlockNode(ForkChoiceNode.createBase(child.getRoot())))
+        .contains(ForkChoiceNode.createFull(parent.getRoot()));
+  }
+
+  @Test
+  void onBlock_gloasShouldRejectBlockBuildingOnInvalidatedParentPayloadEvictedFromStoreCache() {
+    // Once the parent payload has been invalidated and its envelope evicted from the store's
+    // bounded cache, a block building on it must still be rejected, not queued as waiting for a
+    // payload that fork choice has already seen
+    setupWithSpec(
+        TestSpecFactory.createMinimalGloas(
+            builder -> builder.blsSignatureVerifier(BLSSignatureVerifier.NOOP)),
+        StoreConfig.builder().blockCacheSize(1).build());
+
+    final SignedBlockAndState parent = chainBuilder.generateBlockAtSlot(ONE);
+    importBlock(parent);
+    final SignedExecutionPayloadEnvelope parentPayload = importPayloadOptimistically(parent);
+    final ChainBuilder emptySiblingChain = chainBuilder.fork();
+    final SignedBlockAndState child = chainBuilder.generateBlockAtSlot(3);
+    invalidateExecutionPayload(parent, parentPayload);
+    executionLayer.setPayloadStatus(PayloadStatus.VALID);
+    setForkChoiceNotifierForkChoiceUpdatedResult(PayloadStatus.VALID);
+    // a sibling on EMPTY(parent) and its payload evict the parent's envelope from the cache
+    final SignedBlockAndState sibling =
+        emptySiblingChain.generateBlockAtSlot(
+            UInt64.valueOf(2), BlockOptions.create().setBuildOnEmptyParent(true));
+    importBlock(sibling);
+    assertThat(
+            forkChoice.onExecutionPayloadEnvelope(
+                emptySiblingChain.getExecutionPayloadAtSlot(sibling.getSlot()).orElseThrow(),
+                executionLayer,
+                Optional.of(mock(ReceivedExecutionPayloadEventsChannel.class))))
+        .isCompletedWithValueMatching(ExecutionPayloadImportResult::isSuccessful);
+    assertThat(recentChainData.getStore().getExecutionPayloadIfAvailable(parent.getRoot()))
+        .isEmpty();
+
+    importBlockAndAssertFailure(child, FailureReason.DOES_NOT_DESCEND_FROM_LATEST_FINALIZED);
+    assertThat(recentChainData.containsBlock(child.getRoot())).isFalse();
+  }
+
+  @Test
+  void onBlock_gloasShouldRejectBlockWhoseParentWasInvalidatedThroughAncestorPayload() {
+    // Invalidating FULL(grandparent) takes the parent out of fork choice entirely, index entry
+    // included, while its state is still cached: the block is rejected by the finality walk, not
+    // queued as waiting for the parent's payload
+    setupWithSpec(
+        TestSpecFactory.createMinimalGloas(
+            builder -> builder.blsSignatureVerifier(BLSSignatureVerifier.NOOP)));
+
+    final SignedBlockAndState grandparent = chainBuilder.generateBlockAtSlot(ONE);
+    importBlock(grandparent);
+    final SignedExecutionPayloadEnvelope grandparentPayload =
+        importPayloadOptimistically(grandparent);
+    final SignedBlockAndState parent = chainBuilder.generateBlockAtSlot(2);
+    importBlock(parent);
+    final SignedBlockAndState child = chainBuilder.generateBlockAtSlot(3);
+
+    invalidateExecutionPayload(grandparent, grandparentPayload);
+    assertThat(recentChainData.containsBlock(parent.getRoot())).isFalse();
+    assertThat(recentChainData.getStore().getBlockStateIfAvailable(parent.getRoot())).isPresent();
+
+    executionLayer.setPayloadStatus(PayloadStatus.VALID);
+    importBlockAndAssertFailure(child, FailureReason.DOES_NOT_DESCEND_FROM_LATEST_FINALIZED);
+  }
+
+  @Test
+  void onBlock_gloasShouldImportFirstGloasBlockAfterSkippedSlotsAcrossTheFork() {
+    // The first Gloas block names the pre-fork execution head, which the fork upgrade also seeds
+    // as latest_execution_payload_bid: its pre-Gloas parent has no payload variants to require
+    setupWithSpec(TestSpecFactory.createMinimalWithGloasForkEpoch(ONE));
+    final UInt64 firstGloasSlot = spec.computeStartSlotAtEpoch(ONE);
+
+    final SignedBlockAndState preGloasParent =
+        chainBuilder.generateBlockAtSlot(firstGloasSlot.minus(2));
+    importBlock(preGloasParent);
+    final SignedBlockAndState firstGloasBlock =
+        chainBuilder.generateBlockAtSlot(firstGloasSlot.plus(1));
+
+    importBlock(firstGloasBlock);
+
+    assertThat(recentChainData.containsBlock(firstGloasBlock.getRoot())).isTrue();
+    assertThat(
+            recentChainData
+                .getForkChoiceStrategy()
+                .orElseThrow()
+                .getParentBeaconBlockNode(ForkChoiceNode.createBase(firstGloasBlock.getRoot())))
+        .contains(ForkChoiceNode.createBase(preGloasParent.getRoot()));
+  }
+
+  @Test
+  void onBlock_gloasShouldRejectBlockWhoseParentPayloadIsInvalidatedWhileImporting() {
+    // The parent payload can be invalidated between the on_block preconditions and the store
+    // update, so the check must be repeated on the fork choice thread right before importing.
+    setupWithSpec(
+        TestSpecFactory.createMinimalGloas(
+            builder -> builder.blsSignatureVerifier(BLSSignatureVerifier.NOOP)));
+    final ReadOnlyForkChoiceStrategy forkChoiceStrategy =
+        recentChainData.getForkChoiceStrategy().orElseThrow();
+
+    final SignedBlockAndState parent = chainBuilder.generateBlockAtSlot(ONE);
+    importBlock(parent);
+    final SignedExecutionPayloadEnvelope parentPayload = importPayloadOptimistically(parent);
+    final SignedBlockAndState child = chainBuilder.generateBlockAtSlot(2);
+
+    // Hold the child import after its preconditions have passed
+    final SafeFuture<BroadcastValidationResult> broadcastValidationResult = new SafeFuture<>();
+    when(blockBroadcastValidator.getResult()).thenReturn(broadcastValidationResult);
+    executionLayer.setPayloadStatus(PayloadStatus.VALID);
+    storageSystem.chainUpdater().advanceCurrentSlotToAtLeast(child.getSlot());
+    final SafeFuture<BlockImportResult> importResult =
+        forkChoice.onBlock(
+            child.getBlock(), Optional.empty(), blockBroadcastValidator, executionLayer);
+    assertThat(importResult).isNotDone();
+
+    invalidateExecutionPayload(parent, parentPayload);
+    broadcastValidationResult.complete(BroadcastValidationResult.SUCCESS);
+
+    assertBlockImportFailure(importResult, FailureReason.DOES_NOT_DESCEND_FROM_LATEST_FINALIZED);
+    assertThat(recentChainData.containsBlock(child.getRoot())).isFalse();
+    assertThat(forkChoiceStrategy.getBlockData(child.getRoot())).isEmpty();
+  }
+
+  @Test
   void onAttestation_gloasFullVoteShouldWaitForExecutionPayload() {
     setupWithSpec(
         TestSpecFactory.createMinimalGloas(
             builder -> builder.blsSignatureVerifier(BLSSignatureVerifier.NOOP)));
-    assertThat(forkChoice.applyGenesisExecutionPayloadForGloas()).isCompleted();
 
     final SignedBlockAndState targetBlock = chainBuilder.generateBlockAtSlot(ONE);
     importBlock(targetBlock);
@@ -1786,7 +2362,6 @@ class ForkChoiceTest {
     setupWithSpec(
         TestSpecFactory.createMinimalGloas(
             builder -> builder.blsSignatureVerifier(BLSSignatureVerifier.NOOP)));
-    assertThat(forkChoice.applyGenesisExecutionPayloadForGloas()).isCompleted();
 
     final SignedBlockAndState targetBlock = chainBuilder.generateBlockAtSlot(ONE);
     importBlock(targetBlock);
@@ -1811,12 +2386,560 @@ class ForkChoiceTest {
         .isEqualTo(ZERO);
   }
 
+  @ParameterizedTest
+  @ValueSource(booleans = {false, true})
+  void onExecutionPayloadEnvelope_shouldNotExtendUnsatisfiedInclusionListPayload(
+      final boolean timelyPtcVotes) {
+    setupWithSpec(
+        TestSpecFactory.createMinimalHeze(
+            builder -> builder.blsSignatureVerifier(BLSSignatureVerifier.NOOP)));
+
+    final SignedBlockAndState targetBlock = chainBuilder.generateBlockAtSlot(ONE);
+    importBlock(targetBlock);
+    executionLayer.setPayloadStatus(
+        PayloadStatus.valid(Optional.empty(), Optional.empty(), Optional.of(false)));
+
+    importPayload(targetBlock);
+
+    assertThat(recentChainData.getStore().satisfiesInclusionList(targetBlock.getRoot())).isFalse();
+    if (timelyPtcVotes) {
+      recentChainData
+          .getStore()
+          .getForkChoiceStrategy()
+          .onPayloadTimelinessCommitteeVote(
+              targetBlock.getRoot(),
+              ptcPositions(spec.getPtc(targetBlock.getState(), targetBlock.getSlot()).size()),
+              true,
+              true);
+    }
+    final UInt64 nextSlot = targetBlock.getSlot().increment();
+    storageSystem.chainUpdater().advanceCurrentSlotToAtLeast(nextSlot);
+    processHead(nextSlot);
+
+    assertThat(recentChainData.getChainHead().orElseThrow().getForkChoiceNode())
+        .isEqualTo(ForkChoiceNode.createEmpty(targetBlock.getRoot()));
+    assertThat(
+            recentChainData
+                .getStore()
+                .getForkChoiceStrategy()
+                .shouldExtendPayload(
+                    recentChainData.getStore(),
+                    new SlotAndBlockRoot(targetBlock.getSlot(), targetBlock.getRoot())))
+        .isFalse();
+    assertThat(
+            safeJoin(
+                    forkChoice.prepareForBlockProduction(nextSlot, BlockProductionPerformance.NOOP))
+                .getForkChoiceNode())
+        .isEqualTo(ForkChoiceNode.createEmpty(targetBlock.getRoot()));
+    assertThat(
+            recentChainData
+                .getStore()
+                .getForkChoiceStrategy()
+                .getBlockData(targetBlock.getRoot(), ForkChoicePayloadStatus.PAYLOAD_STATUS_FULL)
+                .orElseThrow()
+                .getValidationStatus())
+        .isEqualTo(ProtoNodeValidationStatus.VALID);
+
+    // IL satisfaction only affects extension from the immediately preceding slot.
+    final UInt64 laterSlot = nextSlot.increment();
+    storageSystem.chainUpdater().advanceCurrentSlotToAtLeast(laterSlot);
+    processHead(laterSlot);
+    assertThat(recentChainData.getChainHead().orElseThrow().getForkChoiceNode())
+        .isEqualTo(ForkChoiceNode.createFull(targetBlock.getRoot()));
+  }
+
+  @Test
+  void onExecutionPayloadEnvelope_shouldOnlyUseTimelyInclusionListsForBlockDependentRoot() {
+    setupWithSpec(
+        TestSpecFactory.createMinimalHeze(
+            builder -> builder.blsSignatureVerifier(BLSSignatureVerifier.NOOP)));
+
+    final SignedBlockAndState targetBlock = chainBuilder.generateBlockAtSlot(ONE);
+    importBlock(targetBlock);
+
+    // Inclusion lists for the previous slot: the block's shuffling dependent root for epoch 0 is
+    // the genesis block
+    final UInt64 inclusionListSlot = ZERO;
+    final Bytes32 dependentRoot = chainBuilder.getBlockAtSlot(ZERO).getRoot();
+    final Transaction expectedTransaction = inclusionListTransaction(Bytes.of(1));
+    final Transaction otherRootTransaction = inclusionListTransaction(Bytes.of(2));
+    final Transaction untimelyTransaction = inclusionListTransaction(Bytes.of(3));
+    inclusionListStore.processInclusionList(
+        signedInclusionList(inclusionListSlot, ZERO, dependentRoot, expectedTransaction), true);
+    inclusionListStore.processInclusionList(
+        signedInclusionList(
+            inclusionListSlot, ONE, dataStructureUtil.randomBytes32(), otherRootTransaction),
+        true);
+    inclusionListStore.processInclusionList(
+        signedInclusionList(
+            inclusionListSlot, UInt64.valueOf(2), dependentRoot, untimelyTransaction),
+        false);
+
+    executionLayer = spy(executionLayer);
+    importPayload(targetBlock);
+
+    final ArgumentCaptor<NewPayloadRequest> newPayloadRequest =
+        ArgumentCaptor.forClass(NewPayloadRequest.class);
+    verify(executionLayer).engineNewPayload(newPayloadRequest.capture(), any());
+    assertThat(newPayloadRequest.getValue().getInclusionList())
+        .hasValue(List.of(expectedTransaction));
+  }
+
+  private SchemaDefinitionsHeze hezeSchemaDefinitions() {
+    return SchemaDefinitionsHeze.required(
+        spec.forMilestone(SpecMilestone.HEZE).getSchemaDefinitions());
+  }
+
+  private Transaction inclusionListTransaction(final Bytes transactionBytes) {
+    return hezeSchemaDefinitions()
+        .getExecutionPayloadSchema()
+        .getTransactionSchema()
+        .fromBytes(transactionBytes);
+  }
+
+  private SignedInclusionList signedInclusionList(
+      final UInt64 slot,
+      final UInt64 validatorIndex,
+      final Bytes32 dependentRoot,
+      final Transaction transaction) {
+    final SchemaDefinitionsHeze schemaDefinitions = hezeSchemaDefinitions();
+    return schemaDefinitions
+        .getSignedInclusionListSchema()
+        .create(
+            schemaDefinitions
+                .getInclusionListSchema()
+                .create(slot, validatorIndex, dependentRoot, List.of(transaction)),
+            dataStructureUtil.randomSignature());
+  }
+
+  @Test
+  void onForkChoiceUpdatedResult_shouldRecordDelayedUnsatisfiedInclusionListResult() {
+    setupWithSpec(
+        TestSpecFactory.createMinimalHeze(
+            builder -> builder.blsSignatureVerifier(BLSSignatureVerifier.NOOP)));
+
+    final SignedBlockAndState targetBlock = chainBuilder.generateBlockAtSlot(ONE);
+    importBlock(targetBlock);
+    // The payload stays optimistic until the forkchoiceUpdated response below validates it
+    setForkChoiceNotifierForkChoiceUpdatedResult(PayloadStatus.SYNCING);
+    executionLayer.setPayloadStatus(PayloadStatus.ACCEPTED);
+    importPayload(targetBlock);
+
+    final UInt64 nextSlot = targetBlock.getSlot().increment();
+    storageSystem.chainUpdater().advanceCurrentSlotToAtLeast(nextSlot);
+    processHead(nextSlot);
+
+    final ForkChoiceNode fullNode = ForkChoiceNode.createFull(targetBlock.getRoot());
+    final PayloadStatus validButUnsatisfied =
+        PayloadStatus.valid(Optional.empty(), Optional.empty(), Optional.of(false));
+    forkChoice.onForkChoiceUpdatedResult(
+        new ForkChoiceUpdatedResultNotification(
+            new ForkChoiceState(
+                fullNode,
+                targetBlock.getSlot(),
+                UInt64.ZERO,
+                Bytes32.ZERO,
+                Bytes32.ZERO,
+                Bytes32.ZERO,
+                false),
+            Optional.empty(),
+            false,
+            SafeFuture.completedFuture(
+                new ForkChoiceUpdatedResult(validButUnsatisfied, Optional.empty()))));
+
+    assertThat(recentChainData.getStore().satisfiesInclusionList(targetBlock.getRoot())).isFalse();
+    processHead(nextSlot);
+    assertThat(recentChainData.getChainHead().orElseThrow().getForkChoiceNode())
+        .isEqualTo(ForkChoiceNode.createEmpty(targetBlock.getRoot()));
+  }
+
+  @Test
+  void onForkChoiceUpdatedResult_shouldNotChangeSatisfactionOfAlreadyValidPayload() {
+    setupWithSpec(
+        TestSpecFactory.createMinimalHeze(
+            builder -> builder.blsSignatureVerifier(BLSSignatureVerifier.NOOP)));
+
+    final SignedBlockAndState targetBlock = chainBuilder.generateBlockAtSlot(ONE);
+    importBlock(targetBlock);
+    // The payload is validated, and satisfies the inclusion lists, when it's imported
+    executionLayer.setPayloadStatus(
+        PayloadStatus.valid(Optional.empty(), Optional.empty(), Optional.of(true)));
+    importPayload(targetBlock);
+    assertThat(recentChainData.getStore().satisfiesInclusionList(targetBlock.getRoot())).isTrue();
+
+    notifyForkChoiceUpdatedResult(
+        ForkChoiceNode.createFull(targetBlock.getRoot()),
+        targetBlock.getSlot(),
+        PayloadStatus.valid(Optional.empty(), Optional.empty(), Optional.of(false)));
+
+    assertThat(recentChainData.getStore().satisfiesInclusionList(targetBlock.getRoot())).isTrue();
+  }
+
+  @Test
+  void onForkChoiceUpdatedResult_shouldRecordSatisfactionOfEmptyNodesParentPayload() {
+    setupWithSpec(
+        TestSpecFactory.createMinimalHeze(
+            builder -> builder.blsSignatureVerifier(BLSSignatureVerifier.NOOP)));
+    // Payloads stay optimistic until the forkchoiceUpdated response below validates them
+    setForkChoiceNotifierForkChoiceUpdatedResult(PayloadStatus.SYNCING);
+    executionLayer.setPayloadStatus(PayloadStatus.ACCEPTED);
+
+    final SignedBlockAndState parentBlock = chainBuilder.generateBlockAtSlot(ONE);
+    importBlock(parentBlock);
+    importPayload(parentBlock);
+    final SignedBlockAndState targetBlock = chainBuilder.generateBlockAtSlot(UInt64.valueOf(2));
+    importBlock(targetBlock);
+    final ForkChoiceNode emptyNode = ForkChoiceNode.createEmpty(targetBlock.getRoot());
+    final ForkChoiceNode parentFullNode = ForkChoiceNode.createFull(parentBlock.getRoot());
+    assertThat(
+            recentChainData.getStore().getForkChoiceStrategy().getParentBeaconBlockNode(emptyNode))
+        .contains(parentFullNode);
+    assertThat(
+            recentChainData
+                .getStore()
+                .getForkChoiceStrategy()
+                .getNodeData(parentFullNode)
+                .orElseThrow()
+                .isOptimistic())
+        .isTrue();
+
+    // An EMPTY node's execution head is its parent's payload, so the response is the parent
+    // payload's transition to VALID and says nothing about this block
+    notifyForkChoiceUpdatedResult(
+        emptyNode,
+        targetBlock.getSlot(),
+        PayloadStatus.valid(Optional.empty(), Optional.empty(), Optional.of(false)));
+
+    assertThat(
+            recentChainData
+                .getStore()
+                .getForkChoiceStrategy()
+                .getNodeData(parentFullNode)
+                .orElseThrow()
+                .isOptimistic())
+        .isFalse();
+    assertThat(recentChainData.getStore().satisfiesInclusionList(parentBlock.getRoot())).isFalse();
+    assertThat(recentChainData.getStore().satisfiesInclusionList(targetBlock.getRoot())).isTrue();
+  }
+
+  @Test
+  void onForkChoiceUpdatedResult_shouldNotChangeSatisfactionOfEmptyNodesValidParentPayload() {
+    setupWithSpec(
+        TestSpecFactory.createMinimalHeze(
+            builder -> builder.blsSignatureVerifier(BLSSignatureVerifier.NOOP)));
+
+    final SignedBlockAndState parentBlock = chainBuilder.generateBlockAtSlot(ONE);
+    importBlock(parentBlock);
+    // The parent payload is validated, and satisfies the inclusion lists, when it's imported
+    executionLayer.setPayloadStatus(
+        PayloadStatus.valid(Optional.empty(), Optional.empty(), Optional.of(true)));
+    importPayload(parentBlock);
+    final SignedBlockAndState targetBlock = chainBuilder.generateBlockAtSlot(UInt64.valueOf(2));
+    importBlock(targetBlock);
+
+    notifyForkChoiceUpdatedResult(
+        ForkChoiceNode.createEmpty(targetBlock.getRoot()),
+        targetBlock.getSlot(),
+        PayloadStatus.valid(Optional.empty(), Optional.empty(), Optional.of(false)));
+
+    assertThat(recentChainData.getStore().satisfiesInclusionList(parentBlock.getRoot())).isTrue();
+    assertThat(recentChainData.getStore().satisfiesInclusionList(targetBlock.getRoot())).isTrue();
+  }
+
+  @Test
+  void onForkChoiceUpdatedResult_shouldRecordInclusionListSatisfactionOnForkChoiceThread() {
+    final SignedBlockAndState targetBlock = setupHezeWithOptimisticPayloadAtSlotOne();
+    final RecentChainData recentChainDataSpy = spy(recentChainData);
+    doAnswer(
+            invocation -> {
+              eventThread.checkOnEventThread();
+              return invocation.callRealMethod();
+            })
+        .when(recentChainDataSpy)
+        .startStoreTransaction();
+    recentChainData = recentChainDataSpy;
+    recreateForkChoice(LateBlockReorgPreparationHandler.NOOP);
+
+    final ForkChoiceNode fullNode = ForkChoiceNode.createFull(targetBlock.getRoot());
+    // Completed from the test thread, as the EL response would be, rather than the fork choice
+    // thread
+    final SafeFuture<ForkChoiceUpdatedResult> forkChoiceUpdatedResult = new SafeFuture<>();
+    forkChoice.onForkChoiceUpdatedResult(
+        new ForkChoiceUpdatedResultNotification(
+            new ForkChoiceState(
+                fullNode,
+                targetBlock.getSlot(),
+                UInt64.ZERO,
+                Bytes32.ZERO,
+                Bytes32.ZERO,
+                Bytes32.ZERO,
+                false),
+            Optional.empty(),
+            false,
+            forkChoiceUpdatedResult));
+    forkChoiceUpdatedResult.complete(
+        new ForkChoiceUpdatedResult(
+            PayloadStatus.valid(Optional.empty(), Optional.empty(), Optional.of(false)),
+            Optional.empty()));
+
+    verify(recentChainDataSpy).startStoreTransaction();
+    assertThat(recentChainData.getStore().satisfiesInclusionList(targetBlock.getRoot())).isFalse();
+    assertThat(isOptimistic(fullNode)).isFalse();
+  }
+
+  @Test
+  void onForkChoiceUpdatedResult_shouldApplyPayloadResultWhenRecordingSatisfactionFails() {
+    final SignedBlockAndState targetBlock = setupHezeWithOptimisticPayloadAtSlotOne();
+    final StoreTransaction failingTransaction = mock(StoreTransaction.class);
+    when(failingTransaction.commit())
+        .thenReturn(SafeFuture.failedFuture(new IllegalStateException("commit failed")));
+    final RecentChainData recentChainDataSpy = spy(recentChainData);
+    doReturn(failingTransaction).when(recentChainDataSpy).startStoreTransaction();
+    recentChainData = recentChainDataSpy;
+    recreateForkChoice(LateBlockReorgPreparationHandler.NOOP);
+
+    final ForkChoiceNode fullNode = ForkChoiceNode.createFull(targetBlock.getRoot());
+    assertThat(isOptimistic(fullNode)).isTrue();
+    notifyForkChoiceUpdatedResult(
+        fullNode,
+        targetBlock.getSlot(),
+        PayloadStatus.valid(Optional.empty(), Optional.empty(), Optional.of(false)));
+
+    verify(failingTransaction).putUnsatisfiedInclusionListBlock(targetBlock.getRoot());
+    // The forkchoiceUpdated result is still applied
+    assertThat(isOptimistic(fullNode)).isFalse();
+  }
+
+  /** Imports a Heze block at slot 1 whose payload stays optimistic. */
+  private SignedBlockAndState setupHezeWithOptimisticPayloadAtSlotOne() {
+    setupWithSpec(
+        TestSpecFactory.createMinimalHeze(
+            builder -> builder.blsSignatureVerifier(BLSSignatureVerifier.NOOP)));
+
+    final SignedBlockAndState targetBlock = chainBuilder.generateBlockAtSlot(ONE);
+    importBlock(targetBlock);
+    setForkChoiceNotifierForkChoiceUpdatedResult(PayloadStatus.SYNCING);
+    executionLayer.setPayloadStatus(PayloadStatus.ACCEPTED);
+    importPayload(targetBlock);
+    assertThat(isOptimistic(ForkChoiceNode.createFull(targetBlock.getRoot()))).isTrue();
+    return targetBlock;
+  }
+
+  private boolean isOptimistic(final ForkChoiceNode node) {
+    return recentChainData
+        .getStore()
+        .getForkChoiceStrategy()
+        .getNodeData(node)
+        .orElseThrow()
+        .isOptimistic();
+  }
+
+  private void notifyForkChoiceUpdatedResult(
+      final ForkChoiceNode headNode, final UInt64 headSlot, final PayloadStatus payloadStatus) {
+    forkChoice.onForkChoiceUpdatedResult(
+        new ForkChoiceUpdatedResultNotification(
+            new ForkChoiceState(
+                headNode, headSlot, UInt64.ZERO, Bytes32.ZERO, Bytes32.ZERO, Bytes32.ZERO, false),
+            Optional.empty(),
+            false,
+            SafeFuture.completedFuture(
+                new ForkChoiceUpdatedResult(payloadStatus, Optional.empty()))));
+  }
+
+  @Test
+  void onInclusionList_shouldRejectListContainingEmptyTransaction() {
+    setupWithSpec(TestSpecFactory.createMinimalHeze());
+    final SchemaDefinitionsHeze schemaDefinitions =
+        SchemaDefinitionsHeze.required(spec.getGenesisSchemaDefinitions());
+    final Transaction emptyTransaction =
+        schemaDefinitions.getExecutionPayloadSchema().getTransactionSchema().fromBytes(Bytes.EMPTY);
+    final InclusionList inclusionList =
+        schemaDefinitions
+            .getInclusionListSchema()
+            .create(
+                ZERO,
+                ZERO,
+                dataStructureUtil.randomBytes32(),
+                List.of(inclusionListTransaction(Bytes.of(1)), emptyTransaction));
+    final SignedInclusionList signedInclusionList =
+        schemaDefinitions
+            .getSignedInclusionListSchema()
+            .create(inclusionList, dataStructureUtil.randomSignature());
+
+    final InclusionListImportResult result =
+        safeJoin(forkChoice.onInclusionList(signedInclusionList));
+
+    assertThat(result.isSuccessful()).isFalse();
+    assertThat(result.getFailureReason())
+        .contains(InclusionListImportResult.FailureReason.EMPTY_TRANSACTION);
+    assertThat(
+            inclusionListStore.getInclusionLists(
+                new SlotAndBlockRoot(ZERO, inclusionList.getDependentRoot())))
+        .isEmpty();
+  }
+
+  @Test
+  void onInclusionList_shouldRejectListWithNoTransactions() {
+    setupWithSpec(TestSpecFactory.createMinimalHeze());
+    final SignedInclusionList signedInclusionList =
+        signedInclusionList(ZERO, dataStructureUtil.randomBytes32(), List.of());
+
+    final InclusionListImportResult result =
+        safeJoin(forkChoice.onInclusionList(signedInclusionList));
+
+    assertThat(result.getFailureReason())
+        .contains(InclusionListImportResult.FailureReason.NO_TRANSACTIONS);
+    assertNotStored(signedInclusionList);
+  }
+
+  @Test
+  void onInclusionList_shouldRejectListForFutureSlot() {
+    setupWithSpec(TestSpecFactory.createMinimalHeze());
+    final SignedInclusionList signedInclusionList =
+        signedInclusionList(
+            ONE, dataStructureUtil.randomBytes32(), List.of(inclusionListTransaction(Bytes.of(1))));
+
+    final InclusionListImportResult result =
+        safeJoin(forkChoice.onInclusionList(signedInclusionList));
+
+    assertThat(result.getFailureReason())
+        .contains(InclusionListImportResult.FailureReason.SLOT_OUTSIDE_RETENTION_WINDOW);
+    assertNotStored(signedInclusionList);
+  }
+
+  @Test
+  void onInclusionList_shouldOnlyStoreListsWithinRetentionWindow() {
+    setupWithSpec(TestSpecFactory.createMinimalHeze());
+    final int minSlotsForInclusionListsRequests =
+        SpecConfigHeze.required(spec.getGenesisSpecConfig()).getMinSlotsForInclusionListsRequests();
+    final UInt64 currentSlot = UInt64.valueOf(minSlotsForInclusionListsRequests + 1);
+    storageSystem.chainUpdater().setCurrentSlot(currentSlot);
+    final SignedInclusionList oldestRetained =
+        signedInclusionList(
+            currentSlot.minus(minSlotsForInclusionListsRequests),
+            dataStructureUtil.randomBytes32(),
+            List.of(inclusionListTransaction(Bytes.of(1))));
+    final SignedInclusionList tooOld =
+        signedInclusionList(
+            currentSlot.minus(minSlotsForInclusionListsRequests + 1),
+            dataStructureUtil.randomBytes32(),
+            List.of(inclusionListTransaction(Bytes.of(2))));
+
+    assertThat(safeJoin(forkChoice.onInclusionList(oldestRetained)).isSuccessful()).isTrue();
+    assertThat(safeJoin(forkChoice.onInclusionList(tooOld)).getFailureReason())
+        .contains(InclusionListImportResult.FailureReason.SLOT_OUTSIDE_RETENTION_WINDOW);
+    assertNotStored(tooOld);
+  }
+
+  @Test
+  void onInclusionList_shouldMeasureTimelinessFromSlotStartAfterSlotDurationChange() {
+    // EIP-8198: 6000 ms slots, then 5000 ms slots from Heze at epoch 1 (slot 8, 48 s)
+    setupWithSpec(
+        TestSpecFactory.createMinimalHeze(
+            builder -> builder.hezeForkEpoch(ONE).slotDurationMsHeze(5000)));
+    final UInt64 inclusionListSlot = UInt64.valueOf(9);
+    final int inclusionListDueMillis =
+        spec.getInclusionListDueMillis(inclusionListSlot).orElseThrow();
+    final UInt64 slotStartMillis =
+        spec.computeTimeMillisAtSlot(
+            inclusionListSlot, recentChainData.getStore().getGenesisTimeMillis());
+    assertThat(slotStartMillis.minus(recentChainData.getStore().getGenesisTimeMillis()))
+        .isEqualTo(UInt64.valueOf(53_000));
+
+    final SignedInclusionList timely =
+        signedInclusionList(
+            inclusionListSlot,
+            dataStructureUtil.randomBytes32(),
+            List.of(inclusionListTransaction(Bytes.of(1))));
+    storageSystem.chainUpdater().setTimeMillis(slotStartMillis.plus(inclusionListDueMillis - 1));
+    assertThat(safeJoin(forkChoice.onInclusionList(timely)).isSuccessful()).isTrue();
+
+    // Measuring time into the slot modulo the slot duration would treat this as 2500 ms
+    final SignedInclusionList late =
+        signedInclusionList(
+            inclusionListSlot,
+            dataStructureUtil.randomBytes32(),
+            List.of(inclusionListTransaction(Bytes.of(2))));
+    storageSystem.chainUpdater().setTimeMillis(slotStartMillis.plus(3_500));
+    assertThat(inclusionListDueMillis).isLessThan(3_500);
+    assertThat(safeJoin(forkChoice.onInclusionList(late)).isSuccessful()).isTrue();
+
+    assertThat(
+            inclusionListStore.getTimelyInclusionLists(
+                new SlotAndBlockRoot(inclusionListSlot, timely.getMessage().getDependentRoot())))
+        .containsExactly(timely.getMessage());
+    assertThat(
+            inclusionListStore.getTimelyInclusionLists(
+                new SlotAndBlockRoot(inclusionListSlot, late.getMessage().getDependentRoot())))
+        .isEmpty();
+    assertThat(
+            inclusionListStore.getInclusionLists(
+                new SlotAndBlockRoot(inclusionListSlot, late.getMessage().getDependentRoot())))
+        .isPresent();
+  }
+
+  private SignedInclusionList signedInclusionList(
+      final UInt64 slot, final Bytes32 dependentRoot, final List<Transaction> transactions) {
+    final SchemaDefinitionsHeze schemaDefinitions = hezeSchemaDefinitions();
+    return schemaDefinitions
+        .getSignedInclusionListSchema()
+        .create(
+            schemaDefinitions
+                .getInclusionListSchema()
+                .create(slot, ZERO, dependentRoot, transactions),
+            dataStructureUtil.randomSignature());
+  }
+
+  private void assertNotStored(final SignedInclusionList signedInclusionList) {
+    final InclusionList inclusionList = signedInclusionList.getMessage();
+    assertThat(
+            inclusionListStore.getInclusionLists(
+                new SlotAndBlockRoot(inclusionList.getSlot(), inclusionList.getDependentRoot())))
+        .isEmpty();
+  }
+
+  @Test
+  void onInclusionList_shouldRejectListExceedingTransactionSizeLimit() {
+    setupWithSpec(TestSpecFactory.createMinimalHeze());
+    final SchemaDefinitionsHeze schemaDefinitions =
+        SchemaDefinitionsHeze.required(spec.getGenesisSchemaDefinitions());
+    final int maxTransactionsSize =
+        spec.atSlot(ZERO)
+            .getConfig()
+            .toVersionHeze()
+            .orElseThrow()
+            .getMaxTransactionsBytesPerInclusionList();
+    final Transaction oversizedTransaction =
+        schemaDefinitions
+            .getExecutionPayloadSchema()
+            .getTransactionSchema()
+            .fromBytes(dataStructureUtil.randomBytes(maxTransactionsSize + 1));
+    final InclusionList inclusionList =
+        schemaDefinitions
+            .getInclusionListSchema()
+            .create(ZERO, ZERO, dataStructureUtil.randomBytes32(), List.of(oversizedTransaction));
+    final SignedInclusionList signedInclusionList =
+        schemaDefinitions
+            .getSignedInclusionListSchema()
+            .create(inclusionList, dataStructureUtil.randomSignature());
+
+    final InclusionListImportResult result =
+        safeJoin(forkChoice.onInclusionList(signedInclusionList));
+
+    assertThat(result.isSuccessful()).isFalse();
+    assertThat(result.getFailureReason())
+        .contains(InclusionListImportResult.FailureReason.TRANSACTIONS_SIZE_EXCEEDS_LIMIT);
+    assertThat(
+            inclusionListStore.getInclusionLists(
+                new SlotAndBlockRoot(ZERO, inclusionList.getDependentRoot())))
+        .isEmpty();
+  }
+
   @Test
   void applyIndexedAttestations_gloasFullVoteShouldNotApplyWhenExecutionPayloadMissing() {
     setupWithSpec(
         TestSpecFactory.createMinimalGloas(
             builder -> builder.blsSignatureVerifier(BLSSignatureVerifier.NOOP)));
-    assertThat(forkChoice.applyGenesisExecutionPayloadForGloas()).isCompleted();
 
     final SignedBlockAndState targetBlock = chainBuilder.generateBlockAtSlot(ONE);
     importBlock(targetBlock);
@@ -1845,6 +2968,124 @@ class ForkChoiceTest {
                 .orElseThrow()
                 .getWeight())
         .isEqualTo(ZERO);
+  }
+
+  /** Imports the block's execution payload while the execution layer is still syncing. */
+  private SignedExecutionPayloadEnvelope importPayloadOptimistically(
+      final SignedBlockAndState block) {
+    final SignedExecutionPayloadEnvelope payload =
+        chainBuilder.getExecutionPayloadAtSlot(block.getSlot()).orElseThrow();
+    executionLayer.setPayloadStatus(PayloadStatus.SYNCING);
+    // the execution layer also answers SYNCING to the following forkchoiceUpdated
+    setForkChoiceNotifierForkChoiceUpdatedResult(PayloadStatus.SYNCING);
+    final SafeFuture<ExecutionPayloadImportResult> payloadImportResult =
+        forkChoice.onExecutionPayloadEnvelope(
+            payload,
+            executionLayer,
+            Optional.of(mock(ReceivedExecutionPayloadEventsChannel.class)));
+    assertThat(payloadImportResult)
+        .isCompletedWithValueMatching(ExecutionPayloadImportResult::isImportedOptimistically);
+    assertThat(
+            recentChainData
+                .getForkChoiceStrategy()
+                .orElseThrow()
+                .getBlockData(block.getRoot(), ForkChoicePayloadStatus.PAYLOAD_STATUS_FULL)
+                .map(ProtoNodeData::isOptimistic))
+        .contains(true);
+    return payload;
+  }
+
+  /** Delivers an INVALID forkchoiceUpdated verdict for FULL(block). */
+  private void invalidateExecutionPayload(
+      final SignedBlockAndState block, final SignedExecutionPayloadEnvelope payload) {
+    final ExecutionPayload executionPayload = payload.getMessage().getPayload();
+    forkChoice.onForkChoiceUpdatedResult(
+        new ForkChoiceUpdatedResultNotification(
+            new ForkChoiceState(
+                ForkChoiceNode.createFull(block.getRoot()),
+                block.getSlot(),
+                executionPayload.getBlockNumber(),
+                executionPayload.getBlockHash(),
+                Bytes32.ZERO,
+                Bytes32.ZERO,
+                true),
+            Optional.empty(),
+            false,
+            SafeFuture.completedFuture(
+                new ForkChoiceUpdatedResult(
+                    PayloadStatus.invalid(Optional.empty(), Optional.of("bad payload")),
+                    Optional.empty()))));
+  }
+
+  private Bytes32 getExecutionPayloadBidParentBlockHash(final SignedBlockAndState block) {
+    return BeaconBlockBodyGloas.required(block.getBlock().getMessage().getBody())
+        .getSignedExecutionPayloadBid()
+        .getMessage()
+        .getParentBlockHash();
+  }
+
+  @ParameterizedTest
+  @ValueSource(booleans = {true, false})
+  void initializeFromAnchorPoint_gloasShouldNotMarkCheckpointAnchorAsFull(
+      final boolean stateOnlyAnchor) {
+    setupWithSpec(
+        TestSpecFactory.createMinimalGloas(
+            builder -> builder.blsSignatureVerifier(BLSSignatureVerifier.NOOP)));
+    storageSystem.chainUpdater().advanceChainUntil(spec.computeStartSlotAtEpoch(UInt64.valueOf(3)));
+    final SignedBlockAndState anchorBlockAndState =
+        chainBuilder.getLatestBlockAndStateAtEpochBoundary(UInt64.valueOf(2));
+    final AnchorPoint anchor =
+        stateOnlyAnchor
+            ? AnchorPoint.fromInitialState(spec, anchorBlockAndState.getState())
+            : AnchorPoint.fromInitialBlockAndState(spec, anchorBlockAndState);
+
+    final StorageSystem checkpointStorageSystem =
+        InMemoryStorageSystemBuilder.create()
+            .storageMode(StateStorageMode.PRUNE)
+            .specProvider(spec)
+            .numberOfValidators(16)
+            .build();
+    final RecentChainData checkpointRecentChainData = checkpointStorageSystem.recentChainData();
+    checkpointRecentChainData.initializeFromAnchorPoint(
+        anchor, spec.computeTimeAtSlot(anchor.getBlockSlot(), genesis.getState().getGenesisTime()));
+    // As in BeaconChainController, the head is selected while fork choice is constructed
+    createForkChoice(checkpointRecentChainData);
+    final ReadOnlyForkChoiceStrategy forkChoiceStrategy =
+        checkpointRecentChainData.getForkChoiceStrategy().orElseThrow();
+    final ChainHead head = checkpointRecentChainData.getChainHead().orElseThrow();
+    assertThat(head.getRoot()).isEqualTo(anchor.getRoot());
+
+    // The anchor payload is only known once its real envelope is received, so fork choice does not
+    // treat the anchor as FULL
+    assertThat(head.getPayloadStatus()).isNotEqualTo(ForkChoicePayloadStatus.PAYLOAD_STATUS_FULL);
+    assertThat(
+            forkChoiceStrategy.getBlockData(
+                anchor.getRoot(), ForkChoicePayloadStatus.PAYLOAD_STATUS_FULL))
+        .isEmpty();
+    assertThat(
+            checkpointRecentChainData.getStore().getExecutionPayloadIfAvailable(anchor.getRoot()))
+        .isEmpty();
+    assertThat(
+            checkpointStorageSystem.database().getBlindedExecutionPayloadEnvelope(anchor.getRoot()))
+        .isEmpty();
+  }
+
+  private ForkChoice createForkChoice(final RecentChainData recentChainData) {
+    return new ForkChoice(
+        spec,
+        eventThread,
+        recentChainData,
+        inclusionListStore,
+        forkChoiceNotifier,
+        new ForkChoiceStateProvider(eventThread, recentChainData),
+        new TickProcessor(spec, recentChainData),
+        transitionBlockValidator,
+        FastConfirmationTracker.NOOP,
+        DEFAULT_FORK_CHOICE_LATE_BLOCK_REORG_ENABLED,
+        LateBlockReorgPreparationHandler.NOOP,
+        debugDataDumper,
+        metricsSystem,
+        AsyncBLSSignatureVerifier.wrap(BLSSignatureVerifier.SIMPLE));
   }
 
   private void importPayload(final SignedBlockAndState targetBlock) {
@@ -2049,6 +3290,7 @@ class ForkChoiceTest {
             spec,
             eventThread,
             recentChainData,
+            inclusionListStore,
             forkChoiceNotifier,
             new ForkChoiceStateProvider(eventThread, recentChainData),
             new TickProcessor(spec, recentChainData),

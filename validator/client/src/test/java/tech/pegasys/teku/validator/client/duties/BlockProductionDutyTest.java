@@ -1,5 +1,5 @@
 /*
- * Copyright Consensys Software Inc., 2026
+ * Copyright (c) 2026 Consensys Incorporated. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with
  * the License. You may obtain a copy of the License at
@@ -17,6 +17,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -75,6 +76,8 @@ import tech.pegasys.teku.validator.client.BuilderConfigProvider;
 import tech.pegasys.teku.validator.client.ForkProvider;
 import tech.pegasys.teku.validator.client.Validator;
 import tech.pegasys.teku.validator.client.duties.execution.ExecutionPayloadBidEventsChannel;
+import tech.pegasys.teku.validator.client.hashchain.HashChain;
+import tech.pegasys.teku.validator.client.hashchain.HashChainGenerator;
 import tech.pegasys.teku.validator.client.signer.BlockContainerSigner;
 import tech.pegasys.teku.validator.client.signer.MilestoneBasedBlockContainerSigner;
 
@@ -119,6 +122,8 @@ class BlockProductionDutyTest {
             executionPayloadBidEventsChannelPublisher,
             builderConfigProvider);
     when(forkProvider.getForkInfo(any())).thenReturn(completedFuture(fork));
+    when(validatorApiChannel.getValidatorRandaoCommitment(any()))
+        .thenReturn(completedFuture(Optional.empty()));
     when(builderConfigProvider.getBuilderConfig(any(), any()))
         .thenReturn(SafeFuture.completedFuture(Optional.empty()));
   }
@@ -547,6 +552,308 @@ class BlockProductionDutyTest {
         .containsExactly(
             "Blobs: 4",
             "Builder: 1702157, Bid gas limit: 4817049881864128048, Bid EL block: d3b102..314a");
+  }
+
+  @Test
+  public void shouldProduceBlockWithLegacyBlsRevealWhenCommitmentIsZero() {
+    final BLSSignature randaoReveal = dataStructureUtil.randomSignature();
+    final BLSSignature blockSignature = dataStructureUtil.randomSignature();
+    final BlockContainerAndMetaData blockContainerAndMetaData =
+        dataStructureUtil.randomBlockContainerAndMetaData(CAPELLA_SLOT);
+    final BeaconBlock unsignedBlock = blockContainerAndMetaData.blockContainer().getBlock();
+
+    when(validatorApiChannel.getValidatorRandaoCommitment(validator.getPublicKey()))
+        .thenReturn(completedFuture(Optional.of(Bytes32.ZERO)));
+    when(signer.createRandaoReveal(spec.computeEpochAtSlot(CAPELLA_SLOT), fork))
+        .thenReturn(completedFuture(randaoReveal));
+    when(validatorApiChannel.createUnsignedBlock(
+            CAPELLA_SLOT, randaoReveal, Optional.of(graffiti), false, Optional.empty()))
+        .thenReturn(completedFuture(Optional.of(blockContainerAndMetaData)));
+    when(signer.signBlock(unsignedBlock, fork)).thenReturn(completedFuture(blockSignature));
+    when(validatorApiChannel.sendSignedBlock(any(), any(), any()))
+        .thenReturn(completedFuture(SendSignedBlockResult.success(unsignedBlock.getRoot())));
+
+    performAndReportDuty();
+
+    verify(signer).createRandaoReveal(spec.computeEpochAtSlot(CAPELLA_SLOT), fork);
+    verify(validatorApiChannel)
+        .createUnsignedBlock(
+            CAPELLA_SLOT, randaoReveal, Optional.of(graffiti), false, Optional.empty());
+    verify(validatorLogger)
+        .dutyCompleted(
+            eq(TYPE), eq(CAPELLA_SLOT), eq(1), eq(Set.of(unsignedBlock.hashTreeRoot())), any());
+  }
+
+  @Test
+  public void shouldProduceBlockWithHashChainRevealWhenCommitmentIsNonZero() {
+    final HashChain hashChain =
+        HashChainGenerator.generateFromSeed(dataStructureUtil.randomBytes32(), 10);
+    final Bytes32 currentCommitment = hashChain.getCommitment();
+    final Bytes32 expectedPreimage =
+        hashChain.getRevealForCommitment(currentCommitment).orElseThrow();
+
+    final BLSSignature blockSignature = dataStructureUtil.randomSignature();
+    final BlockContainerAndMetaData blockContainerAndMetaData =
+        dataStructureUtil.randomBlockContainerAndMetaData(CAPELLA_SLOT);
+    final BeaconBlock unsignedBlock = blockContainerAndMetaData.blockContainer().getBlock();
+
+    final BlockProductionDuty hashChainDuty =
+        new BlockProductionDuty(
+            validator,
+            CAPELLA_SLOT,
+            forkProvider,
+            validatorApiChannel,
+            blockContainerSigner,
+            spec,
+            validatorDutyMetrics,
+            executionPayloadBidEventsChannelPublisher,
+            builderConfigProvider,
+            Optional.empty(),
+            Optional.of(hashChain));
+
+    when(validatorApiChannel.getValidatorRandaoCommitment(validator.getPublicKey()))
+        .thenReturn(completedFuture(Optional.of(currentCommitment)));
+    when(validatorApiChannel.createUnsignedBlock(
+            CAPELLA_SLOT,
+            BLSSignature.infinity(),
+            Optional.of(expectedPreimage),
+            Optional.of(graffiti),
+            false,
+            Optional.empty()))
+        .thenReturn(completedFuture(Optional.of(blockContainerAndMetaData)));
+    when(signer.signBlock(unsignedBlock, fork)).thenReturn(completedFuture(blockSignature));
+    when(validatorApiChannel.sendSignedBlock(any(), any(), any()))
+        .thenReturn(completedFuture(SendSignedBlockResult.success(unsignedBlock.getRoot())));
+
+    final SafeFuture<DutyResult> result = hashChainDuty.performDuty();
+    assertThat(result).isCompleted();
+    safeJoin(result).report(TYPE, CAPELLA_SLOT, validatorLogger);
+
+    verify(validatorApiChannel)
+        .createUnsignedBlock(
+            CAPELLA_SLOT,
+            BLSSignature.infinity(),
+            Optional.of(expectedPreimage),
+            Optional.of(graffiti),
+            false,
+            Optional.empty());
+    verify(signer, never()).createRandaoReveal(any(), any());
+    verify(signer).signBlock(unsignedBlock, fork);
+    verify(validatorLogger)
+        .dutyCompleted(
+            eq(TYPE), eq(CAPELLA_SLOT), eq(1), eq(Set.of(unsignedBlock.hashTreeRoot())), any());
+  }
+
+  @Test
+  public void shouldProduceSameRevealAfterOrphanedProposalWithoutAdvancingCursor() {
+    final HashChain hashChain =
+        HashChainGenerator.generateFromSeed(dataStructureUtil.randomBytes32(), 10);
+    final Bytes32 currentCommitment = hashChain.getCommitment();
+    final Bytes32 expectedPreimage =
+        hashChain.getRevealForCommitment(currentCommitment).orElseThrow();
+
+    final BLSSignature blockSignature = dataStructureUtil.randomSignature();
+    final BlockContainerAndMetaData blockContainerAndMetaData =
+        dataStructureUtil.randomBlockContainerAndMetaData(CAPELLA_SLOT);
+    final BeaconBlock unsignedBlock = blockContainerAndMetaData.blockContainer().getBlock();
+
+    final BlockProductionDuty hashChainDuty1 =
+        new BlockProductionDuty(
+            validator,
+            CAPELLA_SLOT,
+            forkProvider,
+            validatorApiChannel,
+            blockContainerSigner,
+            spec,
+            validatorDutyMetrics,
+            executionPayloadBidEventsChannelPublisher,
+            builderConfigProvider,
+            Optional.empty(),
+            Optional.of(hashChain));
+
+    when(validatorApiChannel.getValidatorRandaoCommitment(validator.getPublicKey()))
+        .thenReturn(completedFuture(Optional.of(currentCommitment)));
+    when(validatorApiChannel.createUnsignedBlock(
+            CAPELLA_SLOT,
+            BLSSignature.infinity(),
+            Optional.of(expectedPreimage),
+            Optional.of(graffiti),
+            false,
+            Optional.empty()))
+        .thenReturn(completedFuture(Optional.of(blockContainerAndMetaData)));
+    when(signer.signBlock(unsignedBlock, fork)).thenReturn(completedFuture(blockSignature));
+    when(validatorApiChannel.sendSignedBlock(any(), any(), any()))
+        .thenReturn(completedFuture(SendSignedBlockResult.success(unsignedBlock.getRoot())));
+
+    // First proposal at slot N
+    final SafeFuture<DutyResult> result1 = hashChainDuty1.performDuty();
+    assertThat(result1).isCompleted();
+
+    // Reorg happens -> proposal was orphaned, so canonical commitment in state is still
+    // currentCommitment
+    final UInt64 nextSlot = CAPELLA_SLOT.plus(1);
+    final BlockContainerAndMetaData nextBlockContainerAndMetaData =
+        dataStructureUtil.randomBlockContainerAndMetaData(nextSlot);
+    final BeaconBlock nextUnsignedBlock = nextBlockContainerAndMetaData.blockContainer().getBlock();
+
+    final BlockProductionDuty hashChainDuty2 =
+        new BlockProductionDuty(
+            validator,
+            nextSlot,
+            forkProvider,
+            validatorApiChannel,
+            blockContainerSigner,
+            spec,
+            validatorDutyMetrics,
+            executionPayloadBidEventsChannelPublisher,
+            builderConfigProvider,
+            Optional.empty(),
+            Optional.of(hashChain));
+
+    when(validatorApiChannel.createUnsignedBlock(
+            nextSlot,
+            BLSSignature.infinity(),
+            Optional.of(expectedPreimage),
+            Optional.of(graffiti),
+            false,
+            Optional.empty()))
+        .thenReturn(completedFuture(Optional.of(nextBlockContainerAndMetaData)));
+    when(signer.signBlock(nextUnsignedBlock, fork)).thenReturn(completedFuture(blockSignature));
+    when(validatorApiChannel.sendSignedBlock(any(), any(), any()))
+        .thenReturn(completedFuture(SendSignedBlockResult.success(nextUnsignedBlock.getRoot())));
+
+    // Second proposal at slot N+1 after reorg -> should reveal same preimage
+    final SafeFuture<DutyResult> result2 = hashChainDuty2.performDuty();
+    assertThat(result2).isCompleted();
+
+    verify(validatorApiChannel)
+        .createUnsignedBlock(
+            nextSlot,
+            BLSSignature.infinity(),
+            Optional.of(expectedPreimage),
+            Optional.of(graffiti),
+            false,
+            Optional.empty());
+  }
+
+  @Test
+  public void shouldProduceNextRevealWhenCanonicalCommitmentAdvances() {
+    final HashChain hashChain =
+        HashChainGenerator.generateFromSeed(dataStructureUtil.randomBytes32(), 10);
+    final Bytes32 commitment1 = hashChain.getCommitment();
+    final Bytes32 reveal1 = hashChain.getRevealForCommitment(commitment1).orElseThrow();
+    final Bytes32 commitment2 = reveal1;
+    final Bytes32 reveal2 = hashChain.getRevealForCommitment(commitment2).orElseThrow();
+
+    final UInt64 slot2 = CAPELLA_SLOT.plus(32);
+    final BLSSignature blockSignature2 = dataStructureUtil.randomSignature();
+    final BlockContainerAndMetaData blockContainerAndMetaData2 =
+        dataStructureUtil.randomBlockContainerAndMetaData(slot2);
+    final BeaconBlock unsignedBlock2 = blockContainerAndMetaData2.blockContainer().getBlock();
+
+    final BlockProductionDuty hashChainDuty =
+        new BlockProductionDuty(
+            validator,
+            slot2,
+            forkProvider,
+            validatorApiChannel,
+            blockContainerSigner,
+            spec,
+            validatorDutyMetrics,
+            executionPayloadBidEventsChannelPublisher,
+            builderConfigProvider,
+            Optional.empty(),
+            Optional.of(hashChain));
+
+    when(validatorApiChannel.getValidatorRandaoCommitment(validator.getPublicKey()))
+        .thenReturn(completedFuture(Optional.of(commitment2)));
+    when(validatorApiChannel.createUnsignedBlock(
+            slot2,
+            BLSSignature.infinity(),
+            Optional.of(reveal2),
+            Optional.of(graffiti),
+            false,
+            Optional.empty()))
+        .thenReturn(completedFuture(Optional.of(blockContainerAndMetaData2)));
+    when(signer.signBlock(unsignedBlock2, fork)).thenReturn(completedFuture(blockSignature2));
+    when(validatorApiChannel.sendSignedBlock(any(), any(), any()))
+        .thenReturn(completedFuture(SendSignedBlockResult.success(unsignedBlock2.getRoot())));
+
+    final SafeFuture<DutyResult> result = hashChainDuty.performDuty();
+    assertThat(result).isCompleted();
+
+    verify(validatorApiChannel)
+        .createUnsignedBlock(
+            slot2,
+            BLSSignature.infinity(),
+            Optional.of(reveal2),
+            Optional.of(graffiti),
+            false,
+            Optional.empty());
+  }
+
+  @Test
+  public void shouldFailWhenRegisteredValidatorHasNoHashChain() {
+    final Bytes32 currentCommitment = dataStructureUtil.randomBytes32();
+    when(validatorApiChannel.getValidatorRandaoCommitment(validator.getPublicKey()))
+        .thenReturn(completedFuture(Optional.of(currentCommitment)));
+
+    final BlockProductionDuty dutyWithoutChain =
+        new BlockProductionDuty(
+            validator,
+            CAPELLA_SLOT,
+            forkProvider,
+            validatorApiChannel,
+            blockContainerSigner,
+            spec,
+            validatorDutyMetrics,
+            executionPayloadBidEventsChannelPublisher,
+            builderConfigProvider);
+
+    final SafeFuture<DutyResult> result = dutyWithoutChain.performDuty();
+    assertThat(result).isCompleted();
+    result.join().report(TYPE, CAPELLA_SLOT, validatorLogger);
+
+    verify(validatorLogger)
+        .dutyFailed(
+            eq(TYPE),
+            eq(CAPELLA_SLOT),
+            eq(Set.of(validator.getPublicKey().toAbbreviatedString())),
+            any(IllegalStateException.class));
+  }
+
+  @Test
+  public void shouldFailWhenPreimageNotFoundForCanonicalCommitment() {
+    final HashChain hashChain =
+        HashChainGenerator.generateFromSeed(dataStructureUtil.randomBytes32(), 10);
+    final Bytes32 unknownCommitment = dataStructureUtil.randomBytes32();
+    when(validatorApiChannel.getValidatorRandaoCommitment(validator.getPublicKey()))
+        .thenReturn(completedFuture(Optional.of(unknownCommitment)));
+
+    final BlockProductionDuty dutyWithMismatchedChain =
+        new BlockProductionDuty(
+            validator,
+            CAPELLA_SLOT,
+            forkProvider,
+            validatorApiChannel,
+            blockContainerSigner,
+            spec,
+            validatorDutyMetrics,
+            executionPayloadBidEventsChannelPublisher,
+            builderConfigProvider,
+            Optional.empty(),
+            Optional.of(hashChain));
+
+    final SafeFuture<DutyResult> result = dutyWithMismatchedChain.performDuty();
+    assertThat(result).isCompleted();
+    result.join().report(TYPE, CAPELLA_SLOT, validatorLogger);
+
+    verify(validatorLogger)
+        .dutyFailed(
+            eq(TYPE),
+            eq(CAPELLA_SLOT),
+            eq(Set.of(validator.getPublicKey().toAbbreviatedString())),
+            any(IllegalStateException.class));
   }
 
   public void assertDutyFails(final RuntimeException error) {

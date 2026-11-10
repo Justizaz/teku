@@ -1,5 +1,5 @@
 /*
- * Copyright Consensys Software Inc., 2026
+ * Copyright (c) 2026 Consensys Incorporated. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with
  * the License. You may obtain a copy of the License at
@@ -116,6 +116,7 @@ class Store extends CacheableStore {
   private final Map<Bytes32, SignedBeaconBlock> blocks;
   private final CachingTaskQueue<SlotAndBlockRoot, BeaconState> checkpointStates;
   private final Map<SlotAndBlockRoot, List<BlobSidecar>> blobSidecars;
+
   private UInt64 timeMillis;
   private UInt64 genesisTime;
   private AnchorPoint finalizedAnchor;
@@ -743,6 +744,11 @@ class Store extends CacheableStore {
         headUnrealizedJustifiedCheckpoint.equals(parentUnrealizedJustifiedCheckpoint));
   }
 
+  @Override
+  public boolean satisfiesInclusionList(final Bytes32 blockRoot) {
+    return forkChoiceStrategy.satisfiesInclusionList(blockRoot);
+  }
+
   private Optional<ProtoNodeData> getBlockDataFromForkChoiceStrategy(final Bytes32 root) {
     readLock.lock();
     try {
@@ -783,7 +789,27 @@ class Store extends CacheableStore {
   public SafeFuture<Optional<BeaconState>> retrieveBlockState(
       final SlotAndBlockRoot slotAndBlockRoot) {
     return checkpointStates.perform(
-        new StateAtSlotTask(spec, slotAndBlockRoot, this::retrieveBlockState));
+        new StateAtSlotTask(
+            spec,
+            slotAndBlockRoot,
+            blockRoot ->
+                getOrRegenerateBlockAndState(blockRoot)
+                    .thenApply(
+                        result ->
+                            result
+                                .map(StateAndBlockSummary::getState)
+                                .filter(
+                                    state -> {
+                                      final UInt64 requestedSlot = slotAndBlockRoot.getSlot();
+                                      // An advanced checkpoint cannot supply an earlier state.
+                                      // Requests before the block's own slot must still fail task
+                                      // validation.
+                                      return !state.getSlot().isGreaterThan(requestedSlot)
+                                          || state
+                                              .getLatestBlockHeader()
+                                              .getSlot()
+                                              .isGreaterThan(requestedSlot);
+                                    }))));
   }
 
   @Override
@@ -806,8 +832,7 @@ class Store extends CacheableStore {
 
   @Override
   public SafeFuture<Optional<BeaconState>> retrieveCheckpointState(final Checkpoint checkpoint) {
-    return checkpointStates.perform(
-        new StateAtSlotTask(spec, checkpoint.toSlotAndBlockRoot(spec), this::retrieveBlockState));
+    return retrieveBlockState(checkpoint.toSlotAndBlockRoot(spec));
   }
 
   @Override
@@ -868,6 +893,12 @@ class Store extends CacheableStore {
         .map(BlockAndCheckpoints::getBlock)
         .forEach(block -> blocks.put(block.getRoot(), block));
     blockCountGauge.ifPresent(gauge -> gauge.set(blocks.size()));
+  }
+
+  /** Non-synchronized, no lock, unsafe if Store is not locked externally */
+  @Override
+  void cacheUnsatisfiedInclusionListBlock(final Bytes32 blockRoot) {
+    forkChoiceStrategy.onUnsatisfiedInclusionList(blockRoot);
   }
 
   /** Non-synchronized, no lock, unsafe if Store is not locked externally */

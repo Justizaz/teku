@@ -1,5 +1,5 @@
 /*
- * Copyright Consensys Software Inc., 2026
+ * Copyright (c) 2026 Consensys Incorporated. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with
  * the License. You may obtain a copy of the License at
@@ -28,7 +28,9 @@ import tech.pegasys.teku.spec.datastructures.epbs.versions.gloas.ExecutionPayloa
 import tech.pegasys.teku.spec.datastructures.epbs.versions.gloas.SignedExecutionPayloadBid;
 import tech.pegasys.teku.spec.datastructures.operations.BlsToExecutionChange;
 import tech.pegasys.teku.spec.datastructures.operations.ProposerSlashing;
+import tech.pegasys.teku.spec.datastructures.operations.RandaoCommitmentRegistration;
 import tech.pegasys.teku.spec.datastructures.operations.SignedBlsToExecutionChange;
+import tech.pegasys.teku.spec.datastructures.operations.SignedRandaoCommitmentRegistration;
 import tech.pegasys.teku.spec.datastructures.operations.SignedVoluntaryExit;
 import tech.pegasys.teku.spec.datastructures.operations.VoluntaryExit;
 import tech.pegasys.teku.spec.datastructures.state.Fork;
@@ -146,6 +148,44 @@ public class OperationSignatureVerifier {
     final Bytes32 domain =
         miscHelpers.computeDomain(Domain.BLS_TO_EXECUTION_CHANGE, state.getGenesisValidatorsRoot());
     return miscHelpers.computeSigningRoot(addressChange, domain);
+  }
+
+  public boolean verifyRandaoCommitmentRegistrationSignature(
+      final BeaconState state,
+      final SignedRandaoCommitmentRegistration signedRegistration,
+      final BLSSignatureVerifier signatureVerifier) {
+    final RandaoCommitmentRegistration registration = signedRegistration.getMessage();
+    final Optional<BLSPublicKey> validatorPubKey =
+        beaconStateAccessors.getValidatorPubKey(state, registration.getValidatorIndex());
+    if (validatorPubKey.isEmpty()) {
+      return false;
+    }
+    final Bytes signingRoot = calculateRandaoCommitmentRegistrationSigningRoot(state, registration);
+    return signatureVerifier.verify(
+        validatorPubKey.get(), signingRoot, signedRegistration.getSignature());
+  }
+
+  public SafeFuture<Boolean> verifyRandaoCommitmentRegistrationSignature(
+      final BeaconState state,
+      final SignedRandaoCommitmentRegistration signedRegistration,
+      final AsyncBLSSignatureVerifier signatureVerifier) {
+    final RandaoCommitmentRegistration registration = signedRegistration.getMessage();
+    final Optional<BLSPublicKey> validatorPubKey =
+        beaconStateAccessors.getValidatorPubKey(state, registration.getValidatorIndex());
+    if (validatorPubKey.isEmpty()) {
+      return SafeFuture.completedFuture(false);
+    }
+    final Bytes signingRoot = calculateRandaoCommitmentRegistrationSigningRoot(state, registration);
+    return signatureVerifier.verify(
+        validatorPubKey.get(), signingRoot, signedRegistration.getSignature());
+  }
+
+  private Bytes calculateRandaoCommitmentRegistrationSigningRoot(
+      final BeaconState state, final RandaoCommitmentRegistration registration) {
+    final Bytes32 domain =
+        miscHelpers.computeDomain(
+            Domain.DOMAIN_RANDAO_COMMITMENT_REGISTRATION, state.getGenesisValidatorsRoot());
+    return miscHelpers.computeSigningRoot(registration, domain);
   }
 
   public boolean verifyExecutionPayloadBidSignature(

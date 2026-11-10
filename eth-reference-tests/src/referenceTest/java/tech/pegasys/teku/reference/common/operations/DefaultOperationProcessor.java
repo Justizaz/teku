@@ -1,5 +1,5 @@
 /*
- * Copyright Consensys Software Inc., 2026
+ * Copyright (c) 2026 Consensys Incorporated. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with
  * the License. You may obtain a copy of the License at
@@ -25,6 +25,7 @@ import tech.pegasys.teku.spec.datastructures.blocks.blockbody.BeaconBlockBody;
 import tech.pegasys.teku.spec.datastructures.blocks.blockbody.BeaconBlockBodySchema;
 import tech.pegasys.teku.spec.datastructures.blocks.blockbody.versions.altair.SyncAggregate;
 import tech.pegasys.teku.spec.datastructures.blocks.blockbody.versions.capella.BeaconBlockBodySchemaCapella;
+import tech.pegasys.teku.spec.datastructures.blocks.blockbody.versions.eip8321.BeaconBlockBodySchemaEip8321;
 import tech.pegasys.teku.spec.datastructures.blocks.blockbody.versions.gloas.BeaconBlockBodySchemaGloas;
 import tech.pegasys.teku.spec.datastructures.epbs.versions.gloas.PayloadAttestation;
 import tech.pegasys.teku.spec.datastructures.epbs.versions.gloas.SignedExecutionPayloadBid;
@@ -34,16 +35,19 @@ import tech.pegasys.teku.spec.datastructures.execution.versions.electra.DepositR
 import tech.pegasys.teku.spec.datastructures.execution.versions.electra.WithdrawalRequest;
 import tech.pegasys.teku.spec.datastructures.execution.versions.gloas.BuilderDepositRequest;
 import tech.pegasys.teku.spec.datastructures.execution.versions.gloas.BuilderExitRequest;
+import tech.pegasys.teku.spec.datastructures.execution.versions.heze.InclusionList;
 import tech.pegasys.teku.spec.datastructures.operations.Attestation;
 import tech.pegasys.teku.spec.datastructures.operations.AttesterSlashing;
 import tech.pegasys.teku.spec.datastructures.operations.Deposit;
 import tech.pegasys.teku.spec.datastructures.operations.ProposerSlashing;
 import tech.pegasys.teku.spec.datastructures.operations.SignedBlsToExecutionChange;
+import tech.pegasys.teku.spec.datastructures.operations.SignedRandaoCommitmentRegistration;
 import tech.pegasys.teku.spec.datastructures.operations.SignedVoluntaryExit;
 import tech.pegasys.teku.spec.datastructures.state.beaconstate.MutableBeaconState;
 import tech.pegasys.teku.spec.logic.common.helpers.BeaconStateMutators.ValidatorExitContext;
 import tech.pegasys.teku.spec.logic.common.statetransition.exceptions.BlockProcessingException;
 import tech.pegasys.teku.spec.logic.versions.bellatrix.block.OptimisticExecutionPayloadExecutor;
+import tech.pegasys.teku.spec.logic.versions.eip8321.block.BlockProcessorEip8321;
 
 public class DefaultOperationProcessor implements OperationProcessor {
 
@@ -124,10 +128,11 @@ public class DefaultOperationProcessor implements OperationProcessor {
   public void processExecutionPayload(
       final MutableBeaconState state,
       final BeaconBlockBody beaconBlockBody,
-      final Optional<? extends OptimisticExecutionPayloadExecutor> payloadExecutor)
+      final Optional<? extends OptimisticExecutionPayloadExecutor> payloadExecutor,
+      final Optional<List<InclusionList>> inclusionLists)
       throws BlockProcessingException {
     spec.getBlockProcessor(state.getSlot())
-        .processExecutionPayload(state, beaconBlockBody, payloadExecutor);
+        .processExecutionPayload(state, beaconBlockBody, payloadExecutor, inclusionLists);
   }
 
   @Override
@@ -218,5 +223,28 @@ public class DefaultOperationProcessor implements OperationProcessor {
       final MutableBeaconState state, final List<BuilderExitRequest> builderExitRequests) {
     spec.getExecutionRequestsProcessor(state.getSlot())
         .processBuilderExitRequests(state, builderExitRequests);
+  }
+
+  @Override
+  public void processRandaoCommitmentRegistration(
+      final MutableBeaconState state, final SignedRandaoCommitmentRegistration registration)
+      throws BlockProcessingException {
+    final BlockProcessorEip8321 blockProcessor = (BlockProcessorEip8321) spec.getBlockProcessor(state.getSlot());
+    final BeaconBlockBodySchemaEip8321<?> eip8321BodySchema = (BeaconBlockBodySchemaEip8321<?>) beaconBlockBodySchema;
+    blockProcessor.processRandaoCommitmentRegistrations(
+        state,
+        eip8321BodySchema
+            .getRandaoCommitmentRegistrationsSchema()
+            .of(registration)
+    );
+  }
+
+  @Override
+  public void processRandao(
+      final MutableBeaconState state,
+      final BeaconBlock block)
+      throws BlockProcessingException {
+    spec.getBlockProcessor(state.getSlot())
+        .processRandao(state, block, BLSSignatureVerifier.SIMPLE);
   }
 }

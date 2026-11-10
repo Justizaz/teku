@@ -1,5 +1,5 @@
 /*
- * Copyright Consensys Software Inc., 2026
+ * Copyright (c) 2026 Consensys Incorporated. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with
  * the License. You may obtain a copy of the License at
@@ -34,6 +34,7 @@ import tech.pegasys.teku.spec.logic.common.util.ForkChoiceUtil;
 import tech.pegasys.teku.spec.logic.common.util.ProposerPreferencesUtil;
 import tech.pegasys.teku.spec.logic.common.util.ValidatorsUtil;
 import tech.pegasys.teku.spec.logic.common.weaksubjectivity.WeakSubjectivityCalculator;
+import tech.pegasys.teku.spec.logic.versions.heze.util.InclusionListUtil;
 
 public abstract class AbstractSpecLogic implements SpecLogic {
   // Helpers
@@ -190,5 +191,10 @@ public abstract class AbstractSpecLogic implements SpecLogic {
   @Override
   public ProposerPreferencesUtil getProposerPreferencesUtil() {
     return ProposerPreferencesUtil.NOOP;
+  }
+
+  @Override
+  public Optional<InclusionListUtil> getInclusionListUtil() {
+    return Optional.empty();
   }
 }

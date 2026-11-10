@@ -1,5 +1,5 @@
 /*
- * Copyright Consensys Software Inc., 2026
+ * Copyright (c) 2026 Consensys Incorporated. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with
  * the License. You may obtain a copy of the License at
@@ -21,6 +21,7 @@ import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import java.util.List;
@@ -30,6 +31,7 @@ import java.util.stream.IntStream;
 import java.util.stream.Stream;
 import org.apache.tuweni.bytes.Bytes32;
 import org.junit.jupiter.api.Test;
+import tech.pegasys.infrastructure.logging.LogCaptor;
 import tech.pegasys.teku.ethereum.pow.api.DepositTreeSnapshot;
 import tech.pegasys.teku.ethereum.pow.api.DepositsFromBlockEvent;
 import tech.pegasys.teku.infrastructure.async.SafeFuture;
@@ -50,6 +52,7 @@ import tech.pegasys.teku.spec.datastructures.state.Checkpoint;
 import tech.pegasys.teku.spec.datastructures.state.beaconstate.BeaconState;
 import tech.pegasys.teku.spec.datastructures.state.beaconstate.versions.electra.MutableBeaconStateElectra;
 import tech.pegasys.teku.spec.datastructures.util.DepositUtil;
+import tech.pegasys.teku.spec.datastructures.util.Eip8015RemovedFields;
 import tech.pegasys.teku.spec.datastructures.util.MerkleTree;
 import tech.pegasys.teku.spec.networks.Eth2Network;
 import tech.pegasys.teku.spec.util.DataStructureUtil;
@@ -223,6 +226,26 @@ public class DepositProviderTest {
     depositProvider.onNewFinalizedCheckpoint(new Checkpoint(UInt64.ONE, finalizedBlockRoot), false);
 
     assertThat(depositProvider.getDepositMapSize()).isEqualTo(10);
+  }
+
+  @Test
+  void shouldNotReadRemovedEth1FieldsWhenFinalizedStateIsHeze() {
+    setup(16, SpecMilestone.HEZE);
+    mockDepositsFromEth1Block(0, 20);
+    final AnchorPoint anchorPoint = mock(AnchorPoint.class);
+    final UpdatableStore store = mock(UpdatableStore.class);
+    when(recentChainData.getStore()).thenReturn(store);
+    when(store.getLatestFinalized()).thenReturn(anchorPoint);
+    when(anchorPoint.getState()).thenAnswer(__ -> state);
+
+    try (final LogCaptor logCaptor = LogCaptor.forClass(Eip8015RemovedFields.class)) {
+      depositProvider.onNewFinalizedCheckpoint(
+          new Checkpoint(UInt64.ONE, Bytes32.fromHexString("0x01")), false);
+
+      assertThat(logCaptor.getErrorLogs()).isEmpty();
+    }
+    assertThat(depositProvider.getDepositMapSize()).isEqualTo(20);
+    verifyNoInteractions(storageUpdateChannel);
   }
 
   @Test

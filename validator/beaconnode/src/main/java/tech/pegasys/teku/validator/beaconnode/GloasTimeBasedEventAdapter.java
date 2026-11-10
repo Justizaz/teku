@@ -1,5 +1,5 @@
 /*
- * Copyright Consensys Software Inc., 2026
+ * Copyright (c) 2026 Consensys Incorporated. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with
  * the License. You may obtain a copy of the License at
@@ -30,13 +30,22 @@ public class GloasTimeBasedEventAdapter extends TimeBasedEventAdapter {
       final ValidatorTimingChannel validatorTimingChannel,
       final Runnable onLastSlot,
       final Spec spec) {
-    super(
+    this(
         spec.computeStartSlotAtEpoch(
             spec.getForkSchedule().getFork(SpecMilestone.GLOAS).getEpoch()),
         taskScheduler,
         validatorTimingChannel,
         onLastSlot,
         spec);
+  }
+
+  protected GloasTimeBasedEventAdapter(
+      final UInt64 firstSlot,
+      final RepeatingTaskScheduler taskScheduler,
+      final ValidatorTimingChannel validatorTimingChannel,
+      final Runnable onLastSlot,
+      final Spec spec) {
+    super(firstSlot, taskScheduler, validatorTimingChannel, onLastSlot, spec);
   }
 
   @Override

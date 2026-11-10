@@ -1,5 +1,5 @@
 /*
- * Copyright Consensys Software Inc., 2026
+ * Copyright (c) 2026 Consensys Incorporated. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with
  * the License. You may obtain a copy of the License at
@@ -36,6 +36,7 @@ import tech.pegasys.teku.infrastructure.restapi.endpoints.RestApiRequest;
 import tech.pegasys.teku.infrastructure.restapi.openapi.response.EventStreamResponseContentTypeDefinition;
 import tech.pegasys.teku.infrastructure.time.TimeProvider;
 import tech.pegasys.teku.spec.Spec;
+import tech.pegasys.teku.spec.schemas.SchemaDefinitionCache;
 
 public class GetEvents extends RestApiEndpoint {
   public static final String ROUTE = "/eth/v1/events";
@@ -43,6 +44,7 @@ public class GetEvents extends RestApiEndpoint {
 
   public GetEvents(
       final Spec spec,
+      final SchemaDefinitionCache schemaDefinitionCache,
       final DataProvider dataProvider,
       final EventChannels eventChannels,
       final AsyncRunner asyncRunner,
@@ -50,6 +52,7 @@ public class GetEvents extends RestApiEndpoint {
       final int maxPendingEvents) {
     this(
         spec,
+        schemaDefinitionCache,
         dataProvider.getNodeDataProvider(),
         dataProvider.getChainDataProvider(),
         dataProvider.getSyncDataProvider(),
@@ -62,6 +65,7 @@ public class GetEvents extends RestApiEndpoint {
 
   GetEvents(
       final Spec spec,
+      final SchemaDefinitionCache schemaDefinitionCache,
       final NodeDataProvider nodeDataProvider,
       final ChainDataProvider chainDataProvider,
       final SyncDataProvider syncDataProvider,
@@ -90,6 +94,7 @@ public class GetEvents extends RestApiEndpoint {
     eventSubscriptionManager =
         new EventSubscriptionManager(
             spec,
+            schemaDefinitionCache,
             nodeDataProvider,
             chainDataProvider,
             syncDataProvider,

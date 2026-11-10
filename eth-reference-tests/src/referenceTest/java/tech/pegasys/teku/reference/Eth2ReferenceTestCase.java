@@ -1,5 +1,5 @@
 /*
- * Copyright Consensys Software Inc., 2026
+ * Copyright (c) 2026 Consensys Incorporated. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with
  * the License. You may obtain a copy of the License at
@@ -136,6 +136,8 @@ public abstract class Eth2ReferenceTestCase {
           case TestFork.ELECTRA -> ELECTRA_TEST_TYPES.get(testDefinition.getTestType());
           case TestFork.FULU -> FULU_TEST_TYPES.get(testDefinition.getTestType());
           case TestFork.GLOAS -> GLOAS_TEST_TYPES.get(testDefinition.getTestType());
+          case TestFork.HEZE -> GLOAS_TEST_TYPES.get(testDefinition.getTestType());
+          case TestFork.EIP8321 -> GLOAS_TEST_TYPES.get(testDefinition.getTestType());
           default -> null;
         };
 

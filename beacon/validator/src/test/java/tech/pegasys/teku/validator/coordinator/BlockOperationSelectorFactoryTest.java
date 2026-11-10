@@ -1,5 +1,5 @@
 /*
- * Copyright Consensys Software Inc., 2026
+ * Copyright (c) 2026 Consensys Incorporated. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with
  * the License. You may obtain a copy of the License at
@@ -16,7 +16,9 @@ package tech.pegasys.teku.validator.coordinator;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 import static tech.pegasys.teku.infrastructure.async.SafeFutureAssert.assertThatSafeFuture;
 import static tech.pegasys.teku.infrastructure.async.SafeFutureAssert.safeJoin;
@@ -77,6 +79,7 @@ import tech.pegasys.teku.spec.datastructures.operations.AttesterSlashing;
 import tech.pegasys.teku.spec.datastructures.operations.Deposit;
 import tech.pegasys.teku.spec.datastructures.operations.ProposerSlashing;
 import tech.pegasys.teku.spec.datastructures.operations.SignedBlsToExecutionChange;
+import tech.pegasys.teku.spec.datastructures.operations.SignedRandaoCommitmentRegistration;
 import tech.pegasys.teku.spec.datastructures.operations.SignedVoluntaryExit;
 import tech.pegasys.teku.spec.datastructures.operations.versions.altair.SignedContributionAndProof;
 import tech.pegasys.teku.spec.datastructures.state.beaconstate.BeaconState;
@@ -165,6 +168,10 @@ class BlockOperationSelectorFactoryTest {
               s -> s.toVersionCapella().orElseThrow().getBlsToExecutionChangesSchema()),
           blsToExecutionChangeValidator);
 
+  @SuppressWarnings("unchecked")
+  private final OperationPool<SignedRandaoCommitmentRegistration> randaoCommitmentRegistrationPool =
+          mock(OperationPool.class);
+
   private final SyncCommitteeContributionPool contributionPool =
       new SyncCommitteeContributionPool(spec, contributionValidator);
 
@@ -200,6 +207,7 @@ class BlockOperationSelectorFactoryTest {
         proposerSlashingPool,
         voluntaryExitPool,
         blsToExecutionChangePool,
+        randaoCommitmentRegistrationPool,
         contributionPool,
         payloadAttestationPool,
         depositProvider,
@@ -299,6 +307,55 @@ class BlockOperationSelectorFactoryTest {
     assertThat(attestationRewardState.getExecutionPayloadAvailability().getBit(parentSlotIndex))
         .isTrue();
     assertThat(blockSlotState.getExecutionPayloadAvailability().getBit(parentSlotIndex)).isFalse();
+  }
+
+  @Test
+  void shouldIncludeEth1VoteAndDepositsWhenSupported() {
+    final BeaconState blockSlotState = dataStructureUtil.randomBeaconState(UInt64.ONE);
+    final Eth1Data eth1Vote = dataStructureUtil.randomEth1Data();
+    when(eth1DataCache.getEth1Vote(blockSlotState)).thenReturn(eth1Vote);
+
+    selectOperations(blockSlotState, bodyBuilder);
+
+    verify(eth1DataCache).getEth1Vote(blockSlotState);
+    verify(depositProvider).getDeposits(blockSlotState, eth1Vote);
+  }
+
+  @Test
+  void shouldNotRequestEth1VoteOrDepositsWhenNotSupported() {
+    final BeaconState blockSlotState = dataStructureUtil.randomBeaconState(UInt64.ONE);
+    final CapturingBeaconBlockBodyBuilder hezeBodyBuilder =
+        new CapturingBeaconBlockBodyBuilder(false) {
+          @Override
+          public boolean supportsEth1DataAndDeposits() {
+            return false;
+          }
+        };
+
+    selectOperations(blockSlotState, hezeBodyBuilder);
+
+    verifyNoInteractions(eth1DataCache);
+    verify(depositProvider, never()).getDeposits(any(), any());
+  }
+
+  private void selectOperations(
+      final BeaconState blockSlotState, final BeaconBlockBodyBuilder builder) {
+    prepareBlockProductionWithPayload(
+        dataStructureUtil.randomExecutionPayload(),
+        executionPayloadContext,
+        blockSlotState,
+        Optional.of(dataStructureUtil.randomUInt256()));
+    safeJoin(
+        factory
+            .createSelector(
+                blockProductionContext(
+                    parentRoot,
+                    blockSlotState,
+                    dataStructureUtil.randomSignature(),
+                    Optional.empty(),
+                    Optional.empty(),
+                    BlockProductionPerformance.NOOP))
+            .apply(builder));
   }
 
   @Test
@@ -1134,6 +1191,7 @@ class BlockOperationSelectorFactoryTest {
     protected SszList<AttesterSlashing> attesterSlashings;
     protected SszList<SignedVoluntaryExit> voluntaryExits;
     protected SszList<SignedBlsToExecutionChange> blsToExecutionChanges;
+    protected SszList<SignedRandaoCommitmentRegistration> randaoCommitmentRegistrations;
     protected SyncAggregate syncAggregate;
     protected ExecutionPayload executionPayload;
     protected ExecutionPayloadHeader executionPayloadHeader;
@@ -1234,6 +1292,13 @@ class BlockOperationSelectorFactoryTest {
     public BeaconBlockBodyBuilder blsToExecutionChanges(
         final SszList<SignedBlsToExecutionChange> blsToExecutionChanges) {
       this.blsToExecutionChanges = blsToExecutionChanges;
+      return this;
+    }
+
+    @Override
+    public BeaconBlockBodyBuilder randaoCommitmentRegistrations(
+            final SszList<SignedRandaoCommitmentRegistration> randaoCommitmentRegistrations) {
+      this.randaoCommitmentRegistrations = randaoCommitmentRegistrations;
       return this;
     }
 

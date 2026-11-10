@@ -1,5 +1,5 @@
 /*
- * Copyright Consensys Software Inc., 2026
+ * Copyright (c) 2026 Consensys Incorporated. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with
  * the License. You may obtain a copy of the License at
@@ -100,9 +100,12 @@ public class EpochAttestationRewardsCalculator {
             .toList();
 
     final TotalBalances totalBalances = validatorStatuses.getTotalBalances();
+    final BeaconStateAccessorsAltair beaconStateAccessors =
+        BeaconStateAccessorsAltair.required(specVersion.beaconStateAccessors());
+    // participation rewards are for the previous epoch (scaled to its slot duration from Heze)
     final UInt64 baseRewardPerIncrement =
-        BeaconStateAccessorsAltair.required(specVersion.beaconStateAccessors())
-            .getBaseRewardPerIncrement(state);
+        beaconStateAccessors.getBaseRewardPerIncrement(
+            state, beaconStateAccessors.getPreviousEpoch(state));
 
     for (int flagIndex = 0; flagIndex < PARTICIPATION_FLAG_WEIGHTS.size(); flagIndex++) {
       final UInt64 weight = PARTICIPATION_FLAG_WEIGHTS.get(flagIndex);

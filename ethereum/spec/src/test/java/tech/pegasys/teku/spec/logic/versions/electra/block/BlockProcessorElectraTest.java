@@ -1,5 +1,5 @@
 /*
- * Copyright Consensys Software Inc., 2026
+ * Copyright (c) 2026 Consensys Incorporated. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with
  * the License. You may obtain a copy of the License at
@@ -17,6 +17,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import java.util.List;
+import java.util.Optional;
 import java.util.stream.Collectors;
 import org.apache.tuweni.bytes.Bytes;
 import org.apache.tuweni.bytes.Bytes32;
@@ -162,7 +163,8 @@ class BlockProcessorElectraTest extends BlockProcessorDenebTest {
         spec.getExecutionRequestsDataCodec(UInt64.ONE).encode(blockBody.getExecutionRequests());
 
     final NewPayloadRequest newPayloadRequest =
-        spec.getBlockProcessor(UInt64.ONE).computeNewPayloadRequest(preState, blockBody);
+        spec.getBlockProcessor(UInt64.ONE)
+            .computeNewPayloadRequest(preState, blockBody, Optional.empty());
 
     assertThat(newPayloadRequest.getExecutionPayload())
         .isEqualTo(blockBody.getOptionalExecutionPayload().orElseThrow());

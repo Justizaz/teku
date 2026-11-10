@@ -1,5 +1,5 @@
 /*
- * Copyright Consensys Software Inc., 2026
+ * Copyright (c) 2026 Consensys Incorporated. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with
  * the License. You may obtain a copy of the License at
@@ -28,6 +28,7 @@ import tech.pegasys.teku.spec.datastructures.operations.AttesterSlashing;
 import tech.pegasys.teku.spec.datastructures.operations.Deposit;
 import tech.pegasys.teku.spec.datastructures.operations.ProposerSlashing;
 import tech.pegasys.teku.spec.datastructures.operations.SignedBlsToExecutionChange;
+import tech.pegasys.teku.spec.datastructures.operations.SignedRandaoCommitmentRegistration;
 import tech.pegasys.teku.spec.datastructures.operations.SignedVoluntaryExit;
 import tech.pegasys.teku.spec.datastructures.type.SszKZGCommitment;
 
@@ -48,6 +49,11 @@ public interface BeaconBlockBodyBuilder {
   BeaconBlockBodyBuilder deposits(SszList<Deposit> deposits);
 
   BeaconBlockBodyBuilder voluntaryExits(SszList<SignedVoluntaryExit> voluntaryExits);
+
+  /** {@code eth1_data} and {@code deposits} were removed in Heze (EIP-8015). */
+  default boolean supportsEth1DataAndDeposits() {
+    return true;
+  }
 
   default Boolean supportsSyncAggregate() {
     return false;
@@ -100,6 +106,21 @@ public interface BeaconBlockBodyBuilder {
   }
 
   BeaconBlockBodyBuilder parentExecutionRequests(ExecutionRequests parentExecutionRequests);
+
+  default boolean supportsRandaoCommitmentRegistrations() {
+    return false;
+  }
+
+  BeaconBlockBodyBuilder randaoCommitmentRegistrations(
+      SszList<SignedRandaoCommitmentRegistration> randaoCommitmentRegistrations);
+
+  default boolean supportsHashChainReveal() {
+    return false;
+  }
+
+  default BeaconBlockBodyBuilder hashChainReveal(final Bytes32 hashChainReveal) {
+    return this;
+  }
 
   BeaconBlockBody build();
 }

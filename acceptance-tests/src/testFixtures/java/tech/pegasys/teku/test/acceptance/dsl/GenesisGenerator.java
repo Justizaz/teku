@@ -1,5 +1,5 @@
 /*
- * Copyright Consensys Software Inc., 2026
+ * Copyright (c) 2026 Consensys Incorporated. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with
  * the License. You may obtain a copy of the License at
@@ -96,9 +96,27 @@ public class GenesisGenerator {
   }
 
   public GenesisGenerator witGloasEpoch(final UInt64 gloasForkEpoch) {
+    return withGloasEpoch(gloasForkEpoch);
+  }
+
+  public GenesisGenerator withGloasEpoch(final UInt64 gloasForkEpoch) {
     specConfigModifier =
         specConfigModifier.andThen(
             specConfigBuilder -> specConfigBuilder.gloasForkEpoch(gloasForkEpoch));
+    return this;
+  }
+
+  public GenesisGenerator withHezeEpoch(final UInt64 hezeForkEpoch) {
+    specConfigModifier =
+        specConfigModifier.andThen(
+            specConfigBuilder -> specConfigBuilder.hezeForkEpoch(hezeForkEpoch));
+    return this;
+  }
+
+  public GenesisGenerator withEip8321Epoch(final UInt64 eip8321ForkEpoch) {
+    specConfigModifier =
+        specConfigModifier.andThen(
+            specConfigBuilder -> specConfigBuilder.eip8321ForkEpoch(eip8321ForkEpoch));
     return this;
   }
 

@@ -1,5 +1,5 @@
 /*
- * Copyright Consensys Software Inc., 2026
+ * Copyright (c) 2026 Consensys Incorporated. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with
  * the License. You may obtain a copy of the License at
@@ -25,10 +25,13 @@ import static org.mockito.Mockito.when;
 import java.util.List;
 import java.util.Optional;
 import java.util.stream.IntStream;
+import org.apache.tuweni.bytes.Bytes32;
 import org.hyperledger.besu.plugin.services.MetricsSystem;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import tech.pegasys.teku.infrastructure.async.SafeFuture;
+import tech.pegasys.teku.infrastructure.ssz.collections.SszBitvector;
+import tech.pegasys.teku.infrastructure.ssz.schema.collections.SszBitvectorSchema;
 import tech.pegasys.teku.infrastructure.time.TimeProvider;
 import tech.pegasys.teku.infrastructure.unsigned.UInt64;
 import tech.pegasys.teku.networking.eth2.peers.Eth2Peer.PeerStatusSubscriber;
@@ -44,10 +47,13 @@ import tech.pegasys.teku.spec.Spec;
 import tech.pegasys.teku.spec.SpecMilestone;
 import tech.pegasys.teku.spec.TestSpecFactory;
 import tech.pegasys.teku.spec.config.SpecConfigDeneb;
+import tech.pegasys.teku.spec.config.SpecConfigHeze;
 import tech.pegasys.teku.spec.datastructures.blobs.versions.deneb.BlobSidecar;
+import tech.pegasys.teku.spec.datastructures.execution.versions.heze.SignedInclusionList;
 import tech.pegasys.teku.spec.datastructures.networking.libp2p.rpc.BlobIdentifier;
 import tech.pegasys.teku.spec.datastructures.networking.libp2p.rpc.BlobSidecarsByRangeRequestMessage;
 import tech.pegasys.teku.spec.datastructures.networking.libp2p.rpc.BlobSidecarsByRootRequestMessage;
+import tech.pegasys.teku.spec.datastructures.networking.libp2p.rpc.InclusionListByCommitteeRequestMessage;
 import tech.pegasys.teku.spec.datastructures.networking.libp2p.rpc.RpcRequest;
 import tech.pegasys.teku.spec.datastructures.networking.libp2p.rpc.bodyselector.RpcRequestBodySelector;
 import tech.pegasys.teku.spec.datastructures.networking.libp2p.rpc.bodyselector.SingleRpcRequestBodySelector;
@@ -69,6 +75,8 @@ class Eth2PeerTest {
   private final RateTracker blobSidecarsRateTracker = mock(RateTracker.class);
   private final RateTracker dataColumnSidecarsRateTracker = mock(RateTracker.class);
   private final RateTracker executionPayloadEnvelopesRateTracker = mock(RateTracker.class);
+  private final RateTracker lightClientUpdatesRateTracker = mock(RateTracker.class);
+  private final RateTracker inclusionListRateTracker = mock(RateTracker.class);
   private final RateTracker rateTracker = mock(RateTracker.class);
   private final MetricsSystem metricsSystem = mock(MetricsSystem.class);
   private final TimeProvider timeProvider = mock(TimeProvider.class);
@@ -93,6 +101,8 @@ class Eth2PeerTest {
           blobSidecarsRateTracker,
           dataColumnSidecarsRateTracker,
           executionPayloadEnvelopesRateTracker,
+          lightClientUpdatesRateTracker,
+          inclusionListRateTracker,
           rateTracker,
           metricsSystem,
           timeProvider,
@@ -250,6 +260,50 @@ class Eth2PeerTest {
   }
 
   @Test
+  void adjustInclusionListsRequest_shouldAdjustInclusionListRateTracker() {
+    final RequestKey requestKey = new RequestKey(UInt64.ZERO, 1);
+
+    peer.adjustInclusionListsRequest(requestKey, 2);
+
+    verify(inclusionListRateTracker).adjustRequestObjectCount(requestKey, 2);
+    verifyNoInteractions(blobSidecarsRateTracker);
+  }
+
+  @Test
+  @SuppressWarnings({"unchecked", "FutureReturnValueIgnored"})
+  void shouldSendRequest_InclusionListsByCommitteeIndices() {
+    final Spec hezeSpec = TestSpecFactory.createMinimalHeze();
+    final Eth2Peer hezePeer = createPeer(hezeSpec);
+    final Eth2RpcMethod<InclusionListByCommitteeRequestMessage, SignedInclusionList> method =
+        mock(Eth2RpcMethod.class);
+    final RpcStreamController<RpcRequestHandler> rpcStreamController =
+        mock(RpcStreamController.class);
+    final UInt64 slot = UInt64.ONE;
+    final Bytes32 dependentRoot = Bytes32.random();
+    final int committeeSize =
+        SpecConfigHeze.required(hezeSpec.atSlot(slot).getConfig()).getInclusionListCommitteeSize();
+    final SszBitvector committeeIndices = SszBitvectorSchema.create(committeeSize).ofBits(1, 3);
+
+    when(rpcMethods.inclusionListByCommitteeIndices()).thenReturn(Optional.of(method));
+    when(hezePeer.sendRequest(any(), any(RpcRequestBodySelector.class), any()))
+        .thenReturn(SafeFuture.completedFuture(rpcStreamController));
+
+    hezePeer.requestInclusionListsByCommitteeIndices(
+        slot, dependentRoot, committeeIndices, __ -> SafeFuture.COMPLETE);
+
+    final ArgumentCaptor<RpcRequestBodySelector<InclusionListByCommitteeRequestMessage>>
+        requestCaptor = ArgumentCaptor.forClass(RpcRequestBodySelector.class);
+    verify(delegate).sendRequest(any(), requestCaptor.capture(), any());
+
+    final InclusionListByCommitteeRequestMessage request =
+        resolveSingleRpcRequestBody(requestCaptor);
+    assertThat(request.getSlot()).isEqualTo(slot);
+    assertThat(request.getDependentRoot()).isEqualTo(dependentRoot);
+    assertThat(request.getCommitteeIndices()).isEqualTo(committeeIndices);
+    assertThat(request.getMaximumResponseChunks()).isEqualTo(2);
+  }
+
+  @Test
   @SuppressWarnings({"unchecked", "FutureReturnValueIgnored"})
   public void shouldNotUpdateRequestWhenWithinDeneb_BlobSidecarsByRange() {
 
@@ -342,6 +396,28 @@ class Eth2PeerTest {
     assertThat(rpcRequestBodySelector).isInstanceOf(SingleRpcRequestBodySelector.class);
     // For SingleRpcRequestBodySelector, the key applied to the function is irrelevant
     return rpcRequestBodySelector.getBody().apply("").orElseThrow();
+  }
+
+  private Eth2Peer createPeer(final Spec peerSpec) {
+    return Eth2Peer.create(
+        peerSpec,
+        delegate,
+        Optional.empty(),
+        rpcMethods,
+        statusMessageFactory,
+        metadataMessagesFactory,
+        peerChainValidator,
+        dataColumnSidecarSignatureValidator,
+        blocksRateTracker,
+        blobSidecarsRateTracker,
+        dataColumnSidecarsRateTracker,
+        executionPayloadEnvelopesRateTracker,
+        lightClientUpdatesRateTracker,
+        inclusionListRateTracker,
+        rateTracker,
+        metricsSystem,
+        timeProvider,
+        blobKzgCommitmentsProvider);
   }
 
   private PeerStatus randomPeerStatus() {

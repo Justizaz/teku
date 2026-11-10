@@ -1,5 +1,5 @@
 /*
- * Copyright Consensys Software Inc., 2026
+ * Copyright (c) 2026 Consensys Incorporated. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with
  * the License. You may obtain a copy of the License at
@@ -18,10 +18,12 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
+import java.util.function.Function;
 import java.util.function.Supplier;
 import org.hyperledger.besu.plugin.services.MetricsSystem;
 import tech.pegasys.teku.infrastructure.async.AsyncRunner;
 import tech.pegasys.teku.infrastructure.bytes.Bytes4;
+import tech.pegasys.teku.infrastructure.ssz.SszData;
 import tech.pegasys.teku.infrastructure.ssz.schema.SszSchema;
 import tech.pegasys.teku.networking.eth2.peers.PeerLookup;
 import tech.pegasys.teku.networking.eth2.rpc.beaconchain.methods.BeaconBlocksByRangeMessageHandler;
@@ -33,11 +35,16 @@ import tech.pegasys.teku.networking.eth2.rpc.beaconchain.methods.DataColumnSidec
 import tech.pegasys.teku.networking.eth2.rpc.beaconchain.methods.ExecutionPayloadEnvelopesByRangeMessageHandler;
 import tech.pegasys.teku.networking.eth2.rpc.beaconchain.methods.ExecutionPayloadEnvelopesByRootMessageHandler;
 import tech.pegasys.teku.networking.eth2.rpc.beaconchain.methods.GoodbyeMessageHandler;
+import tech.pegasys.teku.networking.eth2.rpc.beaconchain.methods.InclusionListByCommitteeIndicesMessageHandler;
+import tech.pegasys.teku.networking.eth2.rpc.beaconchain.methods.LightClientBootstrapMessageHandler;
+import tech.pegasys.teku.networking.eth2.rpc.beaconchain.methods.LightClientLatestUpdateMessageHandler;
+import tech.pegasys.teku.networking.eth2.rpc.beaconchain.methods.LightClientUpdatesByRangeMessageHandler;
 import tech.pegasys.teku.networking.eth2.rpc.beaconchain.methods.MetadataMessageHandler;
 import tech.pegasys.teku.networking.eth2.rpc.beaconchain.methods.MetadataMessagesFactory;
 import tech.pegasys.teku.networking.eth2.rpc.beaconchain.methods.PingMessageHandler;
 import tech.pegasys.teku.networking.eth2.rpc.beaconchain.methods.StatusMessageFactory;
 import tech.pegasys.teku.networking.eth2.rpc.beaconchain.methods.StatusMessageHandler;
+import tech.pegasys.teku.networking.eth2.rpc.core.LocalMessageHandler;
 import tech.pegasys.teku.networking.eth2.rpc.core.encodings.RpcEncoding;
 import tech.pegasys.teku.networking.eth2.rpc.core.encodings.context.ForkDigestPayloadContext;
 import tech.pegasys.teku.networking.eth2.rpc.core.encodings.context.RpcContextCodec;
@@ -52,6 +59,11 @@ import tech.pegasys.teku.spec.datastructures.blobs.DataColumnSidecar;
 import tech.pegasys.teku.spec.datastructures.blobs.versions.deneb.BlobSidecar;
 import tech.pegasys.teku.spec.datastructures.blocks.SignedBeaconBlock;
 import tech.pegasys.teku.spec.datastructures.epbs.versions.gloas.SignedExecutionPayloadEnvelope;
+import tech.pegasys.teku.spec.datastructures.execution.versions.heze.SignedInclusionList;
+import tech.pegasys.teku.spec.datastructures.lightclient.LightClientBootstrap;
+import tech.pegasys.teku.spec.datastructures.lightclient.LightClientFinalityUpdate;
+import tech.pegasys.teku.spec.datastructures.lightclient.LightClientOptimisticUpdate;
+import tech.pegasys.teku.spec.datastructures.lightclient.LightClientUpdate;
 import tech.pegasys.teku.spec.datastructures.networking.libp2p.rpc.BeaconBlocksByRangeRequestMessage;
 import tech.pegasys.teku.spec.datastructures.networking.libp2p.rpc.BeaconBlocksByRangeRequestMessage.BeaconBlocksByRangeRequestMessageSchema;
 import tech.pegasys.teku.spec.datastructures.networking.libp2p.rpc.BeaconBlocksByRootRequestMessage;
@@ -68,15 +80,24 @@ import tech.pegasys.teku.spec.datastructures.networking.libp2p.rpc.ExecutionPayl
 import tech.pegasys.teku.spec.datastructures.networking.libp2p.rpc.ExecutionPayloadEnvelopesByRootRequestMessage;
 import tech.pegasys.teku.spec.datastructures.networking.libp2p.rpc.ExecutionPayloadEnvelopesByRootRequestMessage.ExecutionPayloadEnvelopesByRootRequestMessageSchema;
 import tech.pegasys.teku.spec.datastructures.networking.libp2p.rpc.GoodbyeMessage;
+import tech.pegasys.teku.spec.datastructures.networking.libp2p.rpc.InclusionListByCommitteeRequestMessage;
+import tech.pegasys.teku.spec.datastructures.networking.libp2p.rpc.InclusionListByCommitteeRequestMessageSchema;
+import tech.pegasys.teku.spec.datastructures.networking.libp2p.rpc.LightClientBootstrapRequestMessage;
+import tech.pegasys.teku.spec.datastructures.networking.libp2p.rpc.LightClientUpdatesByRangeRequestMessage;
 import tech.pegasys.teku.spec.datastructures.networking.libp2p.rpc.PingMessage;
+import tech.pegasys.teku.spec.datastructures.networking.libp2p.rpc.RpcRequest;
 import tech.pegasys.teku.spec.datastructures.networking.libp2p.rpc.metadata.MetadataMessage;
 import tech.pegasys.teku.spec.datastructures.networking.libp2p.rpc.status.StatusMessage;
 import tech.pegasys.teku.spec.schemas.SchemaDefinitionsDeneb;
 import tech.pegasys.teku.spec.schemas.SchemaDefinitionsFulu;
 import tech.pegasys.teku.spec.schemas.SchemaDefinitionsGloas;
+import tech.pegasys.teku.spec.schemas.SchemaDefinitionsHeze;
 import tech.pegasys.teku.statetransition.datacolumns.CustodyGroupCountManager;
 import tech.pegasys.teku.statetransition.datacolumns.DataColumnSidecarArchiveReconstructor;
 import tech.pegasys.teku.statetransition.datacolumns.log.rpc.DasReqRespLogger;
+import tech.pegasys.teku.statetransition.inclusionlist.InclusionListManager;
+import tech.pegasys.teku.statetransition.lightclient.LightClientBootstrapProvider;
+import tech.pegasys.teku.statetransition.lightclient.LightClientUpdateStore;
 import tech.pegasys.teku.storage.client.CombinedChainDataClient;
 import tech.pegasys.teku.storage.client.RecentChainData;
 
@@ -104,8 +125,18 @@ public class BeaconChainMethods {
           Eth2RpcMethod<
               ExecutionPayloadEnvelopesByRangeRequestMessage, SignedExecutionPayloadEnvelope>>
       executionPayloadEnvelopesByRange;
+  private final Optional<Eth2RpcMethod<InclusionListByCommitteeRequestMessage, SignedInclusionList>>
+      inclusionListByCommitteeIndices;
   private final Eth2RpcMethod<EmptyMessage, MetadataMessage> getMetadata;
   private final Eth2RpcMethod<PingMessage, PingMessage> ping;
+  private final Optional<Eth2RpcMethod<EmptyMessage, LightClientFinalityUpdate>>
+      lightClientFinalityUpdate;
+  private final Optional<Eth2RpcMethod<EmptyMessage, LightClientOptimisticUpdate>>
+      lightClientOptimisticUpdate;
+  private final Optional<Eth2RpcMethod<LightClientUpdatesByRangeRequestMessage, LightClientUpdate>>
+      lightClientUpdatesByRange;
+  private final Optional<Eth2RpcMethod<LightClientBootstrapRequestMessage, LightClientBootstrap>>
+      lightClientBootstrap;
 
   private final Collection<RpcMethod<?, ?, ?>> allMethods;
 
@@ -130,8 +161,18 @@ public class BeaconChainMethods {
               Eth2RpcMethod<
                   ExecutionPayloadEnvelopesByRangeRequestMessage, SignedExecutionPayloadEnvelope>>
           executionPayloadEnvelopesByRange,
+      final Optional<Eth2RpcMethod<InclusionListByCommitteeRequestMessage, SignedInclusionList>>
+          inclusionListByCommitteeIndices,
       final Eth2RpcMethod<EmptyMessage, MetadataMessage> getMetadata,
-      final Eth2RpcMethod<PingMessage, PingMessage> ping) {
+      final Eth2RpcMethod<PingMessage, PingMessage> ping,
+      final Optional<Eth2RpcMethod<EmptyMessage, LightClientFinalityUpdate>>
+          lightClientFinalityUpdate,
+      final Optional<Eth2RpcMethod<EmptyMessage, LightClientOptimisticUpdate>>
+          lightClientOptimisticUpdate,
+      final Optional<Eth2RpcMethod<LightClientUpdatesByRangeRequestMessage, LightClientUpdate>>
+          lightClientUpdatesByRange,
+      final Optional<Eth2RpcMethod<LightClientBootstrapRequestMessage, LightClientBootstrap>>
+          lightClientBootstrap) {
     this.status = status;
     this.goodBye = goodBye;
     this.beaconBlocksByRoot = beaconBlocksByRoot;
@@ -142,8 +183,13 @@ public class BeaconChainMethods {
     this.dataColumnSidecarsByRange = dataColumnSidecarsByRange;
     this.executionPayloadEnvelopesByRoot = executionPayloadEnvelopesByRoot;
     this.executionPayloadEnvelopesByRange = executionPayloadEnvelopesByRange;
+    this.inclusionListByCommitteeIndices = inclusionListByCommitteeIndices;
     this.getMetadata = getMetadata;
     this.ping = ping;
+    this.lightClientFinalityUpdate = lightClientFinalityUpdate;
+    this.lightClientOptimisticUpdate = lightClientOptimisticUpdate;
+    this.lightClientUpdatesByRange = lightClientUpdatesByRange;
+    this.lightClientBootstrap = lightClientBootstrap;
     this.allMethods =
         new ArrayList<>(
             List.of(status, goodBye, beaconBlocksByRoot, beaconBlocksByRange, getMetadata, ping));
@@ -156,6 +202,13 @@ public class BeaconChainMethods {
     // Gloas
     executionPayloadEnvelopesByRoot.ifPresent(allMethods::add);
     executionPayloadEnvelopesByRange.ifPresent(allMethods::add);
+    // Light client
+    lightClientFinalityUpdate.ifPresent(allMethods::add);
+    lightClientOptimisticUpdate.ifPresent(allMethods::add);
+    lightClientUpdatesByRange.ifPresent(allMethods::add);
+    lightClientBootstrap.ifPresent(allMethods::add);
+    // Heze
+    inclusionListByCommitteeIndices.ifPresent(allMethods::add);
   }
 
   public static BeaconChainMethods create(
@@ -165,12 +218,14 @@ public class BeaconChainMethods {
       final CombinedChainDataClient combinedChainDataClient,
       final Supplier<CustodyGroupCountManager> custodyGroupCountManagerSupplier,
       final RecentChainData recentChainData,
+      final InclusionListManager inclusionListManager,
       final MetricsSystem metricsSystem,
       final StatusMessageFactory statusMessageFactory,
       final MetadataMessagesFactory metadataMessagesFactory,
       final RpcEncoding rpcEncoding,
       final DataColumnSidecarArchiveReconstructor dataColumnSidecarArchiveReconstructor,
-      final DasReqRespLogger dasLogger) {
+      final DasReqRespLogger dasLogger,
+      final Optional<LightClientUpdateStore> lightClientUpdateStore) {
     return new BeaconChainMethods(
         createStatus(spec, asyncRunner, statusMessageFactory, peerLookup, rpcEncoding),
         createGoodBye(asyncRunner, metricsSystem, peerLookup, rpcEncoding),
@@ -225,8 +280,66 @@ public class BeaconChainMethods {
             spec, asyncRunner, peerLookup, rpcEncoding, combinedChainDataClient, metricsSystem),
         createExecutionPayloadEnvelopesByRange(
             spec, asyncRunner, peerLookup, rpcEncoding, combinedChainDataClient, metricsSystem),
+        createInclusionListByCommitteeIndices(
+            spec,
+            metricsSystem,
+            asyncRunner,
+            inclusionListManager,
+            peerLookup,
+            rpcEncoding,
+            recentChainData),
         createMetadata(spec, asyncRunner, metadataMessagesFactory, peerLookup, rpcEncoding),
-        createPing(asyncRunner, metadataMessagesFactory, peerLookup, rpcEncoding));
+        createPing(asyncRunner, metadataMessagesFactory, peerLookup, rpcEncoding),
+        createLightClientMethod(
+            spec,
+            asyncRunner,
+            peerLookup,
+            rpcEncoding,
+            recentChainData,
+            lightClientUpdateStore,
+            BeaconChainMethodIds.LIGHT_CLIENT_FINALITY_UPDATE,
+            EmptyMessage.SSZ_SCHEMA,
+            ForkDigestPayloadContext.LIGHT_CLIENT_FINALITY_UPDATE,
+            store ->
+                new LightClientLatestUpdateMessageHandler<>(
+                    "light client finality update", store::getLatestFinalityUpdate)),
+        createLightClientMethod(
+            spec,
+            asyncRunner,
+            peerLookup,
+            rpcEncoding,
+            recentChainData,
+            lightClientUpdateStore,
+            BeaconChainMethodIds.LIGHT_CLIENT_OPTIMISTIC_UPDATE,
+            EmptyMessage.SSZ_SCHEMA,
+            ForkDigestPayloadContext.LIGHT_CLIENT_OPTIMISTIC_UPDATE,
+            store ->
+                new LightClientLatestUpdateMessageHandler<>(
+                    "light client optimistic update", store::getLatestOptimisticUpdate)),
+        createLightClientMethod(
+            spec,
+            asyncRunner,
+            peerLookup,
+            rpcEncoding,
+            recentChainData,
+            lightClientUpdateStore,
+            BeaconChainMethodIds.LIGHT_CLIENT_UPDATES_BY_RANGE,
+            LightClientUpdatesByRangeRequestMessage.SSZ_SCHEMA,
+            ForkDigestPayloadContext.LIGHT_CLIENT_UPDATE,
+            LightClientUpdatesByRangeMessageHandler::new),
+        createLightClientMethod(
+            spec,
+            asyncRunner,
+            peerLookup,
+            rpcEncoding,
+            recentChainData,
+            lightClientUpdateStore,
+            BeaconChainMethodIds.LIGHT_CLIENT_BOOTSTRAP,
+            LightClientBootstrapRequestMessage.SSZ_SCHEMA,
+            ForkDigestPayloadContext.LIGHT_CLIENT_BOOTSTRAP,
+            __ ->
+                new LightClientBootstrapMessageHandler(
+                    new LightClientBootstrapProvider(spec, combinedChainDataClient))));
   }
 
   private static Eth2RpcMethod<StatusMessage, StatusMessage> createStatus(
@@ -638,6 +751,48 @@ public class BeaconChainMethods {
             peerLookup));
   }
 
+  private static Optional<
+          Eth2RpcMethod<InclusionListByCommitteeRequestMessage, SignedInclusionList>>
+      createInclusionListByCommitteeIndices(
+          final Spec spec,
+          final MetricsSystem metricsSystem,
+          final AsyncRunner asyncRunner,
+          final InclusionListManager inclusionListManager,
+          final PeerLookup peerLookup,
+          final RpcEncoding rpcEncoding,
+          final RecentChainData recentChainData) {
+
+    if (!spec.isMilestoneSupported(SpecMilestone.HEZE)) {
+      return Optional.empty();
+    }
+
+    final RpcContextCodec<Bytes4, SignedInclusionList> forkDigestContextCodec =
+        RpcContextCodec.forkDigest(
+            spec, recentChainData, ForkDigestPayloadContext.SIGNED_INCLUSION_LIST);
+
+    final InclusionListByCommitteeIndicesMessageHandler
+        inclusionListByCommitteeIndicesMessageHandler =
+            new InclusionListByCommitteeIndicesMessageHandler(
+                spec, metricsSystem, inclusionListManager);
+    final InclusionListByCommitteeRequestMessageSchema
+        inclusionListByCommitteeRequestMessageSchema =
+            SchemaDefinitionsHeze.required(
+                    spec.forMilestone(SpecMilestone.HEZE).getSchemaDefinitions())
+                .getInclusionListByCommitteeRequestMessageSchema();
+
+    return Optional.of(
+        new SingleProtocolEth2RpcMethod<>(
+            asyncRunner,
+            BeaconChainMethodIds.INCLUSION_LISTS_BY_INDICES,
+            1,
+            rpcEncoding,
+            inclusionListByCommitteeRequestMessageSchema,
+            true,
+            forkDigestContextCodec,
+            inclusionListByCommitteeIndicesMessageHandler,
+            peerLookup));
+  }
+
   private static Eth2RpcMethod<EmptyMessage, MetadataMessage> createMetadata(
       final Spec spec,
       final AsyncRunner asyncRunner,
@@ -746,6 +901,35 @@ public class BeaconChainMethods {
         peerLookup);
   }
 
+  private static <I extends RpcRequest, O extends SszData>
+      Optional<Eth2RpcMethod<I, O>> createLightClientMethod(
+          final Spec spec,
+          final AsyncRunner asyncRunner,
+          final PeerLookup peerLookup,
+          final RpcEncoding rpcEncoding,
+          final RecentChainData recentChainData,
+          final Optional<LightClientUpdateStore> lightClientUpdateStore,
+          final String methodId,
+          final SszSchema<I> requestSchema,
+          final ForkDigestPayloadContext<O> payloadContext,
+          final Function<LightClientUpdateStore, LocalMessageHandler<I, O>> handlerFactory) {
+    if (!spec.isMilestoneSupported(SpecMilestone.ALTAIR)) {
+      return Optional.empty();
+    }
+    return lightClientUpdateStore.map(
+        store ->
+            new SingleProtocolEth2RpcMethod<>(
+                asyncRunner,
+                methodId,
+                1,
+                rpcEncoding,
+                requestSchema,
+                true,
+                RpcContextCodec.forkDigest(spec, recentChainData, payloadContext),
+                handlerFactory.apply(store),
+                peerLookup));
+  }
+
   private static SpecConfigGloas getSpecConfigGloas(final Spec spec) {
     return SpecConfigGloas.required(spec.forMilestone(SpecMilestone.GLOAS).getConfig());
   }
@@ -804,11 +988,36 @@ public class BeaconChainMethods {
     return executionPayloadEnvelopesByRange;
   }
 
+  public Optional<Eth2RpcMethod<InclusionListByCommitteeRequestMessage, SignedInclusionList>>
+      inclusionListByCommitteeIndices() {
+    return inclusionListByCommitteeIndices;
+  }
+
   public Eth2RpcMethod<EmptyMessage, MetadataMessage> getMetadata() {
     return getMetadata;
   }
 
   public Eth2RpcMethod<PingMessage, PingMessage> ping() {
     return ping;
+  }
+
+  public Optional<Eth2RpcMethod<EmptyMessage, LightClientFinalityUpdate>>
+      lightClientFinalityUpdate() {
+    return lightClientFinalityUpdate;
+  }
+
+  public Optional<Eth2RpcMethod<EmptyMessage, LightClientOptimisticUpdate>>
+      lightClientOptimisticUpdate() {
+    return lightClientOptimisticUpdate;
+  }
+
+  public Optional<Eth2RpcMethod<LightClientUpdatesByRangeRequestMessage, LightClientUpdate>>
+      lightClientUpdatesByRange() {
+    return lightClientUpdatesByRange;
+  }
+
+  public Optional<Eth2RpcMethod<LightClientBootstrapRequestMessage, LightClientBootstrap>>
+      lightClientBootstrap() {
+    return lightClientBootstrap;
   }
 }

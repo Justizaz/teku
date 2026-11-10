@@ -1,5 +1,5 @@
 /*
- * Copyright Consensys Software Inc., 2026
+ * Copyright (c) 2026 Consensys Incorporated. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with
  * the License. You may obtain a copy of the License at
@@ -28,9 +28,9 @@ import tech.pegasys.teku.spec.datastructures.type.SszSignature;
 
 public class BeaconBlockBodyBuilderGloas extends BeaconBlockBodyBuilderElectra {
 
-  private SignedExecutionPayloadBid signedExecutionPayloadBid;
-  private SszList<PayloadAttestation> payloadAttestations;
-  private ExecutionRequests parentExecutionRequests;
+  protected SignedExecutionPayloadBid signedExecutionPayloadBid;
+  protected SszList<PayloadAttestation> payloadAttestations;
+  protected ExecutionRequests parentExecutionRequests;
 
   public BeaconBlockBodyBuilderGloas(
       final BeaconBlockBodySchema<? extends BeaconBlockBodyGloas> schema) {

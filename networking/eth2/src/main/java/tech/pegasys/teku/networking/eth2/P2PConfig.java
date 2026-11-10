@@ -1,5 +1,5 @@
 /*
- * Copyright Consensys Software Inc., 2026
+ * Copyright (c) 2026 Consensys Incorporated. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with
  * the License. You may obtain a copy of the License at
@@ -30,12 +30,14 @@ import tech.pegasys.teku.spec.SpecVersion;
 import tech.pegasys.teku.spec.config.NetworkingSpecConfig;
 import tech.pegasys.teku.spec.config.SpecConfig;
 import tech.pegasys.teku.spec.config.SpecConfigFulu;
+import tech.pegasys.teku.statetransition.validation.signatures.SignatureVerificationMode;
 
 public class P2PConfig {
 
   public static final int DEFAULT_PEER_BLOCKS_RATE_LIMIT = 500;
   // 250 MB per peer per minute (~ 4.16 MB/s)
   public static final int DEFAULT_PEER_BLOB_SIDECARS_RATE_LIMIT = 2000;
+  public static final int DEFAULT_PEER_INCLUSION_LISTS_RATE_LIMIT = 200;
 
   public static final int DEFAULT_PEER_REQUEST_LIMIT = 100;
 
@@ -51,6 +53,14 @@ public class P2PConfig {
   public static final int DEFAULT_BATCH_VERIFY_QUEUE_CAPACITY = 30_000;
   public static final int DEFAULT_BATCH_VERIFY_MAX_BATCH_SIZE = 250;
   public static final boolean DEFAULT_BATCH_VERIFY_STRICT_THREAD_LIMIT_ENABLED = false;
+  public static final SignatureVerificationMode DEFAULT_BATCH_VERIFY_MODE =
+      SignatureVerificationMode.GATHER_AND_GROUP;
+  // In GATHER_AND_GROUP mode, after the first task of a batch arrives, keep gathering tasks for up
+  // to this long (or until the batch is full) so that batches amortise the per-batch pairing cost
+  public static final int DEFAULT_BATCH_VERIFY_GATHER_TIMEOUT_MILLIS = 10;
+  // A batch that never fills up is held for the whole window, so keep the window well below the
+  // time budget of gossip validation
+  public static final int MAX_BATCH_VERIFY_GATHER_TIMEOUT_MILLIS = 100;
   // it's not allowed to set less than requirement which is > 0, so it's safe value
   public static final int DEFAULT_CUSTODY_GROUP_COUNT_OVERRIDE = 0;
   public static final int DEFAULT_DAS_PUBLISH_WITHHOLD_COLUMNS_EVERY_SLOTS = -1;
@@ -88,11 +98,14 @@ public class P2PConfig {
   private final int historicalDataMaxQueryQueueSize;
   private final int peerBlocksRateLimit;
   private final int peerBlobSidecarsRateLimit;
+  private final int peerInclusionListsRateLimit;
   private final int peerRequestLimit;
   private final int batchVerifyMaxThreads;
   private final int batchVerifyQueueCapacity;
   private final int batchVerifyMaxBatchSize;
   private final boolean batchVerifyStrictThreadLimitEnabled;
+  private final SignatureVerificationMode batchVerifyMode;
+  private final int batchVerifyGatherTimeoutMillis;
   private final boolean isGossipBlobsAfterBlockEnabled;
   private final boolean allTopicsFilterEnabled;
   private final int sidecarRecoveryTimeout;
@@ -120,11 +133,14 @@ public class P2PConfig {
       final int historicalDataMaxQueryQueueSize,
       final int peerBlocksRateLimit,
       final int peerBlobSidecarsRateLimit,
+      final int peerInclusionListsRateLimit,
       final int peerRequestLimit,
       final int batchVerifyMaxThreads,
       final int batchVerifyQueueCapacity,
       final int batchVerifyMaxBatchSize,
       final boolean batchVerifyStrictThreadLimitEnabled,
+      final SignatureVerificationMode batchVerifyMode,
+      final int batchVerifyGatherTimeoutMillis,
       final boolean allTopicsFilterEnabled,
       final boolean isGossipBlobsAfterBlockEnabled,
       final int sidecarRecoveryTimeout,
@@ -150,11 +166,14 @@ public class P2PConfig {
     this.historicalDataMaxQueryQueueSize = historicalDataMaxQueryQueueSize;
     this.peerBlocksRateLimit = peerBlocksRateLimit;
     this.peerBlobSidecarsRateLimit = peerBlobSidecarsRateLimit;
+    this.peerInclusionListsRateLimit = peerInclusionListsRateLimit;
     this.peerRequestLimit = peerRequestLimit;
     this.batchVerifyMaxThreads = batchVerifyMaxThreads;
     this.batchVerifyQueueCapacity = batchVerifyQueueCapacity;
     this.batchVerifyMaxBatchSize = batchVerifyMaxBatchSize;
     this.batchVerifyStrictThreadLimitEnabled = batchVerifyStrictThreadLimitEnabled;
+    this.batchVerifyMode = batchVerifyMode;
+    this.batchVerifyGatherTimeoutMillis = batchVerifyGatherTimeoutMillis;
     this.networkingSpecConfig = spec.getNetworkingConfig();
     this.allTopicsFilterEnabled = allTopicsFilterEnabled;
     this.isGossipBlobsAfterBlockEnabled = isGossipBlobsAfterBlockEnabled;
@@ -233,6 +252,10 @@ public class P2PConfig {
     return peerBlobSidecarsRateLimit;
   }
 
+  public int getPeerInclusionListsRateLimit() {
+    return peerInclusionListsRateLimit;
+  }
+
   public int getPeerRequestLimit() {
     return peerRequestLimit;
   }
@@ -251,6 +274,14 @@ public class P2PConfig {
 
   public boolean isBatchVerifyStrictThreadLimitEnabled() {
     return batchVerifyStrictThreadLimitEnabled;
+  }
+
+  public SignatureVerificationMode getBatchVerifyMode() {
+    return batchVerifyMode;
+  }
+
+  public Duration getBatchVerifyGatherTimeout() {
+    return Duration.ofMillis(batchVerifyGatherTimeoutMillis);
   }
 
   public NetworkingSpecConfig getNetworkingSpecConfig() {
@@ -318,12 +349,15 @@ public class P2PConfig {
     private int historicalDataMaxQueryQueueSize = DEFAULT_HISTORICAL_MAX_QUERY_QUEUE_SIZE;
     private Integer peerBlocksRateLimit = DEFAULT_PEER_BLOCKS_RATE_LIMIT;
     private Integer peerBlobSidecarsRateLimit = DEFAULT_PEER_BLOB_SIDECARS_RATE_LIMIT;
+    private Integer peerInclusionListsRateLimit = DEFAULT_PEER_INCLUSION_LISTS_RATE_LIMIT;
     private Integer peerRequestLimit = DEFAULT_PEER_REQUEST_LIMIT;
     private int batchVerifyMaxThreads = DEFAULT_BATCH_VERIFY_MAX_THREADS;
     private OptionalInt batchVerifyQueueCapacity = OptionalInt.empty();
     private int batchVerifyMaxBatchSize = DEFAULT_BATCH_VERIFY_MAX_BATCH_SIZE;
     private boolean batchVerifyStrictThreadLimitEnabled =
         DEFAULT_BATCH_VERIFY_STRICT_THREAD_LIMIT_ENABLED;
+    private SignatureVerificationMode batchVerifyMode = DEFAULT_BATCH_VERIFY_MODE;
+    private int batchVerifyGatherTimeoutMillis = DEFAULT_BATCH_VERIFY_GATHER_TIMEOUT_MILLIS;
     private boolean allTopicsFilterEnabled = DEFAULT_PEER_ALL_TOPIC_FILTER_ENABLED;
     private int floodPublishMaxMessageSizeThreshold =
         DEFAULT_FLOOD_PUBLISH_MAX_MESSAGE_SIZE_THRESHOLD;
@@ -358,9 +392,13 @@ public class P2PConfig {
       networkConfig.gossipConfig(
           builder -> {
             gossipConfigurator.configure(builder, eth2Context);
+            // EIP-8198: use the longest slot duration so the TTL covers two epochs on either
+            // side of a slot duration change
+            final long maxSlotDurationMillis =
+                Math.max(
+                    (long) specConfig.getSlotDurationMillis(), specConfig.getSlotDurationMsHeze());
             builder.seenTTL(
-                Duration.ofSeconds(
-                    (long) specConfig.getSecondsPerSlot() * specConfig.getSlotsPerEpoch() * 2));
+                Duration.ofMillis(maxSlotDurationMillis * specConfig.getSlotsPerEpoch() * 2));
             builder.floodPublishMaxMessageSizeThreshold(floodPublishMaxMessageSizeThreshold);
           });
 
@@ -396,11 +434,14 @@ public class P2PConfig {
           historicalDataMaxQueryQueueSize,
           peerBlocksRateLimit,
           peerBlobSidecarsRateLimit,
+          peerInclusionListsRateLimit,
           peerRequestLimit,
           batchVerifyMaxThreads,
           batchVerifyQueueCapacity.orElse(DEFAULT_BATCH_VERIFY_QUEUE_CAPACITY),
           batchVerifyMaxBatchSize,
           batchVerifyStrictThreadLimitEnabled,
+          batchVerifyMode,
+          batchVerifyGatherTimeoutMillis,
           allTopicsFilterEnabled,
           gossipBlobsAfterBlockEnabled,
           sidecarRecoveryTimeout,
@@ -510,6 +551,16 @@ public class P2PConfig {
       return this;
     }
 
+    public Builder peerInclusionListsRateLimit(final Integer peerInclusionListsRateLimit) {
+      checkNotNull(peerInclusionListsRateLimit);
+      if (peerInclusionListsRateLimit < 0) {
+        throw new InvalidConfigurationException(
+            String.format("Invalid peerInclusionListsRateLimit: %d", peerInclusionListsRateLimit));
+      }
+      this.peerInclusionListsRateLimit = peerInclusionListsRateLimit;
+      return this;
+    }
+
     public Builder peerRequestLimit(final Integer peerRequestLimit) {
       checkNotNull(peerRequestLimit);
       if (peerRequestLimit < 0) {
@@ -568,6 +619,28 @@ public class P2PConfig {
     public Builder batchVerifyStrictThreadLimitEnabled(
         final boolean batchVerifyStrictThreadLimitEnabled) {
       this.batchVerifyStrictThreadLimitEnabled = batchVerifyStrictThreadLimitEnabled;
+      return this;
+    }
+
+    public Builder batchVerifyMode(final SignatureVerificationMode batchVerifyMode) {
+      checkNotNull(batchVerifyMode);
+      this.batchVerifyMode = batchVerifyMode;
+      return this;
+    }
+
+    public Builder batchVerifyGatherTimeoutMillis(final int batchVerifyGatherTimeoutMillis) {
+      if (batchVerifyGatherTimeoutMillis < 0) {
+        throw new InvalidConfigurationException(
+            String.format(
+                "Invalid batchVerifyGatherTimeoutMillis: %d", batchVerifyGatherTimeoutMillis));
+      }
+      if (batchVerifyGatherTimeoutMillis > MAX_BATCH_VERIFY_GATHER_TIMEOUT_MILLIS) {
+        throw new InvalidConfigurationException(
+            String.format(
+                "Invalid batchVerifyGatherTimeoutMillis: %d exceeds maximum: %d",
+                batchVerifyGatherTimeoutMillis, MAX_BATCH_VERIFY_GATHER_TIMEOUT_MILLIS));
+      }
+      this.batchVerifyGatherTimeoutMillis = batchVerifyGatherTimeoutMillis;
       return this;
     }
 

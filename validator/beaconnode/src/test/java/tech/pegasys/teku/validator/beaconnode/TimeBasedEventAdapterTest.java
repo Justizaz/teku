@@ -1,5 +1,5 @@
 /*
- * Copyright Consensys Software Inc., 2026
+ * Copyright (c) 2026 Consensys Incorporated. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with
  * the License. You may obtain a copy of the License at
@@ -55,27 +55,30 @@ class TimeBasedEventAdapterTest {
 
   static Stream<Arguments> milestones() {
     return Stream.of(
-        Arguments.of("PHASE0", (Supplier<Spec>) TestSpecFactory::createMinimalPhase0),
-        Arguments.of("ALTAIR", (Supplier<Spec>) TestSpecFactory::createMinimalAltair),
-        Arguments.of("GLOAS", (Supplier<Spec>) TestSpecFactory::createMinimalGloas));
+            Arguments.of("PHASE0", (Supplier<Spec>) TestSpecFactory::createMinimalPhase0),
+            Arguments.of("ALTAIR", (Supplier<Spec>) TestSpecFactory::createMinimalAltair),
+            Arguments.of("GLOAS", (Supplier<Spec>) TestSpecFactory::createMinimalGloas),
+            Arguments.of("HEZE", (Supplier<Spec>) TestSpecFactory::createMinimalHeze));
   }
 
   private TimeBasedEventAdapter createAdapter(final Spec spec, final Runnable onLastSlot) {
     final SpecMilestone milestone = spec.atSlot(UInt64.ZERO).getMilestone();
     return switch (milestone) {
       case PHASE0 ->
-          new Phase0TimeBasedEventAdapter(taskScheduler, validatorTimingChannel, onLastSlot, spec);
-      case ALTAIR, BELLATRIX, CAPELLA, DENEB, ELECTRA, FULU ->
-          new AltairTimeBasedEventAdapter(taskScheduler, validatorTimingChannel, onLastSlot, spec);
-      case GLOAS, HEZE ->
-          new GloasTimeBasedEventAdapter(taskScheduler, validatorTimingChannel, onLastSlot, spec);
+              new Phase0TimeBasedEventAdapter(taskScheduler, validatorTimingChannel, onLastSlot, spec);
+      case GLOAS ->
+              new GloasTimeBasedEventAdapter(taskScheduler, validatorTimingChannel, onLastSlot, spec);
+      case HEZE ->
+              new HezeTimeBasedEventAdapter(taskScheduler, validatorTimingChannel, onLastSlot, spec);
+      default ->
+              new AltairTimeBasedEventAdapter(taskScheduler, validatorTimingChannel, onLastSlot, spec);
     };
   }
 
   @ParameterizedTest(name = "{0}")
   @MethodSource("milestones")
   void shouldScheduleExpectedEventsWithCorrectTiming(
-      final String name, final Supplier<Spec> specFactory) {
+          final String name, final Supplier<Spec> specFactory) {
     final Spec spec = specFactory.get();
     final TimeBasedEventAdapter adapter = createAdapter(spec, () -> {});
     final int secondsPerSlot = spec.getGenesisSpecConfig().getSecondsPerSlot();
@@ -98,13 +101,13 @@ class TimeBasedEventAdapterTest {
     verify(validatorTimingChannel).onBlockProductionDue(nextSlotUInt);
 
     SlotEventVerifierTestUtil.verifySlotEvents(
-        spec, timeProvider, asyncRunner, validatorTimingChannel, nextSlotUInt);
+            spec, timeProvider, asyncRunner, validatorTimingChannel, nextSlotUInt);
   }
 
   @ParameterizedTest(name = "{0}")
   @MethodSource("milestones")
   void shouldCallOnLastSlotExactlyOnceWhenEventsExpire(
-      final String name, final Supplier<Spec> specFactory) {
+          final String name, final Supplier<Spec> specFactory) {
     final Spec spec = specFactory.get();
     final Runnable onLastSlotCallback = mock(Runnable.class);
     final TimeBasedEventAdapter adapter = createAdapter(spec, onLastSlotCallback);
@@ -119,9 +122,9 @@ class TimeBasedEventAdapterTest {
     timeProvider.advanceTimeBySeconds(secondsPerSlot * nextSlot - timeUntilNextSlot);
 
     final UInt64 nextSlotStartMillis =
-        UInt64.valueOf(genesisTimeMillis.longValue() + (nextSlot * millisPerSlot));
+            UInt64.valueOf(genesisTimeMillis.longValue() + (nextSlot * millisPerSlot));
     final UInt64 expiryMillis =
-        UInt64.valueOf(genesisTimeMillis.longValue() + ((nextSlot + 1) * millisPerSlot));
+            UInt64.valueOf(genesisTimeMillis.longValue() + ((nextSlot + 1) * millisPerSlot));
 
     adapter.scheduleDuties(nextSlotStartMillis, Optional.of(expiryMillis));
 
@@ -145,8 +148,8 @@ class TimeBasedEventAdapterTest {
     assertThat(secondsPerSlot % 3).isNotZero();
 
     final TimeBasedEventAdapter adapter =
-        new AltairTimeBasedEventAdapter(
-            taskScheduler, validatorTimingChannel, () -> {}, gnosisSpec);
+            new AltairTimeBasedEventAdapter(
+                    taskScheduler, validatorTimingChannel, () -> {}, gnosisSpec);
 
     final UInt64 genesisTimeMillis = timeProvider.getTimeInMillis();
     final long nextSlot = 25;
@@ -187,14 +190,14 @@ class TimeBasedEventAdapterTest {
   }
 
   private void startAdapter(
-      final TimeBasedEventAdapter adapter, final UInt64 genesisTimeMillis, final Spec spec) {
+          final TimeBasedEventAdapter adapter, final UInt64 genesisTimeMillis, final Spec spec) {
 
     adapter.setGenesisTimeMillis(genesisTimeMillis);
 
     final UInt64 currentSlot =
-        spec.getCurrentSlotFromTimeMillis(timeProvider.getTimeInMillis(), genesisTimeMillis);
+            spec.getCurrentSlotFromTimeMillis(timeProvider.getTimeInMillis(), genesisTimeMillis);
     final UInt64 nextSlotStartTimeMillis =
-        spec.computeTimeMillisAtSlot(currentSlot.increment(), genesisTimeMillis);
+            spec.computeTimeMillisAtSlot(currentSlot.increment(), genesisTimeMillis);
 
     adapter.scheduleDuties(nextSlotStartTimeMillis, Optional.empty());
   }

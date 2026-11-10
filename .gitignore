@@ -62,3 +62,6 @@ node_modules
 .agents/
 skills-lock.json
 .worktrees
+/EIP-8321-WORKFLOW.md
+/.junie/
+/docs/

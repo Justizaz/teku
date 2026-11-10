@@ -1,5 +1,5 @@
 /*
- * Copyright Consensys Software Inc., 2026
+ * Copyright (c) 2026 Consensys Incorporated. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with
  * the License. You may obtain a copy of the License at
@@ -16,6 +16,7 @@ package tech.pegasys.teku.services.beaconchain;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.atMostOnce;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -26,12 +27,18 @@ import static tech.pegasys.teku.infrastructure.unsigned.UInt64.ONE;
 import static tech.pegasys.teku.infrastructure.unsigned.UInt64.ZERO;
 import static tech.pegasys.teku.statetransition.forkchoice.ForkChoice.BLOCK_CREATION_TOLERANCE_MS;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Function;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
+import org.mockito.stubbing.Answer;
 import tech.pegasys.teku.beacon.sync.SyncService;
 import tech.pegasys.teku.beacon.sync.events.SyncState;
 import tech.pegasys.teku.beacon.sync.forward.ForwardSync;
@@ -60,6 +67,7 @@ import tech.pegasys.teku.storage.server.StateStorageMode;
 import tech.pegasys.teku.storage.storageSystem.InMemoryStorageSystemBuilder;
 import tech.pegasys.teku.storage.storageSystem.StorageSystem;
 import tech.pegasys.teku.validator.coordinator.FutureBlockProductionPreparationTrigger;
+import tech.pegasys.teku.validator.coordinator.InclusionListPayloadAttributesUpdater;
 
 public class SlotProcessorTest {
   private final Spec spec = TestSpecFactory.createMinimalPhase0();
@@ -81,6 +89,8 @@ public class SlotProcessorTest {
   private final FutureBlockProductionPreparationTrigger blockProductionPreparationTrigger =
       mock(FutureBlockProductionPreparationTrigger.class);
   private final ForkChoiceNotifier forkChoiceNotifier = new NoopForkChoiceNotifier();
+  private final InclusionListPayloadAttributesUpdater inclusionListPayloadAttributesUpdater =
+      mock(InclusionListPayloadAttributesUpdater.class);
   private final Eth2P2PNetwork p2pNetwork = mock(Eth2P2PNetwork.class);
   private final SlotEventsChannel slotEventsChannel = mock(SlotEventsChannel.class);
   private final EpochCachePrimer epochCachePrimer = mock(EpochCachePrimer.class);
@@ -97,6 +107,7 @@ public class SlotProcessorTest {
         forkChoiceTrigger,
         blockProductionPreparationTrigger,
         forkChoiceNotifier,
+        inclusionListPayloadAttributesUpdater,
         p2pNetwork,
         slotEventsChannel,
         epochCachePrimer,
@@ -406,6 +417,7 @@ public class SlotProcessorTest {
             forkChoiceTrigger,
             blockProductionPreparationTrigger,
             forkChoiceNotifier,
+            inclusionListPayloadAttributesUpdater,
             p2pNetwork,
             slotEventsChannel,
             epochCachePrimer,
@@ -457,6 +469,122 @@ public class SlotProcessorTest {
     // let's check that we do not trigger block preparation too early compared to slot time
     assertThat(oneThirdMillis(millisPerSlot) - BLOCK_CREATION_TOLERANCE_MS).isGreaterThan(1000);
   }
+
+  @ParameterizedTest(name = "inclusionListDueBps={0}")
+  // inclusion list due before, at and after the payload attestation deadline (7500 bps)
+  @ValueSource(ints = {6667, 7500, 8500})
+  void shouldProcessEachHezeSlotDeadlineOncePerSlot(final int inclusionListDueBps) {
+    final Spec hezeSpec =
+        TestSpecFactory.createMinimalHeze(
+            builder -> builder.hezeBuilder(heze -> heze.inclusionListDueBps(inclusionListDueBps)));
+    final List<DeadlineEvent> events = tickThroughSlots(hezeSpec, 3);
+
+    final List<DeadlineEvent> expectedEvents = new ArrayList<>();
+    for (int slot = 0; slot < 3; slot++) {
+      final UInt64 slotNumber = UInt64.valueOf(slot);
+      expectedEvents.add(new DeadlineEvent("slotStart", slotNumber, 0));
+      expectedEvents.add(
+          new DeadlineEvent(
+              "attestation", slotNumber, hezeSpec.getAttestationDueMillis(slotNumber)));
+      expectedEvents.add(
+          new DeadlineEvent(
+              "inclusionList",
+              slotNumber,
+              hezeSpec.getInclusionListDueMillis(slotNumber).orElseThrow()));
+      expectedEvents.add(
+          new DeadlineEvent(
+              "payloadAttestation",
+              slotNumber,
+              hezeSpec.getPayloadAttestationDueMillis(slotNumber).orElseThrow()));
+    }
+    assertThat(events).containsExactlyInAnyOrderElementsOf(expectedEvents);
+  }
+
+  @Test
+  void shouldNotProcessInclusionListDeadlineBeforeHeze() {
+    final Spec gloasSpec = TestSpecFactory.createMinimalGloas();
+    final List<DeadlineEvent> events = tickThroughSlots(gloasSpec, 3);
+
+    final List<DeadlineEvent> expectedEvents = new ArrayList<>();
+    for (int slot = 0; slot < 3; slot++) {
+      final UInt64 slotNumber = UInt64.valueOf(slot);
+      expectedEvents.add(new DeadlineEvent("slotStart", slotNumber, 0));
+      expectedEvents.add(
+          new DeadlineEvent(
+              "attestation", slotNumber, gloasSpec.getAttestationDueMillis(slotNumber)));
+      expectedEvents.add(
+          new DeadlineEvent(
+              "payloadAttestation",
+              slotNumber,
+              gloasSpec.getPayloadAttestationDueMillis(slotNumber).orElseThrow()));
+    }
+    assertThat(events).containsExactlyInAnyOrderElementsOf(expectedEvents);
+  }
+
+  /**
+   * Ticks a slot processor every 100ms from genesis through the given number of slots, recording
+   * when each per-slot deadline is processed, relative to the start of the slot it is processed
+   * for.
+   */
+  private List<DeadlineEvent> tickThroughSlots(final Spec spec, final int slotCount) {
+    final StorageSystem storageSystem =
+        InMemoryStorageSystemBuilder.buildDefault(StateStorageMode.ARCHIVE, spec);
+    storageSystem.chainUpdater().initializeGenesis();
+    final RecentChainData recentChainData = storageSystem.recentChainData();
+    final UInt64 genesisTimeMillis = recentChainData.getGenesisTimeMillis();
+    final ForkChoiceNotifier forkChoiceNotifier = mock(ForkChoiceNotifier.class);
+    final SlotEventsChannel slotEventsChannel = mock(SlotEventsChannel.class);
+    final AtomicReference<UInt64> currentTimeMillis = new AtomicReference<>();
+    final List<DeadlineEvent> events = new ArrayList<>();
+    final Function<String, Answer<Object>> recordEvent =
+        deadline ->
+            invocation -> {
+              final UInt64 slot = invocation.getArgument(0);
+              final UInt64 slotStartMillis = spec.computeTimeMillisAtSlot(slot, genesisTimeMillis);
+              events.add(
+                  new DeadlineEvent(
+                      deadline,
+                      slot,
+                      currentTimeMillis.get().minusMinZero(slotStartMillis).intValue()));
+              return null;
+            };
+    doAnswer(recordEvent.apply("slotStart")).when(slotEventsChannel).onSlot(any());
+    doAnswer(recordEvent.apply("attestation")).when(forkChoiceNotifier).onAttestationsDue(any());
+    doAnswer(recordEvent.apply("payloadAttestation"))
+        .when(forkChoiceNotifier)
+        .onPayloadAttestationsDue(any());
+    when(inclusionListPayloadAttributesUpdater.onInclusionListDue(any()))
+        .thenAnswer(
+            invocation -> {
+              recordEvent.apply("inclusionList").answer(invocation);
+              return SafeFuture.completedFuture(Optional.empty());
+            });
+    when(syncService.getCurrentSyncState()).thenReturn(SyncState.IN_SYNC);
+
+    final SlotProcessor slotProcessor =
+        new SlotProcessor(
+            spec,
+            recentChainData,
+            syncService,
+            forkChoiceTrigger,
+            blockProductionPreparationTrigger,
+            forkChoiceNotifier,
+            inclusionListPayloadAttributesUpdater,
+            p2pNetwork,
+            slotEventsChannel,
+            epochCachePrimer,
+            eventLogger);
+
+    final UInt64 endTimeMillis =
+        spec.computeTimeMillisAtSlot(UInt64.valueOf(slotCount), genesisTimeMillis);
+    for (UInt64 time = genesisTimeMillis; time.isLessThan(endTimeMillis); time = time.plus(100)) {
+      currentTimeMillis.set(time);
+      slotProcessor.onTick(time, Optional.empty());
+    }
+    return events;
+  }
+
+  private record DeadlineEvent(String deadline, UInt64 slot, int millisIntoSlot) {}
 
   private long oneThirdMillis(final long millis) {
     return millis / 3L;
