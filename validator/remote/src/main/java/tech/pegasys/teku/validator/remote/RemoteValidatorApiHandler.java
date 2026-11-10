@@ -275,6 +275,7 @@ public class RemoteValidatorApiHandler implements RemoteValidatorApiChannel {
   public SafeFuture<Optional<BlockContainerAndMetaData>> createUnsignedBlock(
       final UInt64 slot,
       final BLSSignature randaoReveal,
+      final Optional<Bytes32> hashChainReveal,
       final Optional<Bytes32> graffiti,
       final boolean includePayload,
       final Optional<BuilderConfig> builderConfig) {
@@ -429,6 +430,11 @@ public class RemoteValidatorApiHandler implements RemoteValidatorApiChannel {
   public SafeFuture<Void> sendSignedRandaoCommitmentRegistration(
       final SignedRandaoCommitmentRegistration registration) {
     return sendRequest(() -> typeDefClient.sendSignedRandaoCommitmentRegistration(registration));
+  }
+
+  @Override
+  public SafeFuture<Optional<Bytes32>> getValidatorRandaoCommitment(final BLSPublicKey publicKey) {
+    return sendRequest(() -> typeDefClient.getValidatorRandaoCommitment(publicKey));
   }
 
   @Override

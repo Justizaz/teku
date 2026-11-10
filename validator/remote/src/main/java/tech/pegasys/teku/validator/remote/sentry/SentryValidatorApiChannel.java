@@ -139,12 +139,18 @@ public class SentryValidatorApiChannel implements ValidatorApiChannel {
   public SafeFuture<Optional<BlockContainerAndMetaData>> createUnsignedBlock(
       final UInt64 slot,
       final BLSSignature randaoReveal,
+      final Optional<Bytes32> hashChainReveal,
       final Optional<Bytes32> graffiti,
       final boolean includePayload,
       final Optional<BuilderConfig> builderConfig) {
-    return blockHandlerChannel
-        .orElse(dutiesProviderChannel)
-        .createUnsignedBlock(slot, randaoReveal, graffiti, includePayload, builderConfig);
+    return hashChainReveal.isPresent() && !hashChainReveal.get().isZero()
+        ? blockHandlerChannel
+            .orElse(dutiesProviderChannel)
+            .createUnsignedBlock(
+                slot, randaoReveal, hashChainReveal, graffiti, includePayload, builderConfig)
+        : blockHandlerChannel
+            .orElse(dutiesProviderChannel)
+            .createUnsignedBlock(slot, randaoReveal, graffiti, includePayload, builderConfig);
   }
 
   @Override
@@ -310,6 +316,11 @@ public class SentryValidatorApiChannel implements ValidatorApiChannel {
   public SafeFuture<Void> sendSignedRandaoCommitmentRegistration(
       final SignedRandaoCommitmentRegistration registration) {
     return dutiesProviderChannel.sendSignedRandaoCommitmentRegistration(registration);
+  }
+
+  @Override
+  public SafeFuture<Optional<Bytes32>> getValidatorRandaoCommitment(final BLSPublicKey publicKey) {
+    return dutiesProviderChannel.getValidatorRandaoCommitment(publicKey);
   }
 
   @Override

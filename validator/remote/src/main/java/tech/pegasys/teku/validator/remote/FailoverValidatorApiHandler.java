@@ -207,13 +207,22 @@ public class FailoverValidatorApiHandler implements ValidatorApiChannel {
   public SafeFuture<Optional<BlockContainerAndMetaData>> createUnsignedBlock(
       final UInt64 slot,
       final BLSSignature randaoReveal,
+      final Optional<Bytes32> hashChainReveal,
       final Optional<Bytes32> graffiti,
       final boolean includePayload,
       final Optional<BuilderConfig> builderConfig) {
     final ValidatorApiChannelRequest<Optional<BlockContainerAndMetaData>> request =
         apiChannel ->
-            apiChannel
-                .createUnsignedBlock(slot, randaoReveal, graffiti, includePayload, builderConfig)
+            (hashChainReveal.isPresent() && !hashChainReveal.get().isZero()
+                    ? apiChannel.createUnsignedBlock(
+                        slot,
+                        randaoReveal,
+                        hashChainReveal,
+                        graffiti,
+                        includePayload,
+                        builderConfig)
+                    : apiChannel.createUnsignedBlock(
+                        slot, randaoReveal, graffiti, includePayload, builderConfig))
                 .thenPeek(
                     maybeBlockContainerAndMetaData -> {
                       if (failoverDelegates.isEmpty()) {
@@ -425,6 +434,13 @@ public class FailoverValidatorApiHandler implements ValidatorApiChannel {
     return relayRequest(
         apiChannel -> apiChannel.sendSignedRandaoCommitmentRegistration(registration),
         BeaconNodeRequestLabels.SEND_SIGNED_RANDAO_COMMITMENT_REGISTRATION_METHOD);
+  }
+
+  @Override
+  public SafeFuture<Optional<Bytes32>> getValidatorRandaoCommitment(final BLSPublicKey publicKey) {
+    return tryRequestUntilSuccess(
+        apiChannel -> apiChannel.getValidatorRandaoCommitment(publicKey),
+        BeaconNodeRequestLabels.GET_VALIDATOR_RANDAO_COMMITMENT_METHOD);
   }
 
   @Override

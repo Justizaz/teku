@@ -113,5 +113,13 @@ public interface BeaconBlockBodyBuilder {
 
   BeaconBlockBodyBuilder randaoCommitmentRegistrations(SszList<SignedRandaoCommitmentRegistration> randaoCommitmentRegistrations);
 
+  default boolean supportsHashChainReveal() {
+    return false;
+  }
+
+  default BeaconBlockBodyBuilder hashChainReveal(final Bytes32 hashChainReveal) {
+    return this;
+  }
+
   BeaconBlockBody build();
 }

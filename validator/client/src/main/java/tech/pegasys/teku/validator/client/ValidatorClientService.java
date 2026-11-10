@@ -72,6 +72,7 @@ import tech.pegasys.teku.validator.client.duties.inclusionlists.InclusionListDut
 import tech.pegasys.teku.validator.client.duties.payloadattestations.PayloadAttestationDutyFactory;
 import tech.pegasys.teku.validator.client.duties.synccommittee.ChainHeadTracker;
 import tech.pegasys.teku.validator.client.duties.synccommittee.SyncCommitteeScheduledDuties;
+import tech.pegasys.teku.validator.client.hashchain.HashChainStore;
 import tech.pegasys.teku.validator.client.loader.HttpClientExternalSignerFactory;
 import tech.pegasys.teku.validator.client.loader.OwnedValidators;
 import tech.pegasys.teku.validator.client.loader.PublicKeyLoader;
@@ -301,7 +302,10 @@ public class ValidatorClientService extends Service {
                   .runAsync(
                       () ->
                           validatorClientService.scheduleValidatorsDuties(
-                              config, validatorApiChannel, asyncRunner))
+                              services.getDataDirLayout(),
+                              config,
+                              validatorApiChannel,
+                              asyncRunner))
                   .propagateTo(validatorClientService.initializationComplete);
               return SafeFuture.COMPLETE;
             })
@@ -464,6 +468,7 @@ public class ValidatorClientService extends Service {
   }
 
   private void scheduleValidatorsDuties(
+      final DataDirLayout dataDirLayout,
       final ValidatorClientConfiguration config,
       final ValidatorApiChannel validatorApiChannel,
       final AsyncRunner asyncRunner) {
@@ -480,6 +485,8 @@ public class ValidatorClientService extends Service {
     } else {
       builderConfigProvider = BuilderConfigProvider.NOOP;
     }
+    final Optional<HashChainStore> hashChainStore =
+        Optional.of(HashChainStore.fromDataDirLayout(dataDirLayout));
     final BlockDutyFactory blockDutyFactory =
         new BlockDutyFactory(
             forkProvider,
@@ -488,7 +495,8 @@ public class ValidatorClientService extends Service {
             spec,
             validatorDutyMetrics,
             eventChannels.getPublisher(ExecutionPayloadBidEventsChannel.class),
-            builderConfigProvider);
+            builderConfigProvider,
+            hashChainStore);
     final boolean dvtSelectionsEndpointEnabled =
         config.getValidatorConfig().isDvtSelectionsEndpointEnabled();
     final AttestationDutyFactory attestationDutyFactory =

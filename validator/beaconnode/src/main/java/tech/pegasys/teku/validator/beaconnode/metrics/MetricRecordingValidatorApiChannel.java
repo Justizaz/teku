@@ -179,11 +179,13 @@ public class MetricRecordingValidatorApiChannel implements ValidatorApiChannel {
   public SafeFuture<Optional<BlockContainerAndMetaData>> createUnsignedBlock(
       final UInt64 slot,
       final BLSSignature randaoReveal,
+      final Optional<Bytes32> hashChainReveal,
       final Optional<Bytes32> graffiti,
       final boolean includePayload,
       final Optional<BuilderConfig> builderConfig) {
     return countOptionalDataRequest(
-        delegate.createUnsignedBlock(slot, randaoReveal, graffiti, includePayload, builderConfig),
+        delegate.createUnsignedBlock(
+            slot, randaoReveal, hashChainReveal, graffiti, includePayload, builderConfig),
         BeaconNodeRequestLabels.CREATE_UNSIGNED_BLOCK_METHOD);
   }
 
@@ -350,6 +352,13 @@ public class MetricRecordingValidatorApiChannel implements ValidatorApiChannel {
     return countDataRequest(
         delegate.sendSignedRandaoCommitmentRegistration(registration),
         BeaconNodeRequestLabels.SEND_SIGNED_RANDAO_COMMITMENT_REGISTRATION_METHOD);
+  }
+
+  @Override
+  public SafeFuture<Optional<Bytes32>> getValidatorRandaoCommitment(final BLSPublicKey publicKey) {
+    return countOptionalDataRequest(
+        delegate.getValidatorRandaoCommitment(publicKey),
+        BeaconNodeRequestLabels.GET_VALIDATOR_RANDAO_COMMITMENT_METHOD);
   }
 
   @Override

@@ -124,6 +124,7 @@ public interface ValidatorApiChannel extends BuilderApiChannel, ChannelInterface
         public SafeFuture<Optional<BlockContainerAndMetaData>> createUnsignedBlock(
             final UInt64 slot,
             final BLSSignature randaoReveal,
+            final Optional<Bytes32> hashChainReveal,
             final Optional<Bytes32> graffiti,
             final boolean includePayload,
             final Optional<BuilderConfig> builderConfig) {
@@ -351,9 +352,20 @@ public interface ValidatorApiChannel extends BuilderApiChannel, ChannelInterface
         requestedBuilderBoostFactor.map(BuilderConfig::withBuilderBoostFactor));
   }
 
+  default SafeFuture<Optional<BlockContainerAndMetaData>> createUnsignedBlock(
+      final UInt64 slot,
+      final BLSSignature randaoReveal,
+      final Optional<Bytes32> graffiti,
+      final boolean includePayload,
+      final Optional<BuilderConfig> builderConfig) {
+    return createUnsignedBlock(
+        slot, randaoReveal, Optional.empty(), graffiti, includePayload, builderConfig);
+  }
+
   SafeFuture<Optional<BlockContainerAndMetaData>> createUnsignedBlock(
       UInt64 slot,
       BLSSignature randaoReveal,
+      Optional<Bytes32> hashChainReveal,
       Optional<Bytes32> graffiti,
       boolean includePayload,
       Optional<BuilderConfig> builderConfig);
@@ -421,6 +433,10 @@ public interface ValidatorApiChannel extends BuilderApiChannel, ChannelInterface
 
   SafeFuture<Void> sendSignedRandaoCommitmentRegistration(
       SignedRandaoCommitmentRegistration registration);
+
+  default SafeFuture<Optional<Bytes32>> getValidatorRandaoCommitment(final BLSPublicKey publicKey) {
+    return SafeFuture.completedFuture(Optional.empty());
+  }
 
   SafeFuture<Optional<List<ValidatorLivenessAtEpoch>>> getValidatorsLiveness(
       List<UInt64> validatorIndices, UInt64 epoch);

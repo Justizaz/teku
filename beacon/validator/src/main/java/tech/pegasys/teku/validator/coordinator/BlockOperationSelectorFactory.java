@@ -300,6 +300,10 @@ public class BlockOperationSelectorFactory {
           .proposerSlashings(proposerSlashings)
           .attesterSlashings(attesterSlashings);
 
+      if (bodyBuilder.supportsHashChainReveal()) {
+        blockProductionContext.hashChainReveal().ifPresent(bodyBuilder::hashChainReveal);
+      }
+
       // Pre-Heze: Eth1 data vote and deposits (removed by EIP-8015)
       if (bodyBuilder.supportsEth1DataAndDeposits()) {
         final Eth1Data eth1Data = eth1DataCache.getEth1Vote(blockSlotState);
@@ -325,11 +329,11 @@ public class BlockOperationSelectorFactory {
       }
 
       // Post-EIP-8321: RANDAO commitment registration
-      if(bodyBuilder.supportsRandaoCommitmentRegistrations()) {
+      if (bodyBuilder.supportsRandaoCommitmentRegistrations()) {
         bodyBuilder.randaoCommitmentRegistrations(
-                randaoCommitmentRegistrationPool.getItemsForBlock(
-                        blockSlotState,
-                        SpecConfigEip8321.required(specConfig).getMaxRandaoCommitmentRegistrations()));
+            randaoCommitmentRegistrationPool.getItemsForBlock(
+                blockSlotState,
+                SpecConfigEip8321.required(specConfig).getMaxRandaoCommitmentRegistrations()));
       }
 
       // Post-Gloas: Payload Attestations

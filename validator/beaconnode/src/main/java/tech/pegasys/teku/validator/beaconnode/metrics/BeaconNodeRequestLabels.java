@@ -46,6 +46,8 @@ public class BeaconNodeRequestLabels {
   public static final String REGISTER_VALIDATORS_METHOD = "register_validators";
   public static final String SEND_SIGNED_RANDAO_COMMITMENT_REGISTRATION_METHOD =
       "send_signed_randao_commitment_registration";
+  public static final String GET_VALIDATOR_RANDAO_COMMITMENT_METHOD =
+      "get_validator_randao_commitment";
   public static final String GET_VALIDATORS_LIVENESS = "get_validators_liveness";
   public static final String BEACON_COMMITTEE_SELECTIONS = "beacon_committee_selections";
   public static final String SYNC_COMMITTEE_SELECTIONS = "sync_committee_selections";

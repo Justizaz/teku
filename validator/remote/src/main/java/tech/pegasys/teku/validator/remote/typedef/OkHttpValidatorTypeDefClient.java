@@ -25,6 +25,7 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.apache.tuweni.bytes.Bytes32;
 import tech.pegasys.teku.api.migrated.ValidatorLivenessAtEpoch;
+import tech.pegasys.teku.bls.BLSPublicKey;
 import tech.pegasys.teku.bls.BLSSignature;
 import tech.pegasys.teku.ethereum.json.types.beacon.StateValidatorData;
 import tech.pegasys.teku.ethereum.json.types.node.PeerCount;
@@ -447,5 +448,9 @@ public class OkHttpValidatorTypeDefClient extends OkHttpValidatorMinimalTypeDefC
     final PostRandaoCommitmentRegistrationRequest postRandaoCommitmentRegistrationRequest =
         new PostRandaoCommitmentRegistrationRequest(getBaseEndpoint(), getOkHttpClient());
     postRandaoCommitmentRegistrationRequest.submit(registration);
+  }
+
+  public Optional<Bytes32> getValidatorRandaoCommitment(final BLSPublicKey publicKey) {
+    return Optional.empty();
   }
 }

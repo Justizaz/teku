@@ -522,6 +522,7 @@ public class ValidatorApiHandler implements ValidatorApiChannel, SlotEventsChann
   public SafeFuture<Optional<BlockContainerAndMetaData>> createUnsignedBlock(
       final UInt64 slot,
       final BLSSignature randaoReveal,
+      final Optional<Bytes32> hashChainReveal,
       final Optional<Bytes32> graffiti,
       final boolean includePayload,
       final Optional<BuilderConfig> builderConfig) {
@@ -530,7 +531,7 @@ public class ValidatorApiHandler implements ValidatorApiChannel, SlotEventsChann
             slot,
             __ ->
                 createUnsignedBlockInternal(
-                    slot, randaoReveal, graffiti, includePayload, builderConfig))
+                    slot, randaoReveal, hashChainReveal, graffiti, includePayload, builderConfig))
         .whenException(
             __ -> {
               // allow further block production attempts for this slot, including a new preparation
@@ -573,6 +574,7 @@ public class ValidatorApiHandler implements ValidatorApiChannel, SlotEventsChann
   private SafeFuture<Optional<BlockContainerAndMetaData>> createUnsignedBlockInternal(
       final UInt64 slot,
       final BLSSignature randaoReveal,
+      final Optional<Bytes32> hashChainReveal,
       final Optional<Bytes32> graffiti,
       final boolean includePayload,
       final Optional<BuilderConfig> builderConfig) {
@@ -588,7 +590,8 @@ public class ValidatorApiHandler implements ValidatorApiChannel, SlotEventsChann
     blockProductionPreparationContext.blockProductionPerformance.validatorBlockRequested();
 
     return blockProductionPreparationContext
-        .toBlockProductionContext(spec, slot, randaoReveal, graffiti, includePayload, builderConfig)
+        .toBlockProductionContext(
+            spec, slot, randaoReveal, hashChainReveal, graffiti, includePayload, builderConfig)
         .thenCompose(this::createBlock)
         .thenPeek(
             maybeBlock ->
@@ -1192,6 +1195,36 @@ public class ValidatorApiHandler implements ValidatorApiChannel, SlotEventsChann
   }
 
   @Override
+  public SafeFuture<Optional<Bytes32>> getValidatorRandaoCommitment(final BLSPublicKey publicKey) {
+    if (isSyncActive()) {
+      return SafeFuture.completedFuture(Optional.empty());
+    }
+    return combinedChainDataClient
+        .getBestState()
+        .orElseGet(
+            () ->
+                SafeFuture.failedFuture(
+                    new IllegalStateException("Head state is not yet available")))
+        .thenApply(
+            state ->
+                state
+                    .toVersionEip8321()
+                    .flatMap(
+                        stateEip8321 -> {
+                          final Optional<Integer> maybeIndex =
+                              spec.getValidatorIndex(state, publicKey);
+                          if (maybeIndex.isPresent()) {
+                            final int index = maybeIndex.get();
+                            if (index < stateEip8321.getRandaoCommitments().size()) {
+                              return Optional.of(
+                                  stateEip8321.getRandaoCommitments().get(index).get());
+                            }
+                          }
+                          return Optional.of(Bytes32.ZERO);
+                        }));
+  }
+
+  @Override
   public SafeFuture<Optional<ExecutionPayloadEnvelope>> createUnsignedExecutionPayload(
       final UInt64 slot, final Bytes32 beaconBlockRoot) {
     if (isSyncActive()) {
@@ -1431,6 +1464,7 @@ public class ValidatorApiHandler implements ValidatorApiChannel, SlotEventsChann
         final Spec spec,
         final UInt64 proposalSlot,
         final BLSSignature randaoReveal,
+        final Optional<Bytes32> hashChainReveal,
         final Optional<Bytes32> graffiti,
         final boolean includePayload,
         final Optional<BuilderConfig> builderConfig) {
@@ -1443,6 +1477,7 @@ public class ValidatorApiHandler implements ValidatorApiChannel, SlotEventsChann
                   state,
                   chainHead,
                   randaoReveal,
+                  hashChainReveal,
                   graffiti,
                   includePayload,
                   builderConfig,

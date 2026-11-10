@@ -1,5 +1,5 @@
 /*
- * Copyright Consensys Software Inc., 2026
+ * Copyright (c) 2026 Consensys Incorporated. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with
  * the License. You may obtain a copy of the License at
@@ -12,6 +12,8 @@
  */
 
 package tech.pegasys.teku.spec.datastructures.blocks.blockbody.versions.eip8321;
+
+import static com.google.common.base.Preconditions.checkNotNull;
 
 import org.apache.tuweni.bytes.Bytes32;
 import tech.pegasys.teku.infrastructure.ssz.SszList;
@@ -26,8 +28,6 @@ import tech.pegasys.teku.spec.datastructures.execution.ExecutionRequests;
 import tech.pegasys.teku.spec.datastructures.operations.SignedRandaoCommitmentRegistration;
 import tech.pegasys.teku.spec.datastructures.type.SszSignature;
 
-import static com.google.common.base.Preconditions.checkNotNull;
-
 public class BeaconBlockBodyBuilderEip8321 extends BeaconBlockBodyBuilderGloas {
   private Bytes32 hashChainReveal = Bytes32.ZERO;
   private SszList<SignedRandaoCommitmentRegistration> randaoCommitmentRegistrations;
@@ -37,9 +37,7 @@ public class BeaconBlockBodyBuilderEip8321 extends BeaconBlockBodyBuilderGloas {
     super(schema);
 
     this.randaoCommitmentRegistrations =
-            ((BeaconBlockBodySchemaEip8321<?>) schema)
-                    .getRandaoCommitmentRegistrationsSchema()
-                    .of();
+        ((BeaconBlockBodySchemaEip8321<?>) schema).getRandaoCommitmentRegistrationsSchema().of();
   }
 
   @Override
@@ -98,6 +96,12 @@ public class BeaconBlockBodyBuilderEip8321 extends BeaconBlockBodyBuilderGloas {
     return this;
   }
 
+  @Override
+  public boolean supportsHashChainReveal() {
+    return true;
+  }
+
+  @Override
   public BeaconBlockBodyBuilderEip8321 hashChainReveal(final Bytes32 hashChainReveal) {
     this.hashChainReveal = hashChainReveal;
     return this;
@@ -109,7 +113,8 @@ public class BeaconBlockBodyBuilderEip8321 extends BeaconBlockBodyBuilderGloas {
   }
 
   @Override
-  public BeaconBlockBodyBuilderEip8321 randaoCommitmentRegistrations(final SszList<SignedRandaoCommitmentRegistration> randaoCommitmentRegistrations) {
+  public BeaconBlockBodyBuilderEip8321 randaoCommitmentRegistrations(
+      final SszList<SignedRandaoCommitmentRegistration> randaoCommitmentRegistrations) {
     this.randaoCommitmentRegistrations = randaoCommitmentRegistrations;
     return this;
   }
@@ -157,7 +162,7 @@ public class BeaconBlockBodyBuilderEip8321 extends BeaconBlockBodyBuilderGloas {
         signedExecutionPayloadBid,
         payloadAttestations,
         parentExecutionRequests,
-            SszBytes32.of(hashChainReveal),
-            randaoCommitmentRegistrations);
+        SszBytes32.of(hashChainReveal),
+        randaoCommitmentRegistrations);
   }
 }

@@ -46,6 +46,8 @@ import tech.pegasys.teku.validator.client.BuilderConfigProvider;
 import tech.pegasys.teku.validator.client.ForkProvider;
 import tech.pegasys.teku.validator.client.Validator;
 import tech.pegasys.teku.validator.client.duties.execution.ExecutionPayloadBidEventsChannel;
+import tech.pegasys.teku.validator.client.hashchain.HashChain;
+import tech.pegasys.teku.validator.client.hashchain.HashChainStore;
 import tech.pegasys.teku.validator.client.signer.BlockContainerSigner;
 
 public class BlockProductionDuty implements Duty {
@@ -61,6 +63,8 @@ public class BlockProductionDuty implements Duty {
   private final ValidatorDutyMetrics validatorDutyMetrics;
   private final ExecutionPayloadBidEventsChannel executionPayloadBidEventsChannelPublisher;
   private final BuilderConfigProvider builderConfigProvider;
+  private final Optional<HashChainStore> hashChainStore;
+  private final Optional<HashChain> maybeHashChain;
 
   public BlockProductionDuty(
       final Validator validator,
@@ -72,6 +76,57 @@ public class BlockProductionDuty implements Duty {
       final ValidatorDutyMetrics validatorDutyMetrics,
       final ExecutionPayloadBidEventsChannel executionPayloadBidEventsChannelPublisher,
       final BuilderConfigProvider builderConfigProvider) {
+    this(
+        validator,
+        slot,
+        forkProvider,
+        validatorApiChannel,
+        blockContainerSigner,
+        spec,
+        validatorDutyMetrics,
+        executionPayloadBidEventsChannelPublisher,
+        builderConfigProvider,
+        Optional.empty(),
+        Optional.empty());
+  }
+
+  public BlockProductionDuty(
+      final Validator validator,
+      final UInt64 slot,
+      final ForkProvider forkProvider,
+      final ValidatorApiChannel validatorApiChannel,
+      final BlockContainerSigner blockContainerSigner,
+      final Spec spec,
+      final ValidatorDutyMetrics validatorDutyMetrics,
+      final ExecutionPayloadBidEventsChannel executionPayloadBidEventsChannelPublisher,
+      final BuilderConfigProvider builderConfigProvider,
+      final Optional<HashChainStore> hashChainStore) {
+    this(
+        validator,
+        slot,
+        forkProvider,
+        validatorApiChannel,
+        blockContainerSigner,
+        spec,
+        validatorDutyMetrics,
+        executionPayloadBidEventsChannelPublisher,
+        builderConfigProvider,
+        hashChainStore,
+        Optional.empty());
+  }
+
+  public BlockProductionDuty(
+      final Validator validator,
+      final UInt64 slot,
+      final ForkProvider forkProvider,
+      final ValidatorApiChannel validatorApiChannel,
+      final BlockContainerSigner blockContainerSigner,
+      final Spec spec,
+      final ValidatorDutyMetrics validatorDutyMetrics,
+      final ExecutionPayloadBidEventsChannel executionPayloadBidEventsChannelPublisher,
+      final BuilderConfigProvider builderConfigProvider,
+      final Optional<HashChainStore> hashChainStore,
+      final Optional<HashChain> maybeHashChain) {
     this.validator = validator;
     this.slot = slot;
     this.forkProvider = forkProvider;
@@ -81,6 +136,8 @@ public class BlockProductionDuty implements Duty {
     this.validatorDutyMetrics = validatorDutyMetrics;
     this.executionPayloadBidEventsChannelPublisher = executionPayloadBidEventsChannelPublisher;
     this.builderConfigProvider = builderConfigProvider;
+    this.hashChainStore = hashChainStore;
+    this.maybeHashChain = maybeHashChain;
   }
 
   @Override
@@ -98,13 +155,15 @@ public class BlockProductionDuty implements Duty {
   }
 
   private SafeFuture<DutyResult> produceBlock(final ForkInfo forkInfo) {
-    return createRandaoReveal(forkInfo)
+    return createRandaoReveals(forkInfo)
         // create unsigned block
         .thenComposeCombined(
             createBuilderConfig(validator, slot),
-            (randaoReveal, builderConfig) ->
+            (reveals, builderConfig) ->
                 validatorDutyMetrics.record(
-                    () -> createUnsignedBlock(randaoReveal, builderConfig),
+                    () ->
+                        createUnsignedBlock(
+                            reveals.blsReveal(), reveals.hashChainReveal(), builderConfig),
                     this,
                     ValidatorDutyMetricsSteps.CREATE))
         .thenCompose(this::validateBlock)
@@ -140,8 +199,61 @@ public class BlockProductionDuty implements Duty {
     return DutyResult.forError(validator.getPublicKey(), error);
   }
 
-  private SafeFuture<BLSSignature> createRandaoReveal(final ForkInfo forkInfo) {
-    return validator.getSigner().createRandaoReveal(spec.computeEpochAtSlot(slot), forkInfo);
+  private record RandaoReveals(BLSSignature blsReveal, Optional<Bytes32> hashChainReveal) {}
+
+  private SafeFuture<RandaoReveals> createRandaoReveals(final ForkInfo forkInfo) {
+    return validatorApiChannel
+        .getValidatorRandaoCommitment(validator.getPublicKey())
+        .thenCompose(
+            maybeCommitment -> {
+              if (maybeCommitment.isEmpty() || maybeCommitment.get().isZero()) {
+                // Zero commitment -> Legacy path
+                return validator
+                    .getSigner()
+                    .createRandaoReveal(spec.computeEpochAtSlot(slot), forkInfo)
+                    .thenApply(
+                        blsSignature -> new RandaoReveals(blsSignature, Optional.of(Bytes32.ZERO)));
+              }
+
+              // Non-zero commitment -> Hash-chain path
+              final Bytes32 currentCommitment = maybeCommitment.get();
+              final Optional<HashChain> hashChain = getHashChain();
+              if (hashChain.isEmpty()) {
+                return SafeFuture.failedFuture(
+                    new IllegalStateException(
+                        String.format(
+                            "Validator %s has on-chain commitment %s but no hash chain is available",
+                            validator.getPublicKey(), currentCommitment)));
+              }
+
+              final Optional<Bytes32> maybeReveal =
+                  hashChain.get().getRevealForCommitment(currentCommitment);
+              if (maybeReveal.isEmpty()) {
+                return SafeFuture.failedFuture(
+                    new IllegalStateException(
+                        String.format(
+                            "Cannot find reveal preimage for canonical commitment %s for validator %s",
+                            currentCommitment, validator.getPublicKey())));
+              }
+
+              final Bytes32 hashChainReveal = maybeReveal.get();
+              return SafeFuture.completedFuture(
+                  new RandaoReveals(BLSSignature.infinity(), Optional.of(hashChainReveal)));
+            });
+  }
+
+  private Optional<HashChain> getHashChain() {
+    if (maybeHashChain.isPresent()) {
+      return maybeHashChain;
+    }
+    if (hashChainStore.isPresent()) {
+      try {
+        return hashChainStore.get().loadHashChain(validator.getPublicKey(), "");
+      } catch (final Exception e) {
+        LOG.debug("Could not load hash chain for validator {}", validator.getPublicKey(), e);
+      }
+    }
+    return Optional.empty();
   }
 
   private SafeFuture<Optional<BuilderConfig>> createBuilderConfig(
@@ -160,7 +272,13 @@ public class BlockProductionDuty implements Duty {
   }
 
   private SafeFuture<Optional<BlockContainerAndMetaData>> createUnsignedBlock(
-      final BLSSignature randaoReveal, final Optional<BuilderConfig> builderConfig) {
+      final BLSSignature randaoReveal,
+      final Optional<Bytes32> hashChainReveal,
+      final Optional<BuilderConfig> builderConfig) {
+    if (hashChainReveal.isPresent() && !hashChainReveal.get().isZero()) {
+      return validatorApiChannel.createUnsignedBlock(
+          slot, randaoReveal, hashChainReveal, validator.getGraffiti(), false, builderConfig);
+    }
     return validatorApiChannel.createUnsignedBlock(
         slot, randaoReveal, validator.getGraffiti(), false, builderConfig);
   }
