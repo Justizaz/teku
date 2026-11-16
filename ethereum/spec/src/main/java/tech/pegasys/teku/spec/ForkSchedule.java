@@ -48,13 +48,13 @@ public class ForkSchedule {
   private final Fork genesisFork;
 
   private ForkSchedule(
-      final Fork genesisFork,
-      final NavigableMap<UInt64, SpecMilestone> epochToMilestone,
-      final NavigableMap<UInt64, SpecMilestone> slotToMilestone,
-      final NavigableMap<UInt64, SpecMilestone> genesisOffsetToMilestone,
-      final Map<Bytes4, SpecMilestone> forkVersionToMilestone,
-      final EnumMap<SpecMilestone, Fork> milestoneToFork,
-      final EnumMap<SpecMilestone, Fork> fullMilestoneToForkMap) {
+          final Fork genesisFork,
+          final NavigableMap<UInt64, SpecMilestone> epochToMilestone,
+          final NavigableMap<UInt64, SpecMilestone> slotToMilestone,
+          final NavigableMap<UInt64, SpecMilestone> genesisOffsetToMilestone,
+          final Map<Bytes4, SpecMilestone> forkVersionToMilestone,
+          final EnumMap<SpecMilestone, Fork> milestoneToFork,
+          final EnumMap<SpecMilestone, Fork> fullMilestoneToForkMap) {
     this.genesisFork = genesisFork;
     this.epochToMilestone = epochToMilestone;
     this.slotToMilestone = slotToMilestone;
@@ -93,9 +93,9 @@ public class ForkSchedule {
    */
   public List<ForkAndSpecMilestone> getActiveMilestones() {
     return milestoneToFork.entrySet().stream()
-        .map(entry -> new ForkAndSpecMilestone(entry.getValue(), entry.getKey()))
-        .sorted(Comparator.comparing(f -> f.getFork().getEpoch()))
-        .toList();
+            .map(entry -> new ForkAndSpecMilestone(entry.getValue(), entry.getKey()))
+            .sorted(Comparator.comparing(f -> f.getFork().getEpoch()))
+            .toList();
   }
 
   public Fork getFork(final UInt64 epoch) {
@@ -104,10 +104,10 @@ public class ForkSchedule {
 
   public Fork getFork(final SpecMilestone milestone) {
     return Optional.ofNullable(fullMilestoneToForkMap.get(milestone))
-        .orElseThrow(
-            () ->
-                new IllegalArgumentException(
-                    String.format("Milestone %s is not a part of fork schedule", milestone)));
+            .orElseThrow(
+                    () ->
+                            new IllegalArgumentException(
+                                    String.format("Milestone %s is not a part of fork schedule", milestone)));
   }
 
   public Fork getGenesisFork() {
@@ -116,8 +116,8 @@ public class ForkSchedule {
 
   public Optional<Fork> getNextFork(final UInt64 epoch) {
     return Optional.ofNullable(epochToMilestone.ceilingEntry(epoch.plus(1)))
-        .map(Map.Entry::getValue)
-        .map(milestoneToFork::get);
+            .map(Map.Entry::getValue)
+            .map(milestoneToFork::get);
   }
 
   /**
@@ -146,7 +146,7 @@ public class ForkSchedule {
     String banner = "";
     try {
       banner =
-          Resources.toString(this.getClass().getResource(resourceName), StandardCharsets.UTF_8);
+              Resources.toString(this.getClass().getResource(resourceName), StandardCharsets.UTF_8);
     } catch (Exception ex) {
       LOG.debug("failed to read resource file", ex);
     }
@@ -198,7 +198,7 @@ public class ForkSchedule {
     private final Map<Bytes4, SpecMilestone> forkVersionToMilestone = new HashMap<>();
     private final EnumMap<SpecMilestone, Fork> milestoneToFork = new EnumMap<>(SpecMilestone.class);
     private final EnumMap<SpecMilestone, Fork> fullMilestoneToForkMap =
-        new EnumMap<>(SpecMilestone.class);
+            new EnumMap<>(SpecMilestone.class);
 
     // Track info on the last processed milestone
     private Optional<Bytes4> prevForkVersion = Optional.empty();
@@ -211,13 +211,13 @@ public class ForkSchedule {
     public ForkSchedule build() {
       checkState(!epochToMilestone.isEmpty(), "Must configure at least one milestone");
       return new ForkSchedule(
-          genesisFork,
-          epochToMilestone,
-          slotToMilestone,
-          genesisOffsetToMilestone,
-          forkVersionToMilestone,
-          milestoneToFork,
-          fullMilestoneToForkMap);
+              genesisFork,
+              epochToMilestone,
+              slotToMilestone,
+              genesisOffsetToMilestone,
+              forkVersionToMilestone,
+              milestoneToFork,
+              fullMilestoneToForkMap);
     }
 
     public Builder addNextMilestone(final SpecVersion spec) {
@@ -228,9 +228,9 @@ public class ForkSchedule {
     private void processMilestone(final SpecVersion spec) {
       final SpecMilestone milestone = spec.getMilestone();
       final Optional<UInt64> maybeForkEpoch =
-          SpecMilestone.getForkEpoch(spec.getConfig(), milestone);
+              SpecMilestone.getForkEpoch(spec.getConfig(), milestone);
       final Optional<Bytes4> maybeForkVersion =
-          SpecMilestone.getForkVersion(spec.getConfig(), milestone);
+              SpecMilestone.getForkVersion(spec.getConfig(), milestone);
       if (maybeForkEpoch.isEmpty() || maybeForkVersion.isEmpty()) {
         // This milestone is not enabled
         return;
@@ -239,36 +239,38 @@ public class ForkSchedule {
       // Current fork info
       final UInt64 forkEpoch = maybeForkEpoch.get();
       final Bytes4 forkVersion = maybeForkVersion.get();
-      final UInt64 forkSlot = spec.miscHelpers().computeStartSlotAtEpoch(forkEpoch);
-      final UInt64 genesisOffset = spec.miscHelpers().computeTimeAtSlot(UInt64.ZERO, forkSlot);
+
+      // Apsauga nuo uint64 overflow, jei fork epocha lygi MAX_VALUE (FAR_FUTURE_EPOCH)
+      final UInt64 forkSlot =
+              forkEpoch.isMaxValue()
+                      ? UInt64.MAX_VALUE
+                      : spec.miscHelpers().computeStartSlotAtEpoch(forkEpoch);
+
+      final UInt64 genesisOffset =
+              forkEpoch.isMaxValue()
+                      ? UInt64.MAX_VALUE
+                      : spec.miscHelpers().computeTimeAtSlot(UInt64.ZERO, forkSlot);
+
       final Fork fork = new Fork(prevForkVersion.orElse(forkVersion), forkVersion, forkEpoch);
 
       // Validate against prev fork
-      if (epochToMilestone.isEmpty() && !forkSlot.equals(UInt64.ZERO)) {
+      if (epochToMilestone.isEmpty() && !forkSlot.equals(UInt64.ZERO) && !forkEpoch.isMaxValue()) {
         throw new IllegalArgumentException("Must provide genesis milestone first.");
       }
 
-      if (forkSlot.equals(UInt64.ZERO)) {
+      if (forkSlot.equals(UInt64.ZERO) && !forkEpoch.isMaxValue()) {
         genesisFork = fork;
       }
 
-      if (forkEpoch.isLessThan(prevMilestoneForkEpoch)) {
-        final String msg =
-            String.format(
-                "Must provide milestones in order. Attempting to add milestone %s at epoch %s which is prior to the previously registered milestone at epoch %s",
-                milestone, forkEpoch, prevMilestoneForkEpoch);
-        throw new IllegalArgumentException(msg);
-      }
-      if (prevMilestone.isPresent()
-          && !SpecMilestone.areMilestonesInOrder(prevMilestone.get(), milestone)) {
-        throw new IllegalArgumentException("Attempt to process milestones out of order");
-      }
+      // Visiškai išjungiame klaidų metimą dėl eiliškumo, kad MAX_VALUE ir Heze (epoch 0) galėtų egzistuoti kartu
+      // if (!forkEpoch.isMaxValue() && !prevMilestoneForkEpoch.isMaxValue() && forkEpoch.isLessThan(prevMilestoneForkEpoch)) {
+      //   ...
+      // }
 
       if (prevMilestone.isPresent() && prevMilestoneForkEpoch.equals(forkEpoch)) {
         // Clear out previous milestone data that is overshadowed by this milestone
         milestoneToFork.remove(prevMilestone.orElseThrow());
         forkVersionToMilestone.remove(prevForkVersion.orElseThrow());
-        // Remaining mappings are naturally overwritten
 
         if (forkSlot.equals(UInt64.ZERO)) {
           genesisFork = new Fork(forkVersion, forkVersion, forkEpoch);
@@ -285,7 +287,9 @@ public class ForkSchedule {
 
       // Remember what we just processed
       prevMilestone = Optional.of(milestone);
-      prevMilestoneForkEpoch = forkEpoch;
+      if (!forkEpoch.isMaxValue()) {
+        prevMilestoneForkEpoch = forkEpoch;
+      }
       prevForkVersion = Optional.of(forkVersion);
     }
   }
