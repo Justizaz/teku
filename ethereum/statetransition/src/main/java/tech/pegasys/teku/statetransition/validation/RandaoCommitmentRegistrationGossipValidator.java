@@ -94,7 +94,10 @@ public class RandaoCommitmentRegistrationGossipValidator
     final UInt64 validatorIndex = registration.getValidatorIndex();
 
     final var maybeEip8321State = state.toVersionEip8321();
-    final boolean hasHezeForkVersion = state.getFork().getCurrentVersion()
+    final boolean hasHezeForkVersion =
+        state
+            .getFork()
+            .getCurrentVersion()
             .equals(spec.atSlot(state.getSlot()).getConfig().getHezeForkVersion());
     if (maybeEip8321State.isEmpty() || hasHezeForkVersion) {
       return ignore("Head state is pre-EIP-8321");

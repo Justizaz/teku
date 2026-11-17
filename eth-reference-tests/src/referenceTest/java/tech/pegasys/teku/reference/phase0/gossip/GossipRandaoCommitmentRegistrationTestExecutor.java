@@ -13,7 +13,14 @@
 
 package tech.pegasys.teku.reference.phase0.gossip;
 
+import static tech.pegasys.teku.infrastructure.async.SafeFutureAssert.safeJoin;
+import static tech.pegasys.teku.reference.TestDataUtils.loadSsz;
+import static tech.pegasys.teku.reference.TestDataUtils.loadYaml;
+
 import com.fasterxml.jackson.annotation.JsonProperty;
+import java.io.IOException;
+import java.util.List;
+import java.util.Locale;
 import tech.pegasys.teku.ethtests.finder.TestDefinition;
 import tech.pegasys.teku.reference.TestExecutor;
 import tech.pegasys.teku.spec.Spec;
@@ -23,21 +30,13 @@ import tech.pegasys.teku.spec.datastructures.state.beaconstate.BeaconState;
 import tech.pegasys.teku.statetransition.validation.InternalValidationResult;
 import tech.pegasys.teku.statetransition.validation.RandaoCommitmentRegistrationGossipValidator;
 
-import java.io.IOException;
-import java.util.List;
-import java.util.Locale;
-
-import static tech.pegasys.teku.infrastructure.async.SafeFutureAssert.safeJoin;
-import static tech.pegasys.teku.reference.TestDataUtils.loadSsz;
-import static tech.pegasys.teku.reference.TestDataUtils.loadYaml;
-
 public class GossipRandaoCommitmentRegistrationTestExecutor implements TestExecutor {
-  //private static final String ALREADY_SEEN_CASE = "gossip_randao_commitment_registration__ignore_already_seen";
+  // private static final String ALREADY_SEEN_CASE =
+  // "gossip_randao_commitment_registration__ignore_already_seen";
 
   @Override
   public void runTest(final TestDefinition testDefinition) throws Throwable {
-    final MetaData metaData =
-        loadYaml(testDefinition, "meta.yaml", MetaData.class);
+    final MetaData metaData = loadYaml(testDefinition, "meta.yaml", MetaData.class);
     final Spec spec = testDefinition.getSpec();
     final BeaconState state = loadHeadState(testDefinition, spec);
     final List<SignedBeaconBlock> blocks =
@@ -49,11 +48,15 @@ public class GossipRandaoCommitmentRegistrationTestExecutor implements TestExecu
     for (final MetaData.Message message : metaData.getMessages()) {
       final SignedRandaoCommitmentRegistration registration =
           loadSsz(
-              testDefinition, message.getMessage() + ".ssz_snappy", SignedRandaoCommitmentRegistration.SSZ_SCHEMA);
-      if(message.isAlreadySeenCase()) {
-        final InternalValidationResult initialResult = safeJoin(validator.validateForGossip(registration));
-        if(!initialResult.isAccept()) {
-          throw new AssertionError("Unable to seed the seen-cache for " + message.getMessage() + ": " + initialResult);
+              testDefinition,
+              message.getMessage() + ".ssz_snappy",
+              SignedRandaoCommitmentRegistration.SSZ_SCHEMA);
+      if (message.isAlreadySeenCase()) {
+        final InternalValidationResult initialResult =
+            safeJoin(validator.validateForGossip(registration));
+        if (!initialResult.isAccept()) {
+          throw new AssertionError(
+              "Unable to seed the seen-cache for " + message.getMessage() + ": " + initialResult);
         }
       }
       final InternalValidationResult result = safeJoin(validator.validateForGossip(registration));
@@ -63,13 +66,14 @@ public class GossipRandaoCommitmentRegistrationTestExecutor implements TestExecu
     }
   }
 
-  private static BeaconState loadHeadState(final TestDefinition testDefinition, final Spec spec) throws IOException {
+  private static BeaconState loadHeadState(final TestDefinition testDefinition, final Spec spec)
+      throws IOException {
     return loadSsz(
-            testDefinition,
-            "state.ssz_snappy",
-            spec.forMilestone(testDefinition.getMilestone())
-                    .getSchemaDefinitions()
-                    .getBeaconStateSchema());
+        testDefinition,
+        "state.ssz_snappy",
+        spec.forMilestone(testDefinition.getMilestone())
+            .getSchemaDefinitions()
+            .getBeaconStateSchema());
   }
 
   @SuppressWarnings("unused")

@@ -128,7 +128,8 @@ public interface GossipForkSubscriptions {
     // since Heze
   }
 
-  default void publishRandaoCommitmentRegistration(final SignedRandaoCommitmentRegistration message) {
+  default void publishRandaoCommitmentRegistration(
+      final SignedRandaoCommitmentRegistration message) {
     // since EIP-8321
   }
 

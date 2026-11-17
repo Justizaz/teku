@@ -99,7 +99,7 @@ public class NoOpEth2P2PNetwork extends MockP2PNetwork<Eth2Peer> implements Eth2
 
   @Override
   public void publishRandaoCommitmentRegistration(
-          final SignedRandaoCommitmentRegistration signedRandaoCommitmentRegistration) {}
+      final SignedRandaoCommitmentRegistration signedRandaoCommitmentRegistration) {}
 
   @Override
   public void publishPayloadAttestationMessage(

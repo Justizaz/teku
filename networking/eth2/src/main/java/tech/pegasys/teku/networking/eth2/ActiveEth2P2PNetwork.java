@@ -426,7 +426,7 @@ public class ActiveEth2P2PNetwork extends DelegatingP2PNetwork<Eth2Peer> impleme
 
   @Override
   public void publishRandaoCommitmentRegistration(
-          final SignedRandaoCommitmentRegistration signedRandaoCommitmentRegistration) {
+      final SignedRandaoCommitmentRegistration signedRandaoCommitmentRegistration) {
     gossipForkManager.publishRandaoCommitmentRegistration(signedRandaoCommitmentRegistration);
   }
 

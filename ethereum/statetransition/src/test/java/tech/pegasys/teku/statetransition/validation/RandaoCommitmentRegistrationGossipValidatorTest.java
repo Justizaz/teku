@@ -198,6 +198,29 @@ public class RandaoCommitmentRegistrationGossipValidatorTest {
   }
 
   @Test
+  void shouldRejectSignatureSignedByMismatchedValidatorKey() {
+    final BLSKeyPair wrongKeyPair = dataStructureUtil.randomKeyPair();
+    final RandaoCommitmentRegistration message =
+        new RandaoCommitmentRegistration(UInt64.ZERO, dataStructureUtil.randomBytes32());
+    final Bytes32 domain =
+        spec.atSlot(state.getSlot())
+            .miscHelpers()
+            .computeDomain(
+                Domain.DOMAIN_RANDAO_COMMITMENT_REGISTRATION, state.getGenesisValidatorsRoot());
+    final Bytes signingRoot =
+        spec.atSlot(state.getSlot()).miscHelpers().computeSigningRoot(message, domain);
+    final BLSSignature signature = BLS.sign(wrongKeyPair.getSecretKey(), signingRoot);
+    final SignedRandaoCommitmentRegistration registration =
+        new SignedRandaoCommitmentRegistration(message, signature);
+
+    final InternalValidationResult result = safeJoin(validator.validateForGossip(registration));
+
+    assertThat(result.isReject()).isTrue();
+    assertThat(result.getDescription().orElse(""))
+        .contains("Invalid RANDAO commitment registration signature");
+  }
+
+  @Test
   void shouldRejectInvalidSignature() {
     final RandaoCommitmentRegistration message =
         new RandaoCommitmentRegistration(UInt64.ZERO, dataStructureUtil.randomBytes32());

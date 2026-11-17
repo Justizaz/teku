@@ -13,6 +13,7 @@
 
 package tech.pegasys.teku.networking.eth2.gossip;
 
+import java.util.Optional;
 import tech.pegasys.teku.infrastructure.async.AsyncRunner;
 import tech.pegasys.teku.infrastructure.bytes.Bytes4;
 import tech.pegasys.teku.networking.eth2.gossip.encoding.GossipEncoding;
@@ -24,8 +25,6 @@ import tech.pegasys.teku.spec.datastructures.operations.SignedRandaoCommitmentRe
 import tech.pegasys.teku.spec.datastructures.state.ForkInfo;
 import tech.pegasys.teku.statetransition.util.DebugDataDumper;
 import tech.pegasys.teku.storage.client.RecentChainData;
-
-import java.util.Optional;
 
 public class RandaoCommitmentRegistrationGossipManager
     extends AbstractGossipManager<SignedRandaoCommitmentRegistration> {
@@ -55,7 +54,8 @@ public class RandaoCommitmentRegistrationGossipManager
         // representedd by the topic on which they arrived.
         message -> forkInfo.getFork().getEpoch(),
         networkingConfig,
-        GossipFailureLogger.createSuppressing(GossipTopicName.RANDAO_COMMITMENT_REGISTRATION.toString()),
+        GossipFailureLogger.createSuppressing(
+            GossipTopicName.RANDAO_COMMITMENT_REGISTRATION.toString()),
         debugDataDumper);
   }
 

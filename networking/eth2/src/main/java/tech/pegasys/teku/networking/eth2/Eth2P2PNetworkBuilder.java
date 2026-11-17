@@ -147,7 +147,8 @@ public class Eth2P2PNetworkBuilder {
   protected OperationProcessor<SignedVoluntaryExit> gossipedVoluntaryExitConsumer;
   protected OperationProcessor<SignedBlsToExecutionChange>
       gossipedSignedBlsToExecutionChangeProcessor;
-  protected OperationProcessor<SignedRandaoCommitmentRegistration> gossipedRandaoCommitmentRegistrationProcessor;
+  protected OperationProcessor<SignedRandaoCommitmentRegistration>
+      gossipedRandaoCommitmentRegistrationProcessor;
   protected OperationProcessor<SignedExecutionPayloadEnvelope> executionPayloadProcessor;
   protected OperationProcessor<PayloadAttestationMessage> payloadAttestationMessageProcessor;
   protected OperationProcessor<SignedExecutionPayloadBid> executionPayloadBidProcessor;
@@ -787,7 +788,9 @@ public class Eth2P2PNetworkBuilder {
     assertNotNull("gossipedSyncCommitteeMessageProcessor", gossipedSyncCommitteeMessageProcessor);
     assertNotNull(
         "gossipedSignedBlsToExecutionChangeProcessor", gossipedSignedBlsToExecutionChangeProcessor);
-    assertNotNull("gossipedRandaoCommitmentRegistrationProcessor", gossipedRandaoCommitmentRegistrationProcessor);
+    assertNotNull(
+        "gossipedRandaoCommitmentRegistrationProcessor",
+        gossipedRandaoCommitmentRegistrationProcessor);
     assertNotNull(
         "gossipedDataColumnSidecarOperationProcessor", dataColumnSidecarOperationProcessor);
     assertNotNull("gossipedExecutionPayloadProcessor", executionPayloadProcessor);
@@ -939,7 +942,8 @@ public class Eth2P2PNetworkBuilder {
       final OperationProcessor<SignedRandaoCommitmentRegistration>
           gossipedRandaoCommitmentRegistrationProcessor) {
     checkNotNull(gossipedRandaoCommitmentRegistrationProcessor);
-    this.gossipedRandaoCommitmentRegistrationProcessor = gossipedRandaoCommitmentRegistrationProcessor;
+    this.gossipedRandaoCommitmentRegistrationProcessor =
+        gossipedRandaoCommitmentRegistrationProcessor;
     return this;
   }
 

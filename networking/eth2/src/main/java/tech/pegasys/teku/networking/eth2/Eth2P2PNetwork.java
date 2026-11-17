@@ -68,7 +68,8 @@ public interface Eth2P2PNetwork extends P2PNetwork<Eth2Peer> {
 
   void publishSignedBlsToExecutionChange(SignedBlsToExecutionChange signedBlsToExecutionChange);
 
-  void publishRandaoCommitmentRegistration(SignedRandaoCommitmentRegistration signedRandaoCommitmentRegistration);
+  void publishRandaoCommitmentRegistration(
+      SignedRandaoCommitmentRegistration signedRandaoCommitmentRegistration);
 
   void publishPayloadAttestationMessage(PayloadAttestationMessage payloadAttestationMessage);
 

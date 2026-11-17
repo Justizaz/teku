@@ -229,20 +229,16 @@ public class DefaultOperationProcessor implements OperationProcessor {
   public void processRandaoCommitmentRegistration(
       final MutableBeaconState state, final SignedRandaoCommitmentRegistration registration)
       throws BlockProcessingException {
-    final BlockProcessorEip8321 blockProcessor = (BlockProcessorEip8321) spec.getBlockProcessor(state.getSlot());
-    final BeaconBlockBodySchemaEip8321<?> eip8321BodySchema = (BeaconBlockBodySchemaEip8321<?>) beaconBlockBodySchema;
+    final BlockProcessorEip8321 blockProcessor =
+        (BlockProcessorEip8321) spec.getBlockProcessor(state.getSlot());
+    final BeaconBlockBodySchemaEip8321<?> eip8321BodySchema =
+        (BeaconBlockBodySchemaEip8321<?>) beaconBlockBodySchema;
     blockProcessor.processRandaoCommitmentRegistrations(
-        state,
-        eip8321BodySchema
-            .getRandaoCommitmentRegistrationsSchema()
-            .of(registration)
-    );
+        state, eip8321BodySchema.getRandaoCommitmentRegistrationsSchema().of(registration));
   }
 
   @Override
-  public void processRandao(
-      final MutableBeaconState state,
-      final BeaconBlock block)
+  public void processRandao(final MutableBeaconState state, final BeaconBlock block)
       throws BlockProcessingException {
     spec.getBlockProcessor(state.getSlot())
         .processRandao(state, block, BLSSignatureVerifier.SIMPLE);

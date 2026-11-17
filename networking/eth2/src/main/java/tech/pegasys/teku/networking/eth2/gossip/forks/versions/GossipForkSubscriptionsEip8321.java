@@ -13,6 +13,8 @@
 
 package tech.pegasys.teku.networking.eth2.gossip.forks.versions;
 
+import java.util.Optional;
+import java.util.function.Supplier;
 import org.hyperledger.besu.plugin.services.MetricsSystem;
 import tech.pegasys.teku.infrastructure.async.AsyncRunner;
 import tech.pegasys.teku.infrastructure.bytes.Bytes4;
@@ -46,12 +48,10 @@ import tech.pegasys.teku.statetransition.datacolumns.log.gossip.DasGossipLogger;
 import tech.pegasys.teku.statetransition.util.DebugDataDumper;
 import tech.pegasys.teku.storage.client.RecentChainData;
 
-import java.util.Optional;
-import java.util.function.Supplier;
-
 public class GossipForkSubscriptionsEip8321 extends GossipForkSubscriptionsHeze {
 
-  private final OperationProcessor<SignedRandaoCommitmentRegistration> randaoCommitmentRegistrationProcessor;
+  private final OperationProcessor<SignedRandaoCommitmentRegistration>
+      randaoCommitmentRegistrationProcessor;
 
   private RandaoCommitmentRegistrationGossipManager randaoCommitmentRegistrationGossipManager;
 
@@ -87,7 +87,8 @@ public class GossipForkSubscriptionsEip8321 extends GossipForkSubscriptionsHeze 
       final OperationProcessor<SignedExecutionPayloadBid> executionPayloadBidOperationProcessor,
       final OperationProcessor<SignedProposerPreferences> proposerPreferencesOperationProcessor,
       final OperationProcessor<SignedInclusionList> inclusionListOperationProcessor,
-      final OperationProcessor<SignedRandaoCommitmentRegistration> randaoCommitmentRegistrationProcessor,
+      final OperationProcessor<SignedRandaoCommitmentRegistration>
+          randaoCommitmentRegistrationProcessor,
       final DebugDataDumper debugDataDumper,
       final DasGossipLogger dasGossipLogger,
       final OperationProcessor<ExecutionProof> executionProcessorOperationProcessor,
@@ -133,7 +134,8 @@ public class GossipForkSubscriptionsEip8321 extends GossipForkSubscriptionsHeze 
     addRandaoCommitmentRegistrationGossipManager(forkInfo, forkDigest);
   }
 
-  void addRandaoCommitmentRegistrationGossipManager(final ForkInfo forkInfo, final Bytes4 forkDigest) {
+  void addRandaoCommitmentRegistrationGossipManager(
+      final ForkInfo forkInfo, final Bytes4 forkDigest) {
     this.randaoCommitmentRegistrationGossipManager =
         new RandaoCommitmentRegistrationGossipManager(
             recentChainData,
@@ -149,7 +151,8 @@ public class GossipForkSubscriptionsEip8321 extends GossipForkSubscriptionsHeze 
   }
 
   @Override
-  public void publishRandaoCommitmentRegistration(final SignedRandaoCommitmentRegistration message) {
+  public void publishRandaoCommitmentRegistration(
+      final SignedRandaoCommitmentRegistration message) {
     randaoCommitmentRegistrationGossipManager.publish(message);
   }
 }

@@ -270,12 +270,13 @@ public class GossipForkManager {
         GossipForkSubscriptions::publishSignedBlsToExecutionChangeMessage);
   }
 
-  public void publishRandaoCommitmentRegistration(final SignedRandaoCommitmentRegistration message) {
+  public void publishRandaoCommitmentRegistration(
+      final SignedRandaoCommitmentRegistration message) {
     publishMessage(
-            spec.computeStartSlotAtEpoch(currentEpoch.orElseThrow()),
-            message,
-            "RANDAO commitment registration",
-            GossipForkSubscriptions::publishRandaoCommitmentRegistration);
+        spec.computeStartSlotAtEpoch(currentEpoch.orElseThrow()),
+        message,
+        "RANDAO commitment registration",
+        GossipForkSubscriptions::publishRandaoCommitmentRegistration);
   }
 
   public void publishPayloadAttestationMessage(final PayloadAttestationMessage message) {

@@ -194,7 +194,8 @@ public class Eth2P2PNetworkFactory {
     protected OperationProcessor<SignedExecutionPayloadBid> executionPayloadBidProcessor;
     protected OperationProcessor<SignedProposerPreferences> proposerPreferencesProcessor;
     protected OperationProcessor<SignedInclusionList> inclusionListProcessor;
-    protected OperationProcessor<SignedRandaoCommitmentRegistration> randaoCommitmentRegistrationProcessor;
+    protected OperationProcessor<SignedRandaoCommitmentRegistration>
+        randaoCommitmentRegistrationProcessor;
     protected ProcessedAttestationSubscriptionProvider processedAttestationSubscriptionProvider;
     protected VerifiedBlockAttestationsSubscriptionProvider
         verifiedBlockAttestationsSubscriptionProvider;
@@ -712,38 +713,38 @@ public class Eth2P2PNetworkFactory {
                 p2PConfig.isExecutionProofTopicEnabled(),
                 isSuperNodeSupplier);
         case EIP8321 ->
-          new GossipForkSubscriptionsEip8321(
-                  forkAndSpecMilestone.getFork(),
-                  spec,
-                  asyncRunner,
-                  metricsSystem,
-                  network,
-                  recentChainData,
-                  gossipEncoding,
-                  gossipedBlockProcessor,
-                  gossipedBlobSidecarProcessor,
-                  gossipedAttestationProcessor,
-                  gossipedAggregateProcessor,
-                  attesterSlashingProcessor,
-                  proposerSlashingProcessor,
-                  voluntaryExitProcessor,
-                  signedContributionAndProofProcessor,
-                  syncCommitteeMessageProcessor,
-                  lightClientFinalityUpdateProcessor,
-                  lightClientOptimisticUpdateProcessor,
-                  signedBlsToExecutionChangeProcessor,
-                  dataColumnSidecarOperationProcessor,
-                  executionPayloadProcessor,
-                  payloadAttestationMessageProcessor,
-                  executionPayloadBidProcessor,
-                  proposerPreferencesProcessor,
-                  inclusionListProcessor,
-                  randaoCommitmentRegistrationProcessor,
-                  debugDataDumper,
-                  DasGossipLogger.NOOP,
-                  executionProofOperationProcessor,
-                  p2PConfig.isExecutionProofTopicEnabled(),
-                  isSuperNodeSupplier);
+            new GossipForkSubscriptionsEip8321(
+                forkAndSpecMilestone.getFork(),
+                spec,
+                asyncRunner,
+                metricsSystem,
+                network,
+                recentChainData,
+                gossipEncoding,
+                gossipedBlockProcessor,
+                gossipedBlobSidecarProcessor,
+                gossipedAttestationProcessor,
+                gossipedAggregateProcessor,
+                attesterSlashingProcessor,
+                proposerSlashingProcessor,
+                voluntaryExitProcessor,
+                signedContributionAndProofProcessor,
+                syncCommitteeMessageProcessor,
+                lightClientFinalityUpdateProcessor,
+                lightClientOptimisticUpdateProcessor,
+                signedBlsToExecutionChangeProcessor,
+                dataColumnSidecarOperationProcessor,
+                executionPayloadProcessor,
+                payloadAttestationMessageProcessor,
+                executionPayloadBidProcessor,
+                proposerPreferencesProcessor,
+                inclusionListProcessor,
+                randaoCommitmentRegistrationProcessor,
+                debugDataDumper,
+                DasGossipLogger.NOOP,
+                executionProofOperationProcessor,
+                p2PConfig.isExecutionProofTopicEnabled(),
+                isSuperNodeSupplier);
       };
     }
 
@@ -864,7 +865,7 @@ public class Eth2P2PNetworkFactory {
       if (inclusionListProcessor == null) {
         inclusionListProcessor = OperationProcessor.noop();
       }
-      if(randaoCommitmentRegistrationProcessor == null) {
+      if (randaoCommitmentRegistrationProcessor == null) {
         randaoCommitmentRegistrationProcessor = OperationProcessor.noop();
       }
       if (isSuperNodeSupplier == null) {
@@ -1021,8 +1022,8 @@ public class Eth2P2PNetworkFactory {
     }
 
     public Eth2P2PNetworkBuilder gossipedRandaoCommitmentRegistrationProcessor(
-            final OperationProcessor<SignedRandaoCommitmentRegistration>
-                gossipedRandaoCommitmentRegistrationProcessor) {
+        final OperationProcessor<SignedRandaoCommitmentRegistration>
+            gossipedRandaoCommitmentRegistrationProcessor) {
       checkNotNull(gossipedRandaoCommitmentRegistrationProcessor);
       this.randaoCommitmentRegistrationProcessor = gossipedRandaoCommitmentRegistrationProcessor;
       return this;

@@ -124,8 +124,8 @@ public abstract class AbstractBlockFactoryTest {
   protected final OperationPool<SignedVoluntaryExit> voluntaryExitPool = mock(OperationPool.class);
   protected final OperationPool<SignedBlsToExecutionChange> blsToExecutionChangePool =
       mock(OperationPool.class);
-  protected final OperationPool<SignedRandaoCommitmentRegistration> randaoCommitmentRegistrationPool =
-          mock(OperationPool.class);
+  protected final OperationPool<SignedRandaoCommitmentRegistration>
+      randaoCommitmentRegistrationPool = mock(OperationPool.class);
   protected final ForkChoiceNotifier forkChoiceNotifier = mock(ForkChoiceNotifier.class);
   protected final ExecutionLayerBlockProductionManager executionLayer =
       mock(ExecutionLayerBlockProductionManager.class);

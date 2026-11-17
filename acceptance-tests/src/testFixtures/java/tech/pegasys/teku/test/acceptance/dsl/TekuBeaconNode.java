@@ -412,6 +412,10 @@ public class TekuBeaconNode extends TekuNode {
     return fetchHeadState().orElseThrow();
   }
 
+  public BeaconState getState(final String stateId) throws IOException {
+    return fetchState(stateId).orElseThrow();
+  }
+
   public void waitForBlsToExecutionChangeEventForValidator(final int validatorIndex) {
     if (maybeEventStreamListener.isEmpty()) {
       fail(

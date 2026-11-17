@@ -406,7 +406,8 @@ public class BeaconChainController extends Service implements BeaconChainControl
   protected volatile OperationPool<ProposerSlashing> proposerSlashingPool;
   protected volatile OperationPool<SignedVoluntaryExit> voluntaryExitPool;
   protected volatile MappedOperationPool<SignedBlsToExecutionChange> blsToExecutionChangePool;
-  protected volatile MappedOperationPool<SignedRandaoCommitmentRegistration> randaoCommitmentRegistrationPool;
+  protected volatile MappedOperationPool<SignedRandaoCommitmentRegistration>
+      randaoCommitmentRegistrationPool;
   protected volatile SyncCommitteeContributionPool syncCommitteeContributionPool;
   protected volatile SyncCommitteeMessagePool syncCommitteeMessagePool;
   protected volatile PayloadAttestationPool payloadAttestationPool;
@@ -1612,21 +1613,21 @@ public class BeaconChainController extends Service implements BeaconChainControl
   protected void initRandaoCommitmentRegistrationPool() {
     LOG.debug("BeaconChainController.initRandaoCommitmentRegistrationPool()");
     final RandaoCommitmentRegistrationGossipValidator validator =
-            new RandaoCommitmentRegistrationGossipValidator(spec, recentChainData);
+        new RandaoCommitmentRegistrationGossipValidator(spec, recentChainData);
 
     randaoCommitmentRegistrationPool =
-            new MappedOperationPool<>(
-                    "RandaoCommitmentRegistrationPool",
-                    metricsSystem,
-                    beaconBlockSchemaSupplier
-                            .andThen(BeaconBlockBodySchema::toVersionEip8321)
-                            .andThen(Optional::orElseThrow)
-                            .andThen(BeaconBlockBodySchemaEip8321::getRandaoCommitmentRegistrationsSchema),
-                    validator,
-                    operationPoolAsyncRunner,
-                    timeProvider);
+        new MappedOperationPool<>(
+            "RandaoCommitmentRegistrationPool",
+            metricsSystem,
+            beaconBlockSchemaSupplier
+                .andThen(BeaconBlockBodySchema::toVersionEip8321)
+                .andThen(Optional::orElseThrow)
+                .andThen(BeaconBlockBodySchemaEip8321::getRandaoCommitmentRegistrationsSchema),
+            validator,
+            operationPoolAsyncRunner,
+            timeProvider);
     blockImporter.subscribeToVerifiedBlockRandaoCommitmentRegistrations(
-            randaoCommitmentRegistrationPool::removeAll);
+        randaoCommitmentRegistrationPool::removeAll);
   }
 
   protected void initPayloadAttestationPool() {
@@ -1705,6 +1706,7 @@ public class BeaconChainController extends Service implements BeaconChainControl
             .proposerSlashingPool(proposerSlashingPool)
             .voluntaryExitPool(voluntaryExitPool)
             .blsToExecutionChangePool(blsToExecutionChangePool)
+            .randaoCommitmentRegistrationPool(randaoCommitmentRegistrationPool)
             .syncCommitteeContributionPool(syncCommitteeContributionPool)
             .proposersDataManager(proposersDataManager)
             .forkChoiceNotifier(forkChoiceNotifier)
@@ -2271,7 +2273,8 @@ public class BeaconChainController extends Service implements BeaconChainControl
             .gossipedSignedContributionAndProofProcessor(syncCommitteeContributionPool::addRemote)
             .gossipedSyncCommitteeMessageProcessor(syncCommitteeMessagePool::addRemote)
             .gossipedSignedBlsToExecutionChangeProcessor(blsToExecutionChangePool::addRemote)
-            .gossipedRandaoCommitmentRegistrationProcessor(randaoCommitmentRegistrationPool::addRemote)
+            .gossipedRandaoCommitmentRegistrationProcessor(
+                randaoCommitmentRegistrationPool::addRemote)
             .gossipedExecutionPayloadProcessor(
                 executionPayloadManager::validateAndImportExecutionPayload)
             .gossipedPayloadAttestationMessageProcessor(payloadAttestationPool::addRemote)
@@ -2339,7 +2342,7 @@ public class BeaconChainController extends Service implements BeaconChainControl
     blsToExecutionChangePool.subscribeOperationAdded(
         new LocalOperationAcceptedFilter<>(p2pNetwork::publishSignedBlsToExecutionChange));
     randaoCommitmentRegistrationPool.subscribeOperationAdded(
-            new LocalOperationAcceptedFilter<>(p2pNetwork::publishRandaoCommitmentRegistration));
+        new LocalOperationAcceptedFilter<>(p2pNetwork::publishRandaoCommitmentRegistration));
     payloadAttestationPool.subscribeOperationAdded(
         new LocalOperationAcceptedFilter<>(p2pNetwork::publishPayloadAttestationMessage));
     proposerPreferencesManager.subscribeOperationAdded(

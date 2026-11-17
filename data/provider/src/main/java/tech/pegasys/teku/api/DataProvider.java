@@ -55,13 +55,13 @@ public class DataProvider {
   private final ExecutionClientDataProvider executionClientDataProvider;
 
   private DataProvider(
-          final ConfigProvider configProvider,
-          final NetworkDataProvider networkDataProvider,
-          final NodeDataProvider nodeDataProvider,
-          final ChainDataProvider chainDataProvider,
-          final SyncDataProvider syncDataProvider,
-          final ValidatorDataProvider validatorDataProvider,
-          final ExecutionClientDataProvider executionClientDataProvider) {
+      final ConfigProvider configProvider,
+      final NetworkDataProvider networkDataProvider,
+      final NodeDataProvider nodeDataProvider,
+      final ChainDataProvider chainDataProvider,
+      final SyncDataProvider syncDataProvider,
+      final ValidatorDataProvider validatorDataProvider,
+      final ExecutionClientDataProvider executionClientDataProvider) {
     this.configProvider = configProvider;
     this.networkDataProvider = networkDataProvider;
     this.nodeDataProvider = nodeDataProvider;
@@ -176,7 +176,7 @@ public class DataProvider {
     }
 
     public Builder blockBlobSidecarsTrackersPool(
-            final BlockBlobSidecarsTrackersPool blockBlobSidecarsTrackersPool) {
+        final BlockBlobSidecarsTrackersPool blockBlobSidecarsTrackersPool) {
       this.blockBlobSidecarsTrackersPool = blockBlobSidecarsTrackersPool;
       return this;
     }
@@ -197,13 +197,13 @@ public class DataProvider {
     }
 
     public Builder attesterSlashingPool(
-            final OperationPool<AttesterSlashing> attesterSlashingPool) {
+        final OperationPool<AttesterSlashing> attesterSlashingPool) {
       this.attesterSlashingPool = attesterSlashingPool;
       return this;
     }
 
     public Builder proposerSlashingPool(
-            final OperationPool<ProposerSlashing> proposerSlashingPool) {
+        final OperationPool<ProposerSlashing> proposerSlashingPool) {
       this.proposerSlashingPool = proposerSlashingPool;
       return this;
     }
@@ -214,19 +214,19 @@ public class DataProvider {
     }
 
     public Builder blsToExecutionChangePool(
-            final OperationPool<SignedBlsToExecutionChange> blsToExecutionChangePool) {
+        final OperationPool<SignedBlsToExecutionChange> blsToExecutionChangePool) {
       this.blsToExecutionChangePool = blsToExecutionChangePool;
       return this;
     }
 
     public Builder randaoCommitmentRegistrationPool(
-            final OperationPool<SignedRandaoCommitmentRegistration> randaoCommitmentRegistrationPool) {
+        final OperationPool<SignedRandaoCommitmentRegistration> randaoCommitmentRegistrationPool) {
       this.randaoCommitmentRegistrationPool = randaoCommitmentRegistrationPool;
       return this;
     }
 
     public Builder syncCommitteeContributionPool(
-            final SyncCommitteeContributionPool syncCommitteeContributionPool) {
+        final SyncCommitteeContributionPool syncCommitteeContributionPool) {
       this.syncCommitteeContributionPool = syncCommitteeContributionPool;
       return this;
     }
@@ -247,13 +247,13 @@ public class DataProvider {
     }
 
     public Builder blobSidecarReconstructionProvider(
-            final BlobSidecarReconstructionProvider blobSidecarReconstructionProvider) {
+        final BlobSidecarReconstructionProvider blobSidecarReconstructionProvider) {
       this.blobSidecarReconstructionProvider = blobSidecarReconstructionProvider;
       return this;
     }
 
     public Builder blobReconstructionProvider(
-            final BlobReconstructionProvider blobReconstructionProvider) {
+        final BlobReconstructionProvider blobReconstructionProvider) {
       this.blobReconstructionProvider = blobReconstructionProvider;
       return this;
     }
@@ -264,7 +264,7 @@ public class DataProvider {
     }
 
     public Builder dataColumnSidecarManager(
-            final DataColumnSidecarManager dataColumnSidecarManager) {
+        final DataColumnSidecarManager dataColumnSidecarManager) {
       this.dataColumnSidecarManager = dataColumnSidecarManager;
       return this;
     }
@@ -273,42 +273,42 @@ public class DataProvider {
       final ConfigProvider configProvider = new ConfigProvider(spec);
       final NetworkDataProvider networkDataProvider = new NetworkDataProvider(p2pNetwork);
       final NodeDataProvider nodeDataProvider =
-              new NodeDataProvider(
-                      attestationPool,
-                      inclusionListManager,
-                      attesterSlashingPool,
-                      proposerSlashingPool,
-                      voluntaryExitPool,
-                      blsToExecutionChangePool,
-                      randaoCommitmentRegistrationPool,
-                      syncCommitteeContributionPool,
-                      blockBlobSidecarsTrackersPool,
-                      attestationManager,
-                      isLivenessTrackingEnabled,
-                      activeValidatorChannel,
-                      proposersDataManager,
-                      forkChoiceNotifier,
-                      recentChainData,
-                      dataColumnSidecarManager,
-                      custodyGroupCountManager,
-                      payloadAttestationPool,
-                      proposerPreferencesManager,
-                      spec);
+          new NodeDataProvider(
+              attestationPool,
+              inclusionListManager,
+              attesterSlashingPool,
+              proposerSlashingPool,
+              voluntaryExitPool,
+              blsToExecutionChangePool,
+              randaoCommitmentRegistrationPool,
+              syncCommitteeContributionPool,
+              blockBlobSidecarsTrackersPool,
+              attestationManager,
+              isLivenessTrackingEnabled,
+              activeValidatorChannel,
+              proposersDataManager,
+              forkChoiceNotifier,
+              recentChainData,
+              dataColumnSidecarManager,
+              custodyGroupCountManager,
+              payloadAttestationPool,
+              proposerPreferencesManager,
+              spec);
       final ChainDataProvider chainDataProvider =
-              new ChainDataProvider(
-                      spec,
-                      recentChainData,
-                      combinedChainDataClient,
-                      rewardCalculator,
-                      blobSidecarReconstructionProvider,
-                      blobReconstructionProvider,
-                      lightClientUpdateStore);
+          new ChainDataProvider(
+              spec,
+              recentChainData,
+              combinedChainDataClient,
+              rewardCalculator,
+              blobSidecarReconstructionProvider,
+              blobReconstructionProvider,
+              lightClientUpdateStore);
       final SyncDataProvider syncDataProvider =
-              new SyncDataProvider(syncService, rejectedExecutionSupplier);
+          new SyncDataProvider(syncService, rejectedExecutionSupplier);
       final ValidatorDataProvider validatorDataProvider =
-              new ValidatorDataProvider(spec, validatorApiChannel, combinedChainDataClient);
+          new ValidatorDataProvider(spec, validatorApiChannel, combinedChainDataClient);
       final ExecutionClientDataProvider executionClientDataProvider =
-              new ExecutionClientDataProvider();
+          new ExecutionClientDataProvider();
 
       checkNotNull(configProvider, "Expect config Provider");
       checkNotNull(networkDataProvider, "Expect Network Data Provider");
@@ -317,13 +317,13 @@ public class DataProvider {
       checkNotNull(validatorDataProvider, "Expect Validator Data Provider");
       checkNotNull(executionClientDataProvider, "Expect Execution Client Data Provider");
       return new DataProvider(
-              configProvider,
-              networkDataProvider,
-              nodeDataProvider,
-              chainDataProvider,
-              syncDataProvider,
-              validatorDataProvider,
-              executionClientDataProvider);
+          configProvider,
+          networkDataProvider,
+          nodeDataProvider,
+          chainDataProvider,
+          syncDataProvider,
+          validatorDataProvider,
+          executionClientDataProvider);
     }
 
     public Builder rejectedExecutionSupplier(final IntSupplier rejectedExecutionCountSupplier) {
@@ -332,7 +332,7 @@ public class DataProvider {
     }
 
     public Builder custodyGroupCountManager(
-            final CustodyGroupCountManager custodyGroupCountManager) {
+        final CustodyGroupCountManager custodyGroupCountManager) {
       this.custodyGroupCountManager = custodyGroupCountManager;
       return this;
     }
@@ -343,7 +343,7 @@ public class DataProvider {
     }
 
     public Builder proposerPreferencesManager(
-            final ProposerPreferencesManager proposerPreferencesManager) {
+        final ProposerPreferencesManager proposerPreferencesManager) {
       this.proposerPreferencesManager = proposerPreferencesManager;
       return this;
     }

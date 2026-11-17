@@ -170,7 +170,7 @@ class BlockOperationSelectorFactoryTest {
 
   @SuppressWarnings("unchecked")
   private final OperationPool<SignedRandaoCommitmentRegistration> randaoCommitmentRegistrationPool =
-          mock(OperationPool.class);
+      mock(OperationPool.class);
 
   private final SyncCommitteeContributionPool contributionPool =
       new SyncCommitteeContributionPool(spec, contributionValidator);
@@ -1297,7 +1297,7 @@ class BlockOperationSelectorFactoryTest {
 
     @Override
     public BeaconBlockBodyBuilder randaoCommitmentRegistrations(
-            final SszList<SignedRandaoCommitmentRegistration> randaoCommitmentRegistrations) {
+        final SszList<SignedRandaoCommitmentRegistration> randaoCommitmentRegistrations) {
       this.randaoCommitmentRegistrations = randaoCommitmentRegistrations;
       return this;
     }

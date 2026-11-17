@@ -457,6 +457,12 @@ public class TekuNodeConfigBuilder {
     return this;
   }
 
+  public TekuNodeConfigBuilder withValidatorDataPath(final Path validatorDataDir) {
+    configMap.put("data-validator-path", "/validator-data");
+    writableMountPoints.put(validatorDataDir.toAbsolutePath().toString(), "/validator-data");
+    return this;
+  }
+
   public TekuNodeConfigBuilder withInitialState(
       final GenesisGenerator.InitialStateData initialState) throws Exception {
     mustBe(NodeType.BEACON_NODE);

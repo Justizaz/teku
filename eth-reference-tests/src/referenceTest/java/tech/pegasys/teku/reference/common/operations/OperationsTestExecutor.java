@@ -186,11 +186,11 @@ public class OperationsTestExecutor<T extends SszData> implements TestExecutor {
           .put(
               "operations/randao_commitment_registration",
               new OperationsTestExecutor<>(
-                  "randao_commitment_registration.ssz_snappy", Operation.RANDAO_COMMITMENT_REGISTRATION))
+                  "randao_commitment_registration.ssz_snappy",
+                  Operation.RANDAO_COMMITMENT_REGISTRATION))
           .put(
               "operations/randao",
-              new OperationsTestExecutor<>(
-                  "block.ssz_snappy", Operation.RANDAO))
+              new OperationsTestExecutor<>("block.ssz_snappy", Operation.RANDAO))
           .build();
 
   private final String dataFileName;
@@ -204,7 +204,7 @@ public class OperationsTestExecutor<T extends SszData> implements TestExecutor {
   @Override
   public void runTest(final TestDefinition testDefinition) throws Exception {
     // The generated EIP-8321 fixture contains only a manifest, with no pre-state or block input.
-    if(testDefinition
+    if (testDefinition
         .getTestDirectory()
         .getFileName()
         .toString()
@@ -435,10 +435,7 @@ public class OperationsTestExecutor<T extends SszData> implements TestExecutor {
       case BUILDER_EXIT_REQUEST -> processBuilderExitRequest(testDefinition, state, processor);
       case RANDAO_COMMITMENT_REGISTRATION -> {
         final SignedRandaoCommitmentRegistration registration =
-            loadSsz(
-                testDefinition,
-                dataFileName,
-                SignedRandaoCommitmentRegistration.SSZ_SCHEMA);
+            loadSsz(testDefinition, dataFileName, SignedRandaoCommitmentRegistration.SSZ_SCHEMA);
         processor.processRandaoCommitmentRegistration(state, registration);
       }
       case RANDAO -> {
@@ -635,7 +632,7 @@ public class OperationsTestExecutor<T extends SszData> implements TestExecutor {
           BUILDER_DEPOSIT_REQUEST,
           BUILDER_EXIT_REQUEST,
           RANDAO_COMMITMENT_REGISTRATION,
-          RANDAO-> {}
+          RANDAO -> {}
     }
   }
 

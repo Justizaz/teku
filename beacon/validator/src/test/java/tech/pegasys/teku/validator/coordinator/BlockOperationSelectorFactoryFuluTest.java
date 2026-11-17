@@ -146,7 +146,7 @@ class BlockOperationSelectorFactoryFuluTest {
 
   @SuppressWarnings("unchecked")
   private final OperationPool<SignedRandaoCommitmentRegistration> randaoCommitmentRegistrationPool =
-          mock(OperationPool.class);
+      mock(OperationPool.class);
 
   private final SyncCommitteeContributionPool contributionPool =
       new SyncCommitteeContributionPool(spec, contributionValidator);

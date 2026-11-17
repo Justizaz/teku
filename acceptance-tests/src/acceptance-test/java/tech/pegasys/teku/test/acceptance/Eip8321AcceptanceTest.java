@@ -16,7 +16,9 @@ package tech.pegasys.teku.test.acceptance;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import java.nio.file.Path;
-import java.util.List;
+import java.util.Optional;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
 import org.apache.tuweni.bytes.Bytes;
 import org.apache.tuweni.bytes.Bytes32;
 import org.junit.jupiter.api.Test;
@@ -24,9 +26,10 @@ import org.junit.jupiter.api.io.TempDir;
 import tech.pegasys.teku.bls.BLS;
 import tech.pegasys.teku.bls.BLSKeyPair;
 import tech.pegasys.teku.bls.BLSSignature;
+import tech.pegasys.teku.infrastructure.async.Waiter;
 import tech.pegasys.teku.infrastructure.unsigned.UInt64;
+import tech.pegasys.teku.spec.datastructures.blocks.SignedBeaconBlock;
 import tech.pegasys.teku.spec.datastructures.blocks.blockbody.versions.eip8321.BeaconBlockBodyEip8321;
-import tech.pegasys.teku.spec.datastructures.interop.MockStartValidatorKeyPairFactory;
 import tech.pegasys.teku.spec.datastructures.operations.RandaoCommitmentRegistration;
 import tech.pegasys.teku.spec.datastructures.operations.SignedRandaoCommitmentRegistration;
 import tech.pegasys.teku.spec.datastructures.state.beaconstate.versions.eip8321.BeaconStateEip8321;
@@ -53,9 +56,8 @@ public class Eip8321AcceptanceTest extends AcceptanceTestBase {
     final ValidatorKeystores validatorKeystores =
         createValidatorKeyGenerator().generateValidatorKeys(validatorCount);
 
-    final List<BLSKeyPair> interopKeyPairs =
-        new MockStartValidatorKeyPairFactory().generateKeyPairs(0, validatorCount);
-    final BLSKeyPair targetValidatorKeyPair = interopKeyPairs.get(targetValidatorIndex);
+    final BLSKeyPair targetValidatorKeyPair =
+        validatorKeystores.getValidatorKeys().get(targetValidatorIndex).getValidatorKey();
 
     final InitialStateData genesis =
         createGenesisGenerator()
@@ -72,6 +74,19 @@ public class Eip8321AcceptanceTest extends AcceptanceTestBase {
             .withEip8321Epoch(UInt64.ZERO)
             .generate();
 
+    // 1. Generate and store a hash chain
+    final Path validatorDataDir = tempDir.resolve("validator-data");
+    final Path hashChainsDir = validatorDataDir.resolve("hash-chains");
+    final HashChain hashChain = new HashChainGenerator().generate(65536);
+    final Bytes32 commitment = hashChain.getCommitment();
+    final HashChainStore hashChainStore = new HashChainStore(hashChainsDir);
+    hashChainStore.storeHashChain(targetValidatorKeyPair.getPublicKey(), hashChain, "");
+
+    assertThat(hashChainStore.hasHashChain(targetValidatorKeyPair.getPublicKey())).isTrue();
+    final HashChain loadedChain =
+        hashChainStore.loadHashChain(targetValidatorKeyPair.getPublicKey(), "").orElseThrow();
+    assertThat(loadedChain.getCommitment()).isEqualTo(commitment);
+
     final TekuBeaconNode beaconNode =
         createTekuBeaconNode(
             TekuNodeConfigBuilder.createBeaconNode()
@@ -87,21 +102,13 @@ public class Eip8321AcceptanceTest extends AcceptanceTestBase {
                 .withHezeEpoch(UInt64.ZERO)
                 .withEip8321Epoch(UInt64.ZERO)
                 .withReadOnlyKeystorePath(validatorKeystores)
+                .withValidatorDataPath(validatorDataDir)
+                .withStubExecutionEngine()
+                .withValidatorProposerDefaultFeeRecipient(
+                    "0xFE3B557E8Fb62b89F4916B721be55cEb828dBd73")
+                .withStartupTargetPeerCount(0)
+                .withRealNetwork()
                 .build());
-
-    // 1. Generate and store a hash chain
-    final HashChain hashChain = new HashChainGenerator().generate(65536);
-    final Bytes32 commitment = hashChain.getCommitment();
-    final HashChainStore hashChainStore = new HashChainStore(tempDir);
-    hashChainStore.storeHashChain(
-        targetValidatorKeyPair.getPublicKey(), hashChain, "test-password");
-
-    assertThat(hashChainStore.hasHashChain(targetValidatorKeyPair.getPublicKey())).isTrue();
-    final HashChain loadedChain =
-        hashChainStore
-            .loadHashChain(targetValidatorKeyPair.getPublicKey(), "test-password")
-            .orElseThrow();
-    assertThat(loadedChain.getCommitment()).isEqualTo(commitment);
 
     beaconNode.start();
     beaconNode.waitForGenesis();
@@ -122,63 +129,127 @@ public class Eip8321AcceptanceTest extends AcceptanceTestBase {
     beaconNode.submitRandaoCommitmentRegistration(signedRegistration);
 
     // 3. Include registration in a block
-    beaconNode.waitForBlockSatisfying(
-        block -> {
-          final BeaconBlockBodyEip8321 body =
-              BeaconBlockBodyEip8321.required(block.getMessage().getBody());
-          assertThat(body.getRandaoCommitmentRegistrations())
-              .anyMatch(
-                  reg ->
-                      reg.getMessage()
-                          .getValidatorIndex()
-                          .equals(UInt64.valueOf(targetValidatorIndex)));
-        });
+    final AtomicReference<SignedBeaconBlock> registrationBlockRef = new AtomicReference<>();
+    Waiter.waitFor(
+        () -> {
+          final UInt64 headSlot = beaconNode.getHeadBlock().getSlot();
+          for (long s = 1; s <= headSlot.longValue(); s++) {
+            final Optional<SignedBeaconBlock> maybeBlock =
+                beaconNode.getBlockAtSlot(UInt64.valueOf(s));
+            if (maybeBlock.isPresent()) {
+              final BeaconBlockBodyEip8321 body =
+                  BeaconBlockBodyEip8321.required(maybeBlock.get().getMessage().getBody());
+              if (body.getRandaoCommitmentRegistrations().stream()
+                  .anyMatch(
+                      reg ->
+                          reg.getMessage()
+                              .getValidatorIndex()
+                              .equals(UInt64.valueOf(targetValidatorIndex)))) {
+                registrationBlockRef.set(maybeBlock.get());
+                break;
+              }
+            }
+          }
+          assertThat(registrationBlockRef.get())
+              .describedAs("Registration included in block")
+              .isNotNull();
+        },
+        1,
+        TimeUnit.MINUTES);
+
+    final SignedBeaconBlock registrationBlock = registrationBlockRef.get();
+    final BeaconStateEip8321 stateAfterRegistration =
+        BeaconStateEip8321.required(beaconNode.getState(registrationBlock.getSlot().toString()));
+    assertThat(stateAfterRegistration.getPendingRandaoCommitments().asList())
+        .anyMatch(
+            pending ->
+                pending.getValidatorIndex().equals(UInt64.valueOf(targetValidatorIndex))
+                    && pending.getCommitment().equals(commitment));
 
     // 4. Advance the chain until the commitment activates (COMMITMENT_REGISTRATION_DELAY = 3
     // epochs)
-    beaconNode.waitForEpochAtOrAbove(4);
-
-    final BeaconStateEip8321 stateAfterActivation =
-        BeaconStateEip8321.required(beaconNode.getHeadState());
-    assertThat(stateAfterActivation.getRandaoCommitments().get(targetValidatorIndex).get())
-        .isEqualTo(commitment);
+    final UInt64 activationSlot = beaconNode.getSpec().computeStartSlotAtEpoch(UInt64.valueOf(4));
+    beaconNode.waitForBlockAtOrAfterSlot(activationSlot.longValue());
 
     // 5. Propose a block using the correct hash-chain reveal and verify state commitment
     // advancement
     final Bytes32 expectedPreimage = loadedChain.getRevealForCommitment(commitment).orElseThrow();
 
-    beaconNode.waitForBlockSatisfying(
-        block -> {
-          if (block.getMessage().getProposerIndex().equals(UInt64.valueOf(targetValidatorIndex))) {
-            final BeaconBlockBodyEip8321 body =
-                BeaconBlockBodyEip8321.required(block.getMessage().getBody());
-            // Proposer must supply hash chain reveal and BLSSignature.infinity()
-            assertThat(body.getHashChainReveal()).isEqualTo(expectedPreimage);
-            assertThat(body.getRandaoReveal()).isEqualTo(BLSSignature.infinity());
+    final AtomicReference<SignedBeaconBlock> targetValidatorBlockRef = new AtomicReference<>();
+    Waiter.waitFor(
+        () -> {
+          final UInt64 headSlot = beaconNode.getHeadBlock().getSlot();
+          for (long s = activationSlot.longValue(); s <= headSlot.longValue(); s++) {
+            final Optional<SignedBeaconBlock> maybeBlock =
+                beaconNode.getBlockAtSlot(UInt64.valueOf(s));
+            if (maybeBlock.isPresent()
+                && maybeBlock
+                    .get()
+                    .getMessage()
+                    .getProposerIndex()
+                    .equals(UInt64.valueOf(targetValidatorIndex))) {
+              targetValidatorBlockRef.set(maybeBlock.get());
+              break;
+            }
           }
-        });
+          assertThat(targetValidatorBlockRef.get()).isNotNull();
+        },
+        1,
+        TimeUnit.MINUTES);
+
+    final SignedBeaconBlock targetValidatorBlock = targetValidatorBlockRef.get();
+    final BeaconBlockBodyEip8321 targetBody =
+        BeaconBlockBodyEip8321.required(targetValidatorBlock.getMessage().getBody());
+    // Proposer must supply hash chain reveal and BLSSignature.infinity()
+    assertThat(targetBody.getHashChainReveal()).isEqualTo(expectedPreimage);
+    assertThat(targetBody.getRandaoReveal()).isEqualTo(BLSSignature.infinity());
+
+    if (targetValidatorBlock.getSlot().isGreaterThan(activationSlot)) {
+      final BeaconStateEip8321 stateAfterActivation =
+          BeaconStateEip8321.required(beaconNode.getState(activationSlot.toString()));
+      assertThat(stateAfterActivation.getRandaoCommitments().get(targetValidatorIndex).get())
+          .isEqualTo(commitment);
+    }
 
     // 6. Verify commitment advances to preimage in state
     final BeaconStateEip8321 stateAfterReveal =
-        BeaconStateEip8321.required(beaconNode.getHeadState());
+        BeaconStateEip8321.required(beaconNode.getState(targetValidatorBlock.getSlot().toString()));
     assertThat(stateAfterReveal.getRandaoCommitments().get(targetValidatorIndex).get())
         .isEqualTo(expectedPreimage);
 
     // 7. Verify an unregistered validator still uses legacy BLS RANDAO and zero hash chain reveal
-    beaconNode.waitForBlockSatisfying(
-        block -> {
-          if (block
-              .getMessage()
-              .getProposerIndex()
-              .equals(UInt64.valueOf(unregisteredValidatorIndex))) {
-            final BeaconBlockBodyEip8321 body =
-                BeaconBlockBodyEip8321.required(block.getMessage().getBody());
-            assertThat(body.getHashChainReveal()).isEqualTo(Bytes32.ZERO);
-            assertThat(body.getRandaoReveal()).isNotEqualTo(BLSSignature.infinity());
+    final AtomicReference<SignedBeaconBlock> unregisteredValidatorBlockRef =
+        new AtomicReference<>();
+    Waiter.waitFor(
+        () -> {
+          final UInt64 headSlot = beaconNode.getHeadBlock().getSlot();
+          for (long s = activationSlot.longValue(); s <= headSlot.longValue(); s++) {
+            final Optional<SignedBeaconBlock> maybeBlock =
+                beaconNode.getBlockAtSlot(UInt64.valueOf(s));
+            if (maybeBlock.isPresent()
+                && maybeBlock
+                    .get()
+                    .getMessage()
+                    .getProposerIndex()
+                    .equals(UInt64.valueOf(unregisteredValidatorIndex))) {
+              unregisteredValidatorBlockRef.set(maybeBlock.get());
+              break;
+            }
           }
-        });
+          assertThat(unregisteredValidatorBlockRef.get()).isNotNull();
+        },
+        1,
+        TimeUnit.MINUTES);
 
-    final BeaconStateEip8321 finalState = BeaconStateEip8321.required(beaconNode.getHeadState());
+    final SignedBeaconBlock unregisteredValidatorBlock = unregisteredValidatorBlockRef.get();
+    final BeaconBlockBodyEip8321 unregisteredBody =
+        BeaconBlockBodyEip8321.required(unregisteredValidatorBlock.getMessage().getBody());
+    assertThat(unregisteredBody.getHashChainReveal()).isEqualTo(Bytes32.ZERO);
+    assertThat(unregisteredBody.getRandaoReveal()).isNotEqualTo(BLSSignature.infinity());
+
+    final BeaconStateEip8321 finalState =
+        BeaconStateEip8321.required(
+            beaconNode.getState(unregisteredValidatorBlock.getSlot().toString()));
     assertThat(finalState.getRandaoCommitments().get(unregisteredValidatorIndex).get())
         .isEqualTo(Bytes32.ZERO);
   }

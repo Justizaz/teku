@@ -103,7 +103,5 @@ public interface OperationProcessor {
       MutableBeaconState state, SignedRandaoCommitmentRegistration registration)
       throws BlockProcessingException;
 
-  void processRandao(
-      MutableBeaconState state, BeaconBlock block)
-      throws BlockProcessingException;
+  void processRandao(MutableBeaconState state, BeaconBlock block) throws BlockProcessingException;
 }

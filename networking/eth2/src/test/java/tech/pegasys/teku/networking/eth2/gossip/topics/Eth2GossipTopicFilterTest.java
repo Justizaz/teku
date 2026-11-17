@@ -95,7 +95,7 @@ class Eth2GossipTopicFilterTest {
                   b -> b.fuluBuilder(fuluBuilder).hezeForkEpoch(nextMilestoneForkEpoch));
           case EIP8321 ->
               TestSpecFactory.createMinimalEip8321(
-                      b -> b.fuluBuilder(fuluBuilder).eip8321ForkEpoch(nextMilestoneForkEpoch));
+                  b -> b.fuluBuilder(fuluBuilder).eip8321ForkEpoch(nextMilestoneForkEpoch));
         };
     p2pConfig = P2PConfig.builder().specProvider(spec).build();
     final StorageSystem storageSystem = InMemoryStorageSystemBuilder.buildDefault(spec);
