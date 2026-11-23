@@ -13,6 +13,12 @@
 
 package tech.pegasys.teku.test.acceptance;
 
+import static org.assertj.core.api.Assertions.assertThat;
+
+import java.nio.file.Path;
+import java.util.Optional;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
 import org.apache.tuweni.bytes.Bytes;
 import org.apache.tuweni.bytes.Bytes32;
 import org.junit.jupiter.api.Test;
@@ -36,13 +42,6 @@ import tech.pegasys.teku.test.acceptance.dsl.tools.deposits.ValidatorKeystores;
 import tech.pegasys.teku.validator.client.hashchain.HashChain;
 import tech.pegasys.teku.validator.client.hashchain.HashChainGenerator;
 import tech.pegasys.teku.validator.client.hashchain.HashChainStore;
-
-import java.nio.file.Path;
-import java.util.Optional;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicReference;
-
-import static org.assertj.core.api.Assertions.assertThat;
 
 public class Eip8321AcceptanceTest extends AcceptanceTestBase {
 
@@ -169,18 +168,17 @@ public class Eip8321AcceptanceTest extends AcceptanceTestBase {
 
     // 4. Advance the chain until the commitment activates (COMMITMENT_REGISTRATION_DELAY = 3
     // epochs)
-    final var pendingRegistration = stateAfterRegistration
-            .getPendingRandaoCommitments()
-            .asList().stream()
-            .filter(pending -> pending
-                    .getValidatorIndex()
-                    .equals(UInt64.valueOf(targetValidatorIndex)))
+    final var pendingRegistration =
+        stateAfterRegistration.getPendingRandaoCommitments().asList().stream()
+            .filter(
+                pending -> pending.getValidatorIndex().equals(UInt64.valueOf(targetValidatorIndex)))
             .findFirst()
             .orElseThrow();
 
     assertThat(pendingRegistration.getCommitment()).isEqualTo(commitment);
 
-    final UInt64 activationSlot = beaconNode.getSpec().computeStartSlotAtEpoch(pendingRegistration.getActivationEpoch());
+    final UInt64 activationSlot =
+        beaconNode.getSpec().computeStartSlotAtEpoch(pendingRegistration.getActivationEpoch());
     beaconNode.waitForBlockAtOrAfterSlot(activationSlot.longValue());
 
     // 5. Propose a block using the correct hash-chain reveal and verify state commitment
@@ -217,19 +215,22 @@ public class Eip8321AcceptanceTest extends AcceptanceTestBase {
     assertThat(targetBody.getRandaoReveal()).isEqualTo(BLSSignature.infinity());
 
     SignedBeaconBlock lastBlockBeforeReveal = null;
-    for(long slot = activationSlot.longValue(); slot < targetValidatorBlock.getSlot().longValue(); slot++) {
+    for (long slot = activationSlot.longValue();
+        slot < targetValidatorBlock.getSlot().longValue();
+        slot++) {
       final Optional<SignedBeaconBlock> maybeBlock =
-              beaconNode.getBlockAtSlot(UInt64.valueOf(slot));
-      if(maybeBlock.isPresent()) {
+          beaconNode.getBlockAtSlot(UInt64.valueOf(slot));
+      if (maybeBlock.isPresent()) {
         lastBlockBeforeReveal = maybeBlock.get();
       }
     }
 
-    if(lastBlockBeforeReveal != null) {
+    if (lastBlockBeforeReveal != null) {
       final BeaconStateEip8321 stateAfterActivation =
-              BeaconStateEip8321.required(beaconNode.getState(lastBlockBeforeReveal.getRoot().toHexString()));
+          BeaconStateEip8321.required(
+              beaconNode.getState(lastBlockBeforeReveal.getMessage().getStateRoot().toHexString()));
       assertThat(stateAfterActivation.getRandaoCommitments().get(targetValidatorIndex).get())
-              .isEqualTo(commitment);
+          .isEqualTo(commitment);
     }
 
     // 6. Verify commitment advances to preimage in state
