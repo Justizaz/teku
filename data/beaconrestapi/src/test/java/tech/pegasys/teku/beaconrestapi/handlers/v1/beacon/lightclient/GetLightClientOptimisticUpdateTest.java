@@ -1,5 +1,5 @@
 /*
- * Copyright Consensys Software Inc., 2026
+ * Copyright (c) 2026 Consensys Incorporated. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with
  * the License. You may obtain a copy of the License at
@@ -124,7 +124,7 @@ public class GetLightClientOptimisticUpdateTest extends AbstractMigratedBeaconHa
   private static Set<String> expectedHeaderFields(final SpecMilestone milestone) {
     return switch (milestone) {
       case ALTAIR, BELLATRIX -> Set.of("beacon");
-      case GLOAS, HEZE -> Set.of("beacon", "execution_block_hash", "execution_branch");
+      case GLOAS, HEZE, EIP8321 -> Set.of("beacon", "execution_block_hash", "execution_branch");
       default -> Set.of("beacon", "execution", "execution_branch");
     };
   }

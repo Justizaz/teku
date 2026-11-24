@@ -1,5 +1,5 @@
 /*
- * Copyright Consensys Software Inc., 2026
+ * Copyright (c) 2026 Consensys Incorporated. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with
  * the License. You may obtain a copy of the License at
@@ -35,6 +35,7 @@ import tech.pegasys.teku.spec.datastructures.operations.AttesterSlashing;
 import tech.pegasys.teku.spec.datastructures.operations.Deposit;
 import tech.pegasys.teku.spec.datastructures.operations.ProposerSlashing;
 import tech.pegasys.teku.spec.datastructures.operations.SignedBlsToExecutionChange;
+import tech.pegasys.teku.spec.datastructures.operations.SignedRandaoCommitmentRegistration;
 import tech.pegasys.teku.spec.datastructures.operations.SignedVoluntaryExit;
 import tech.pegasys.teku.spec.datastructures.type.SszKZGCommitment;
 import tech.pegasys.teku.spec.datastructures.type.SszSignature;
@@ -162,6 +163,12 @@ public class BeaconBlockBodyBuilderPhase0 implements BeaconBlockBodyBuilder {
   public BeaconBlockBodyBuilder parentExecutionRequests(
       final ExecutionRequests parentExecutionRequests) {
     // No ParentExecutionRequests in phase 0
+    return this;
+  }
+
+  @Override
+  public BeaconBlockBodyBuilder randaoCommitmentRegistrations(
+      final SszList<SignedRandaoCommitmentRegistration> randaoCommitmentRegistrations) {
     return this;
   }
 

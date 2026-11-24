@@ -1,5 +1,5 @@
 /*
- * Copyright Consensys Software Inc., 2026
+ * Copyright (c) 2026 Consensys Incorporated. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with
  * the License. You may obtain a copy of the License at
@@ -17,6 +17,7 @@ import static tech.pegasys.teku.spec.constants.WithdrawalPrefixes.ETH1_ADDRESS_W
 
 import com.google.common.annotations.VisibleForTesting;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import java.util.function.Supplier;
@@ -34,6 +35,7 @@ import tech.pegasys.teku.spec.datastructures.blocks.SignedBeaconBlock;
 import tech.pegasys.teku.spec.datastructures.blocks.blockbody.BeaconBlockBody;
 import tech.pegasys.teku.spec.datastructures.execution.ExecutionPayloadHeader;
 import tech.pegasys.teku.spec.datastructures.execution.ExecutionPayloadSummary;
+import tech.pegasys.teku.spec.datastructures.execution.versions.heze.InclusionList;
 import tech.pegasys.teku.spec.datastructures.operations.BlsToExecutionChange;
 import tech.pegasys.teku.spec.datastructures.operations.Deposit;
 import tech.pegasys.teku.spec.datastructures.operations.SignedBlsToExecutionChange;
@@ -101,12 +103,13 @@ public class BlockProcessorCapella extends BlockProcessorBellatrix {
   public void executionProcessing(
       final MutableBeaconState genericState,
       final BeaconBlock beaconBlock,
-      final Optional<? extends OptimisticExecutionPayloadExecutor> payloadExecutor)
+      final Optional<? extends OptimisticExecutionPayloadExecutor> payloadExecutor,
+      final Optional<List<InclusionList>> inclusionLists)
       throws BlockProcessingException {
     final ExecutionPayloadHeader executionPayloadHeader =
         extractExecutionPayloadHeader(beaconBlock.getBody());
     processWithdrawals(genericState, Optional.of(executionPayloadHeader));
-    super.executionProcessing(genericState, beaconBlock, payloadExecutor);
+    super.executionProcessing(genericState, beaconBlock, payloadExecutor, inclusionLists);
   }
 
   @Override
@@ -116,7 +119,6 @@ public class BlockProcessorCapella extends BlockProcessorBellatrix {
       final SignedBeaconBlock block,
       final BLSSignatureVerifier signatureVerifier)
       throws BlockProcessingException {
-    final SszList<Deposit> deposits = block.getMessage().getBody().getDeposits();
     BeaconState validationState = preState;
     final SszList<SignedBlsToExecutionChange> signedBlsToExecutionChanges =
         block
@@ -132,18 +134,26 @@ public class BlockProcessorCapella extends BlockProcessorBellatrix {
         verifyBlsToExecutionChangesPreProcessing(
             validationState, signedBlsToExecutionChanges, signatureVerifier);
 
-    if (!blockValidationResult.isValid() && !deposits.isEmpty()) {
+    if (!blockValidationResult.isValid()) {
       // It's possible that a bls change referred to a validator which is in the
       // pending deposits list, so apply deposits and attempt validation again.
-      final MutableBeaconStateCapella mutableBeaconStateCapella =
-          BeaconStateCapella.required(preState).createWritableCopy();
-      processDeposits(mutableBeaconStateCapella, block.getMessage().getBody().getDeposits());
-      validationState = mutableBeaconStateCapella.commitChanges();
-      blockValidationResult =
-          verifyBlsToExecutionChangesPreProcessing(
-              validationState, signedBlsToExecutionChanges, signatureVerifier);
+      final SszList<Deposit> deposits = getDepositsForBlsChangeRetry(block.getMessage().getBody());
+      if (!deposits.isEmpty()) {
+        final MutableBeaconStateCapella mutableBeaconStateCapella =
+            BeaconStateCapella.required(preState).createWritableCopy();
+        processDeposits(mutableBeaconStateCapella, deposits);
+        validationState = mutableBeaconStateCapella.commitChanges();
+        blockValidationResult =
+            verifyBlsToExecutionChangesPreProcessing(
+                validationState, signedBlsToExecutionChanges, signatureVerifier);
+      }
     }
     return blockValidationResult;
+  }
+
+  /** The block's deposits to apply before retrying its BLS to execution change validation. */
+  protected SszList<Deposit> getDepositsForBlsChangeRetry(final BeaconBlockBody body) {
+    return body.getDeposits();
   }
 
   @Override

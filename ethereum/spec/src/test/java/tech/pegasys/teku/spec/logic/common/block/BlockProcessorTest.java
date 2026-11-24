@@ -1,5 +1,5 @@
 /*
- * Copyright Consensys Software Inc., 2026
+ * Copyright (c) 2026 Consensys Incorporated. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with
  * the License. You may obtain a copy of the License at
@@ -27,6 +27,7 @@ import tech.pegasys.teku.bls.BLSSignatureVerifier;
 import tech.pegasys.teku.infrastructure.ssz.SszList;
 import tech.pegasys.teku.infrastructure.ssz.collections.SszBytes32Vector;
 import tech.pegasys.teku.infrastructure.ssz.schema.SszListSchema;
+import tech.pegasys.teku.infrastructure.ssz.schema.collections.SszUInt64VectorSchema;
 import tech.pegasys.teku.infrastructure.unsigned.UInt64;
 import tech.pegasys.teku.spec.SpecMilestone;
 import tech.pegasys.teku.spec.datastructures.blocks.BeaconBlockHeader;
@@ -60,6 +61,12 @@ public abstract class BlockProcessorTest extends ProcessorTestHelper {
             .updated(
                 state -> {
                   state.getValidators().get(1).withSlashed(true);
+                  if (spec.getGenesisSpec()
+                      .getMilestone()
+                      .isGreaterThanOrEqualTo(SpecMilestone.FULU)) {
+                    state.setProposerLookahead(
+                        SszUInt64VectorSchema.create(64).of(UInt64.ZERO, UInt64.ONE));
+                  }
                 });
     final MutableBeaconState mutablePreState = (MutableBeaconState) preState.createWritableCopy();
     final BeaconBlockHeader header =
@@ -92,7 +99,9 @@ public abstract class BlockProcessorTest extends ProcessorTestHelper {
         postState.getBalances().size(),
         originalValidatorBalancesSize + 1,
         "No balance was added to the validator balances.");
-    if (spec.atSlot(postState.getSlot()).getMilestone().equals(SpecMilestone.ELECTRA)) {
+    if (spec.atSlot(postState.getSlot())
+        .getMilestone()
+        .isGreaterThanOrEqualTo(SpecMilestone.ELECTRA)) {
       assertEquals(
           makeValidator(pubkey, withdrawalCredentials).withEffectiveBalance(UInt64.ZERO),
           postState.getValidators().get(originalValidatorRegistrySize));

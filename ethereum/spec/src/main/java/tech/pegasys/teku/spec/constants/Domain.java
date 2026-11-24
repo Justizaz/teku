@@ -1,5 +1,5 @@
 /*
- * Copyright Consensys Software Inc., 2026
+ * Copyright (c) 2026 Consensys Incorporated. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with
  * the License. You may obtain a copy of the License at
@@ -39,6 +39,10 @@ public class Domain {
   public static final Bytes4 PTC_ATTESTER = Bytes4.fromHexString("0x0C000000");
   public static final Bytes4 PROPOSER_PREFERENCES = Bytes4.fromHexString("0x0D000000");
   public static final Bytes4 BUILDER_DEPOSIT = Bytes4.fromHexString("0x0E000000");
+
+  // EIP-8321
+  public static final Bytes4 DOMAIN_RANDAO_COMMITMENT_REGISTRATION =
+      Bytes4.fromHexString("0x11000000");
 
   // Heze
   public static final Bytes4 INCLUSION_LIST_COMMITTEE = Bytes4.fromHexString("0x10000000");

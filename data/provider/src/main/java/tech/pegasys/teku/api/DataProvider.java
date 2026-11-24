@@ -1,5 +1,5 @@
 /*
- * Copyright Consensys Software Inc., 2026
+ * Copyright (c) 2026 Consensys Incorporated. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with
  * the License. You may obtain a copy of the License at
@@ -22,6 +22,7 @@ import tech.pegasys.teku.spec.Spec;
 import tech.pegasys.teku.spec.datastructures.operations.AttesterSlashing;
 import tech.pegasys.teku.spec.datastructures.operations.ProposerSlashing;
 import tech.pegasys.teku.spec.datastructures.operations.SignedBlsToExecutionChange;
+import tech.pegasys.teku.spec.datastructures.operations.SignedRandaoCommitmentRegistration;
 import tech.pegasys.teku.spec.datastructures.operations.SignedVoluntaryExit;
 import tech.pegasys.teku.statetransition.OperationPool;
 import tech.pegasys.teku.statetransition.attestation.AggregatingAttestationPool;
@@ -32,6 +33,7 @@ import tech.pegasys.teku.statetransition.datacolumns.DataColumnSidecarManager;
 import tech.pegasys.teku.statetransition.execution.ProposerPreferencesManager;
 import tech.pegasys.teku.statetransition.forkchoice.ForkChoiceNotifier;
 import tech.pegasys.teku.statetransition.forkchoice.ProposersDataManager;
+import tech.pegasys.teku.statetransition.inclusionlist.InclusionListManager;
 import tech.pegasys.teku.statetransition.lightclient.LightClientUpdateStore;
 import tech.pegasys.teku.statetransition.payloadattestation.PayloadAttestationPool;
 import tech.pegasys.teku.statetransition.synccommittee.SyncCommitteeContributionPool;
@@ -111,6 +113,7 @@ public class DataProvider {
     private SyncService syncService;
     private ValidatorApiChannel validatorApiChannel;
     private AggregatingAttestationPool attestationPool;
+    private InclusionListManager inclusionListManager;
     private BlockBlobSidecarsTrackersPool blockBlobSidecarsTrackersPool;
     private AttestationManager attestationManager;
     private ActiveValidatorChannel activeValidatorChannel;
@@ -118,6 +121,7 @@ public class DataProvider {
     private OperationPool<ProposerSlashing> proposerSlashingPool;
     private OperationPool<SignedVoluntaryExit> voluntaryExitPool;
     private OperationPool<SignedBlsToExecutionChange> blsToExecutionChangePool;
+    private OperationPool<SignedRandaoCommitmentRegistration> randaoCommitmentRegistrationPool;
     private SyncCommitteeContributionPool syncCommitteeContributionPool;
     private ProposersDataManager proposersDataManager;
     private ForkChoiceNotifier forkChoiceNotifier;
@@ -166,6 +170,11 @@ public class DataProvider {
       return this;
     }
 
+    public Builder inclusionListPool(final InclusionListManager inclusionListManager) {
+      this.inclusionListManager = inclusionListManager;
+      return this;
+    }
+
     public Builder blockBlobSidecarsTrackersPool(
         final BlockBlobSidecarsTrackersPool blockBlobSidecarsTrackersPool) {
       this.blockBlobSidecarsTrackersPool = blockBlobSidecarsTrackersPool;
@@ -207,6 +216,12 @@ public class DataProvider {
     public Builder blsToExecutionChangePool(
         final OperationPool<SignedBlsToExecutionChange> blsToExecutionChangePool) {
       this.blsToExecutionChangePool = blsToExecutionChangePool;
+      return this;
+    }
+
+    public Builder randaoCommitmentRegistrationPool(
+        final OperationPool<SignedRandaoCommitmentRegistration> randaoCommitmentRegistrationPool) {
+      this.randaoCommitmentRegistrationPool = randaoCommitmentRegistrationPool;
       return this;
     }
 
@@ -260,10 +275,12 @@ public class DataProvider {
       final NodeDataProvider nodeDataProvider =
           new NodeDataProvider(
               attestationPool,
+              inclusionListManager,
               attesterSlashingPool,
               proposerSlashingPool,
               voluntaryExitPool,
               blsToExecutionChangePool,
+              randaoCommitmentRegistrationPool,
               syncCommitteeContributionPool,
               blockBlobSidecarsTrackersPool,
               attestationManager,

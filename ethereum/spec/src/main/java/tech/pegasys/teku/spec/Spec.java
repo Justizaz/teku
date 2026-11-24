@@ -1,5 +1,5 @@
 /*
- * Copyright Consensys Software Inc., 2026
+ * Copyright (c) 2026 Consensys Incorporated. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with
  * the License. You may obtain a copy of the License at
@@ -85,6 +85,8 @@ import tech.pegasys.teku.spec.datastructures.execution.ExecutionPayloadHeader;
 import tech.pegasys.teku.spec.datastructures.execution.ExecutionRequests;
 import tech.pegasys.teku.spec.datastructures.execution.ExecutionRequestsDataCodec;
 import tech.pegasys.teku.spec.datastructures.execution.versions.capella.Withdrawal;
+import tech.pegasys.teku.spec.datastructures.execution.versions.heze.InclusionList;
+import tech.pegasys.teku.spec.datastructures.forkchoice.ForkChoiceNode;
 import tech.pegasys.teku.spec.datastructures.forkchoice.ForkChoicePayloadStatus;
 import tech.pegasys.teku.spec.datastructures.forkchoice.MutableStore;
 import tech.pegasys.teku.spec.datastructures.forkchoice.ReadOnlyForkChoiceStrategy;
@@ -741,7 +743,8 @@ public class Spec {
   }
 
   public int getSlotDurationMillis(final UInt64 slot) {
-    return atSlot(slot).getConfig().getSlotDurationMillis();
+    final MiscHelpers miscHelpers = atSlot(slot).miscHelpers();
+    return miscHelpers.getSlotDurationMillis(miscHelpers.computeEpochAtSlot(slot));
   }
 
   public int getSyncMessageDueMillis(final UInt64 slot) {
@@ -758,6 +761,10 @@ public class Spec {
 
   public Optional<Integer> getPayloadDueMillis(final UInt64 slot) {
     return atSlot(slot).getForkChoiceUtil().getPayloadDueMillis();
+  }
+
+  public Optional<Integer> getInclusionListDueMillis(final UInt64 slot) {
+    return atSlot(slot).getForkChoiceUtil().getInclusionListDueMillis();
   }
 
   public Bytes32 getBlockRoot(final BeaconState state, final UInt64 epoch) {
@@ -906,6 +913,16 @@ public class Spec {
     return forGetAncestor(forkChoiceStrategy, root, startSlot)
         .getForkChoiceUtil()
         .getAncestors(forkChoiceStrategy, root, startSlot, step, count);
+  }
+
+  public NavigableMap<UInt64, ForkChoiceNode> getAncestorNodes(
+      final ReadOnlyForkChoiceStrategy forkChoiceStrategy,
+      final ForkChoiceNode node,
+      final UInt64 startSlot,
+      final UInt64 count) {
+    return forGetAncestor(forkChoiceStrategy, node.blockRoot(), startSlot)
+        .getForkChoiceUtil()
+        .getAncestorNodes(forkChoiceStrategy, node, startSlot, count);
   }
 
   public NavigableMap<UInt64, Bytes32> getAncestorsOnFork(
@@ -1130,7 +1147,8 @@ public class Spec {
       final BeaconState preState,
       final SignedBeaconBlock block,
       final BLSSignatureVerifier signatureVerifier,
-      final Optional<OptimisticExecutionPayloadExecutor> payloadExecutor)
+      final Optional<OptimisticExecutionPayloadExecutor> payloadExecutor,
+      final Optional<List<InclusionList>> inclusionLists)
       throws StateTransitionException {
     try {
       final BeaconState blockSlotState = stateTransition.processSlots(preState, block.getSlot());
@@ -1140,7 +1158,8 @@ public class Spec {
               blockSlotState,
               IndexedAttestationCache.NOOP,
               signatureVerifier,
-              payloadExecutor);
+              payloadExecutor,
+              inclusionLists);
     } catch (SlotProcessingException | EpochProcessingException e) {
       throw new StateTransitionException(e);
     }
@@ -1156,6 +1175,7 @@ public class Spec {
               block.getMessage(),
               IndexedAttestationCache.NOOP,
               BLSSignatureVerifier.NOOP,
+              Optional.empty(),
               Optional.empty());
     } catch (SlotProcessingException | EpochProcessingException | BlockProcessingException e) {
       throw new StateTransitionException(e);
@@ -1274,6 +1294,13 @@ public class Spec {
     return atState(state).getValidatorsUtil().getValidatorIndex(state, publicKey);
   }
 
+  public Bytes32 getInclusionListDependentRoot(
+      final BeaconState state, final UInt64 inclusionListSlot) {
+    return computeEpochAtSlot(inclusionListSlot).isGreaterThan(getCurrentEpoch(state))
+        ? getCurrentDutyDependentRoot(state)
+        : getPreviousDutyDependentRoot(state);
+  }
+
   public Optional<CommitteeAssignment> getCommitteeAssignment(
       final BeaconState state, final UInt64 epoch, final int validatorIndex) {
     return atEpoch(epoch).getValidatorsUtil().getCommitteeAssignment(state, epoch, validatorIndex);
@@ -1310,6 +1337,14 @@ public class Spec {
 
   public Optional<Integer> getBuilderIndex(final BeaconState state, final BLSPublicKey publicKey) {
     return atState(state).beaconStateAccessors().getBuilderIndex(state, publicKey);
+  }
+
+  public Int2ObjectMap<UInt64> getValidatorIndexInclusionListAssignmentSlotMap(
+      final BeaconState state, final UInt64 epoch) {
+    return atEpoch(epoch)
+        .getInclusionListUtil()
+        .orElseThrow()
+        .getValidatorIndexToSlotAssignmentMap(state, epoch);
   }
 
   // Attestation helpers
@@ -1461,9 +1496,20 @@ public class Spec {
     if (epoch.isLessThan(specConfigFulu.getFuluForkEpoch())) {
       return false;
     }
-    return getCurrentEpoch(store)
-        .minusMinZero(epoch)
-        .isLessThanOrEqualTo(specConfigFulu.getMinEpochsForDataColumnSidecarsRequests());
+    final UInt64 currentEpoch = getCurrentEpoch(store);
+    return atEpoch(currentEpoch)
+        .miscHelpers()
+        .toVersionFulu()
+        .map(
+            miscHelpersFulu ->
+                miscHelpersFulu.isAvailabilityOfDataColumnSidecarsRequiredAtEpoch(
+                    currentEpoch, epoch))
+        .orElseGet(
+            () ->
+                currentEpoch
+                    .minusMinZero(epoch)
+                    .isLessThanOrEqualTo(
+                        specConfigFulu.getMinEpochsForDataColumnSidecarsRequests()));
   }
 
   public Optional<UInt64> computeFirstSlotWithBlobSupport() {
@@ -1496,6 +1542,10 @@ public class Spec {
         .toVersionGloas()
         .map(MiscHelpersGloas::isPayloadAttestationAvailable)
         .orElse(false);
+  }
+
+  public boolean isInclusionListAvailableAtSlot(final UInt64 slot) {
+    return atSlot(slot).miscHelpers().isInclusionListAvailable();
   }
 
   // Electra Utils
@@ -1583,7 +1633,7 @@ public class Spec {
       case PHASE0, ALTAIR, BELLATRIX, CAPELLA -> Optional.empty();
       case DENEB, ELECTRA ->
           Optional.of(SpecConfigDeneb.required(specVersion.getConfig()).getMaxBlobsPerBlock());
-      case FULU, GLOAS, HEZE -> {
+      case FULU, GLOAS, HEZE, EIP8321 -> {
         final UInt64 epoch = specVersion.miscHelpers().computeEpochAtSlot(slot);
         yield Optional.of(
             MiscHelpersFulu.required(specVersion.miscHelpers())

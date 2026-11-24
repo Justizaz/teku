@@ -1,5 +1,5 @@
 /*
- * Copyright Consensys Software Inc., 2026
+ * Copyright (c) 2026 Consensys Incorporated. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with
  * the License. You may obtain a copy of the License at
@@ -36,6 +36,7 @@ import tech.pegasys.teku.spec.TestSpecFactory;
 import tech.pegasys.teku.spec.datastructures.operations.AttesterSlashing;
 import tech.pegasys.teku.spec.datastructures.operations.ProposerSlashing;
 import tech.pegasys.teku.spec.datastructures.operations.SignedBlsToExecutionChange;
+import tech.pegasys.teku.spec.datastructures.operations.SignedRandaoCommitmentRegistration;
 import tech.pegasys.teku.spec.datastructures.operations.SignedVoluntaryExit;
 import tech.pegasys.teku.spec.util.DataStructureUtil;
 import tech.pegasys.teku.statetransition.OperationPool;
@@ -47,6 +48,7 @@ import tech.pegasys.teku.statetransition.datacolumns.DataColumnSidecarManager;
 import tech.pegasys.teku.statetransition.execution.ProposerPreferencesManager;
 import tech.pegasys.teku.statetransition.forkchoice.ForkChoiceNotifier;
 import tech.pegasys.teku.statetransition.forkchoice.ProposersDataManager;
+import tech.pegasys.teku.statetransition.inclusionlist.InclusionListManager;
 import tech.pegasys.teku.statetransition.payloadattestation.PayloadAttestationPool;
 import tech.pegasys.teku.statetransition.synccommittee.SyncCommitteeContributionPool;
 import tech.pegasys.teku.statetransition.validation.InternalValidationResult;
@@ -59,6 +61,7 @@ public class NodeDataProviderTest {
   private final Spec spec = TestSpecFactory.createMinimalCapella();
   private final DataStructureUtil dataStructureUtil = new DataStructureUtil(spec);
   private final AggregatingAttestationPool attestationPool = mock(AggregatingAttestationPool.class);
+  private final InclusionListManager inclusionListManager = mock(InclusionListManager.class);
   private final BlockBlobSidecarsTrackersPool blockBlobSidecarsTrackersPool =
       mock(BlockBlobSidecarsTrackersPool.class);
   private final DataColumnSidecarManager dataColumnSidecarManager =
@@ -83,6 +86,9 @@ public class NodeDataProviderTest {
   private final OperationPool<SignedBlsToExecutionChange> blsToExecutionChangePool =
       mock(OperationPool.class);
 
+  private final OperationPool<SignedRandaoCommitmentRegistration> randaoCommitmentRegistrationPool =
+      mock(OperationPool.class);
+
   private final SyncCommitteeContributionPool syncCommitteeContributionPool =
       mock(SyncCommitteeContributionPool.class);
   private NodeDataProvider provider;
@@ -92,10 +98,12 @@ public class NodeDataProviderTest {
     provider =
         new NodeDataProvider(
             attestationPool,
+            inclusionListManager,
             attesterSlashingPool,
             proposerSlashingPool,
             voluntaryExitPool,
             blsToExecutionChangePool,
+            randaoCommitmentRegistrationPool,
             syncCommitteeContributionPool,
             blockBlobSidecarsTrackersPool,
             attestationManager,
@@ -219,10 +227,12 @@ public class NodeDataProviderTest {
     provider =
         new NodeDataProvider(
             attestationPool,
+            inclusionListManager,
             attesterSlashingPool,
             proposerSlashingPool,
             voluntaryExitPool,
             blsToExecutionChangePool,
+            randaoCommitmentRegistrationPool,
             syncCommitteeContributionPool,
             blockBlobSidecarsTrackersPool,
             attestationManager,

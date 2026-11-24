@@ -1,5 +1,5 @@
 /*
- * Copyright Consensys Software Inc., 2026
+ * Copyright (c) 2026 Consensys Incorporated. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with
  * the License. You may obtain a copy of the License at
@@ -30,6 +30,7 @@ import tech.pegasys.teku.spec.datastructures.operations.Attestation;
 import tech.pegasys.teku.spec.datastructures.operations.AttesterSlashing;
 import tech.pegasys.teku.spec.datastructures.operations.ProposerSlashing;
 import tech.pegasys.teku.spec.datastructures.operations.SignedBlsToExecutionChange;
+import tech.pegasys.teku.spec.datastructures.operations.SignedRandaoCommitmentRegistration;
 import tech.pegasys.teku.spec.datastructures.operations.SignedVoluntaryExit;
 import tech.pegasys.teku.statetransition.attestation.AggregatingAttestationPool;
 import tech.pegasys.teku.statetransition.attestation.AttestationManager;
@@ -47,6 +48,8 @@ public class OperationsReOrgManager implements ChainHeadChannel, LateBlockReorgP
   private final AttestationManager attestationManager;
   private final AggregatingAttestationPool attestationPool;
   private final MappedOperationPool<SignedBlsToExecutionChange> blsToExecutionOperationPool;
+  private final MappedOperationPool<SignedRandaoCommitmentRegistration>
+      randaoCommitmentRegistrationPool;
   private final RecentChainData recentChainData;
 
   public OperationsReOrgManager(
@@ -56,6 +59,8 @@ public class OperationsReOrgManager implements ChainHeadChannel, LateBlockReorgP
       final AggregatingAttestationPool attestationPool,
       final AttestationManager attestationManager,
       final MappedOperationPool<SignedBlsToExecutionChange> blsToExecutionOperationPool,
+      final MappedOperationPool<SignedRandaoCommitmentRegistration>
+          randaoCommitmentRegistrationPool,
       final RecentChainData recentChainData) {
     this.exitPool = exitPool;
     this.proposerSlashingPool = proposerSlashingPool;
@@ -63,6 +68,7 @@ public class OperationsReOrgManager implements ChainHeadChannel, LateBlockReorgP
     this.attestationManager = attestationManager;
     this.attestationPool = attestationPool;
     this.blsToExecutionOperationPool = blsToExecutionOperationPool;
+    this.randaoCommitmentRegistrationPool = randaoCommitmentRegistrationPool;
     this.recentChainData = recentChainData;
   }
 
@@ -77,22 +83,25 @@ public class OperationsReOrgManager implements ChainHeadChannel, LateBlockReorgP
       final Bytes32 currentDutyDependentRoot,
       final Optional<ForkChoicePayloadStatus> payloadStatus,
       final Optional<ReorgContext> optionalReorgContext) {
-    optionalReorgContext.ifPresent(
-        reorgContext -> {
-          final NavigableMap<UInt64, Bytes32> notCanonicalBlockRoots =
-              recentChainData.getAncestorsOnFork(
-                  reorgContext.getCommonAncestorSlot(), reorgContext.getOldBestBlockRoot());
-          final NavigableMap<UInt64, Bytes32> nowCanonicalBlockRoots =
-              recentChainData.getAncestorsOnFork(
-                  reorgContext.getCommonAncestorSlot(), bestBlockRoot);
+    // Payload reorgs keep every block canonical: nothing to re-queue or remove
+    optionalReorgContext
+        .filter(ReorgContext::isBlockReorg)
+        .ifPresent(
+            reorgContext -> {
+              final NavigableMap<UInt64, Bytes32> notCanonicalBlockRoots =
+                  recentChainData.getAncestorsOnFork(
+                      reorgContext.commonAncestorSlot(), reorgContext.oldBestBlockRoot());
+              final NavigableMap<UInt64, Bytes32> nowCanonicalBlockRoots =
+                  recentChainData.getAncestorsOnFork(
+                      reorgContext.commonAncestorSlot(), bestBlockRoot);
 
-          if (!notCanonicalBlockRoots.isEmpty()) {
-            attestationPool.onReorg(reorgContext.getCommonAncestorSlot());
-          }
-          processNonCanonicalBlockOperations(notCanonicalBlockRoots.values())
-              .alwaysRun(() -> processCanonicalBlockOperations(nowCanonicalBlockRoots.values()))
-              .finishError(LOG);
-        });
+              if (!notCanonicalBlockRoots.isEmpty()) {
+                attestationPool.onReorg(reorgContext.commonAncestorSlot());
+              }
+              processNonCanonicalBlockOperations(notCanonicalBlockRoots.values())
+                  .alwaysRun(() -> processCanonicalBlockOperations(nowCanonicalBlockRoots.values()))
+                  .finishError(LOG);
+            });
   }
 
   @Override
@@ -128,6 +137,9 @@ public class OperationsReOrgManager implements ChainHeadChannel, LateBlockReorgP
                               blockBody
                                   .getOptionalBlsToExecutionChanges()
                                   .ifPresent(blsToExecutionOperationPool::addAll);
+                              blockBody
+                                  .getOptionalRandaoCommitmentRegistrations()
+                                  .ifPresent(randaoCommitmentRegistrationPool::addAll);
 
                               return processNonCanonicalBlockAttestations(
                                   blockBody.getAttestations().stream(), root);
@@ -199,6 +211,9 @@ public class OperationsReOrgManager implements ChainHeadChannel, LateBlockReorgP
                             blockBody
                                 .getOptionalBlsToExecutionChanges()
                                 .ifPresent(blsToExecutionOperationPool::removeAll);
+                            blockBody
+                                .getOptionalRandaoCommitmentRegistrations()
+                                .ifPresent(randaoCommitmentRegistrationPool::removeAll);
                           },
                           () ->
                               LOG.debug(

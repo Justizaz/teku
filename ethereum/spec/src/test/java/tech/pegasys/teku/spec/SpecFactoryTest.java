@@ -1,5 +1,5 @@
 /*
- * Copyright Consensys Software Inc., 2026
+ * Copyright (c) 2026 Consensys Incorporated. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with
  * the License. You may obtain a copy of the License at
@@ -94,6 +94,17 @@ class SpecFactoryTest {
                         .fuluForkEpoch(UInt64.ZERO)
                         .gloasForkEpoch(UInt64.ZERO)
                         .hezeForkEpoch(forkEpoch);
+                case EIP8321 ->
+                    builder
+                        .altairForkEpoch(UInt64.ZERO)
+                        .bellatrixForkEpoch(UInt64.ZERO)
+                        .capellaForkEpoch(UInt64.ZERO)
+                        .denebForkEpoch(UInt64.ZERO)
+                        .electraForkEpoch(UInt64.ZERO)
+                        .fuluForkEpoch(UInt64.ZERO)
+                        .gloasForkEpoch(UInt64.ZERO)
+                        .hezeForkEpoch(UInt64.ZERO)
+                        .eip8321ForkEpoch(forkEpoch);
                 default ->
                     throw new IllegalStateException(
                         "Unhandled fork transition for test "

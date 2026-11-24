@@ -1,5 +1,5 @@
 /*
- * Copyright Consensys Software Inc., 2026
+ * Copyright (c) 2026 Consensys Incorporated. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with
  * the License. You may obtain a copy of the License at
@@ -53,15 +53,20 @@ class ForkChoicePayloadExecutorGloas implements OptimisticExecutionPayloadExecut
   public boolean optimisticallyExecute(
       final Optional<ExecutionPayloadHeader> latestExecutionPayloadHeader,
       final NewPayloadRequest payloadToExecute) {
+    final NewPayloadRequest preparedPayloadToExecute = preparePayloadToExecute(payloadToExecute);
     result =
         Optional.of(
             executionLayer
-                .engineNewPayload(payloadToExecute, signedEnvelope.getSlot())
+                .engineNewPayload(preparedPayloadToExecute, signedEnvelope.getSlot())
                 .exceptionally(
                     error -> {
                       LOG.error("Error while validating payload", error);
                       return PayloadStatus.failedExecution(error);
                     }));
     return true;
+  }
+
+  protected NewPayloadRequest preparePayloadToExecute(final NewPayloadRequest payloadToExecute) {
+    return payloadToExecute;
   }
 }

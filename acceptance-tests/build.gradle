@@ -8,6 +8,8 @@ dependencies {
 	acceptanceTestImplementation project(':data:serializer')
 	acceptanceTestImplementation project(':ethereum:execution-types')
 	acceptanceTestImplementation project(':ethereum:spec')
+	acceptanceTestImplementation project(':validator:client')
+	acceptanceTestImplementation project(':infrastructure:bls-keystore')
 
 	testFixturesImplementation project(':beacon:pow')
 	testFixturesImplementation project(':data:provider')

@@ -1,0 +1,5 @@
+dependencies {
+	implementation project(':ethereum:execution-types')
+	implementation project(':ethereum:spec')
+	implementation project(':infrastructure:unsigned')
+}

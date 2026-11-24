@@ -1,5 +1,5 @@
 /*
- * Copyright Consensys Software Inc., 2026
+ * Copyright (c) 2026 Consensys Incorporated. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with
  * the License. You may obtain a copy of the License at
@@ -26,8 +26,13 @@ public class SignedExecutionPayloadBidSchema
     extends ContainerSchema2<SignedExecutionPayloadBid, ExecutionPayloadBid, SszSignature> {
 
   public SignedExecutionPayloadBidSchema(final SchemaRegistry schemaRegistry) {
+    this("SignedExecutionPayloadBid", schemaRegistry);
+  }
+
+  public SignedExecutionPayloadBidSchema(
+      final String schemaName, final SchemaRegistry schemaRegistry) {
     super(
-        "SignedExecutionPayloadBid",
+        schemaName,
         namedSchema("message", schemaRegistry.get(EXECUTION_PAYLOAD_BID_SCHEMA)),
         namedSchema("signature", SszSignatureSchema.INSTANCE));
   }
@@ -42,7 +47,8 @@ public class SignedExecutionPayloadBidSchema
     return new SignedExecutionPayloadBid(this, node);
   }
 
-  public ExecutionPayloadBidSchema getMessageSchema() {
-    return (ExecutionPayloadBidSchema) getChildSchema(0);
+  @SuppressWarnings("unchecked")
+  public ExecutionPayloadBidSchema<ExecutionPayloadBid> getMessageSchema() {
+    return (ExecutionPayloadBidSchema<ExecutionPayloadBid>) getChildSchema(0);
   }
 }

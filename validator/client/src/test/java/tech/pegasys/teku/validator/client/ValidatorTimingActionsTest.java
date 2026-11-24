@@ -1,5 +1,5 @@
 /*
- * Copyright Consensys Software Inc., 2026
+ * Copyright (c) 2026 Consensys Incorporated. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with
  * the License. You may obtain a copy of the License at
@@ -66,6 +66,18 @@ public class ValidatorTimingActionsTest {
           Map.entry(key2, ValidatorStatus.exited_slashed),
           Map.entry(key3, ValidatorStatus.active_ongoing),
           Map.entry(key4, ValidatorStatus.exited_slashed));
+
+  @Test
+  public void shouldForwardInclusionListCreationDue() {
+    final ValidatorTimingActions validatorTimingActions =
+        new ValidatorTimingActions(
+            validatorIndexProvider, delegates, spec, metricsSystem, maybeSlashedValidatorAction);
+    final UInt64 slot = UInt64.valueOf(12);
+
+    validatorTimingActions.onInclusionListCreationDue(slot);
+
+    verify(delegate).onInclusionListCreationDue(slot);
+  }
 
   @Test
   public void shouldTriggerSlashingActionForSlashedValidators_AttesterSlashing() {

@@ -1,5 +1,5 @@
 /*
- * Copyright Consensys Software Inc., 2026
+ * Copyright (c) 2026 Consensys Incorporated. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with
  * the License. You may obtain a copy of the License at
@@ -16,6 +16,7 @@ package tech.pegasys.teku.validator.client.loader;
 import java.net.URL;
 import java.util.List;
 import java.util.Optional;
+import java.util.function.Supplier;
 import tech.pegasys.teku.bls.BLSPublicKey;
 import tech.pegasys.teku.bls.keystore.model.KeyStoreData;
 import tech.pegasys.teku.spec.signatures.Signer;
@@ -39,5 +40,9 @@ public interface ValidatorSource {
     Signer createSigner();
 
     boolean isReadOnly();
+
+    default Optional<Supplier<String>> getPasswordSupplier() {
+      return Optional.empty();
+    }
   }
 }

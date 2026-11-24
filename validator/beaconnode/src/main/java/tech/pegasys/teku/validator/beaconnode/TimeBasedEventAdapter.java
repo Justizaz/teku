@@ -1,5 +1,5 @@
 /*
- * Copyright Consensys Software Inc., 2026
+ * Copyright (c) 2026 Consensys Incorporated. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with
  * the License. You may obtain a copy of the License at
@@ -46,7 +46,7 @@ public abstract class TimeBasedEventAdapter {
     this.validatorTimingChannel = validatorTimingChannel;
     this.specVersion = spec.atSlot(firstSlot);
     this.onLastSlot = onLastSlot;
-    this.millisPerSlot = UInt64.valueOf(specVersion.getConfig().getSlotDurationMillis());
+    this.millisPerSlot = UInt64.valueOf(spec.getSlotDurationMillis(firstSlot));
   }
 
   abstract void scheduleDuties(
@@ -143,6 +143,18 @@ public abstract class TimeBasedEventAdapter {
       return;
     }
     validatorTimingChannel.onAttestationAggregationDue(slot);
+  }
+
+  void onInclusionListCreationDue(
+      final UInt64 scheduledTimeInMillis, final UInt64 actualTimeInMillis) {
+    final UInt64 slot = getCurrentSlotForMillis(scheduledTimeInMillis);
+    if (isTooLateInMillis(scheduledTimeInMillis, actualTimeInMillis)) {
+      LOG.warn(
+          "Skipping inclusion list creation for slot {} due to unexpected delay in slot processing",
+          slot);
+      return;
+    }
+    validatorTimingChannel.onInclusionListCreationDue(slot);
   }
 
   void onSyncCommitteeCreationDue(

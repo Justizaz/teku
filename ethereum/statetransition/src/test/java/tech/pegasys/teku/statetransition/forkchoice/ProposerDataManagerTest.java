@@ -1,5 +1,5 @@
 /*
- * Copyright Consensys Software Inc., 2026
+ * Copyright (c) 2026 Consensys Incorporated. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with
  * the License. You may obtain a copy of the License at
@@ -39,6 +39,7 @@ import tech.pegasys.teku.spec.TestSpecFactory;
 import tech.pegasys.teku.spec.datastructures.builder.SignedValidatorRegistration;
 import tech.pegasys.teku.spec.datastructures.epbs.versions.gloas.ProposerPreferences;
 import tech.pegasys.teku.spec.datastructures.epbs.versions.gloas.ProposerPreferencesSchema;
+import tech.pegasys.teku.spec.datastructures.forkchoice.InclusionListStore;
 import tech.pegasys.teku.spec.datastructures.state.beaconstate.BeaconState;
 import tech.pegasys.teku.spec.datastructures.validator.BeaconPreparableProposer;
 import tech.pegasys.teku.spec.executionlayer.ExecutionLayerChannel;
@@ -66,7 +67,8 @@ public class ProposerDataManagerTest {
           executionLayerChannel,
           recentChainData,
           defaultFeeRecipient,
-          false);
+          false,
+          new InclusionListStore(4));
 
   private final BeaconState state = dataStructureUtil.randomBeaconState();
 
@@ -229,6 +231,124 @@ public class ProposerDataManagerTest {
     when(specMock.getSlotsPerEpoch(any())).thenReturn(spec.getSlotsPerEpoch(slot));
   }
 
+  @Test
+  void shouldUseProposerPreferencesFeeRecipientForPayloadAttributes() {
+    final UInt64 blockSlot = UInt64.valueOf(12);
+    final UInt64 proposerIndex = UInt64.ONE;
+    final Bytes32 dependentRoot = dataStructureUtil.randomBytes32();
+    final Eth1Address feeRecipient = dataStructureUtil.randomEth1Address();
+    final ProposerPreferencesManager proposerPreferencesManager =
+        mock(ProposerPreferencesManager.class);
+    final ProposersDataManager manager = createProposersDataManager(proposerPreferencesManager);
+    when(proposerPreferencesManager.getProposerPreferences(blockSlot, dependentRoot))
+        .thenReturn(Optional.of(proposerPreferencesWithFeeRecipient(proposerIndex, feeRecipient)));
+
+    assertThat(
+            manager.getFeeRecipient(
+                preparedProposerInfo(dataStructureUtil.randomEth1Address()),
+                blockSlot,
+                proposerIndex,
+                Optional.of(dependentRoot)))
+        .isEqualTo(feeRecipient);
+  }
+
+  @Test
+  void shouldIgnoreProposerPreferencesFeeRecipientForDifferentValidator() {
+    final UInt64 blockSlot = UInt64.valueOf(12);
+    final UInt64 proposerIndex = UInt64.ONE;
+    final Bytes32 dependentRoot = dataStructureUtil.randomBytes32();
+    final Eth1Address preparedFeeRecipient = dataStructureUtil.randomEth1Address();
+    final ProposerPreferencesManager proposerPreferencesManager =
+        mock(ProposerPreferencesManager.class);
+    final ProposersDataManager manager = createProposersDataManager(proposerPreferencesManager);
+    when(proposerPreferencesManager.getProposerPreferences(blockSlot, dependentRoot))
+        .thenReturn(
+            Optional.of(
+                proposerPreferencesWithFeeRecipient(
+                    UInt64.valueOf(2), dataStructureUtil.randomEth1Address())));
+
+    assertThat(
+            manager.getFeeRecipient(
+                preparedProposerInfo(preparedFeeRecipient),
+                blockSlot,
+                proposerIndex,
+                Optional.of(dependentRoot)))
+        .isEqualTo(preparedFeeRecipient);
+  }
+
+  @Test
+  void shouldUsePreparedProposerFeeRecipientWithoutProposerPreferences() {
+    final Eth1Address preparedFeeRecipient = dataStructureUtil.randomEth1Address();
+
+    assertThat(
+            proposersDataManager.getFeeRecipient(
+                preparedProposerInfo(preparedFeeRecipient),
+                UInt64.valueOf(12),
+                UInt64.ONE,
+                Optional.empty()))
+        .isEqualTo(preparedFeeRecipient);
+  }
+
+  @Test
+  void shouldUseDefaultFeeRecipientWithoutPreparedProposerOrProposerPreferences() {
+    assertThat(
+            proposersDataManager.getFeeRecipient(
+                null, UInt64.valueOf(12), UInt64.ONE, Optional.empty()))
+        .isEqualTo(defaultFeeRecipient.orElseThrow());
+  }
+
+  @Test
+  void shouldIgnorePrepareBeaconProposerFeeRecipientForGloasProposal() {
+    final UInt64 blockSlot = UInt64.valueOf(12);
+    when(specMock.areProposerAndBuilderPreferencesRequiredAtEpoch(any())).thenReturn(true);
+
+    assertThat(
+            proposersDataManager.getFeeRecipient(
+                preparedProposerInfo(dataStructureUtil.randomEth1Address()),
+                blockSlot,
+                UInt64.ONE,
+                Optional.empty()))
+        .isEqualTo(defaultFeeRecipient.orElseThrow());
+  }
+
+  @Test
+  void shouldIgnoreCachedFeeRecipientForGloasProposalWithoutMatchingProposerPreferences() {
+    final UInt64 blockSlot = UInt64.valueOf(12);
+    final UInt64 proposerIndex = UInt64.ONE;
+    final Eth1Address feeRecipient = dataStructureUtil.randomEth1Address();
+    final ProposerPreferencesManager proposerPreferencesManager =
+        mock(ProposerPreferencesManager.class);
+    final ProposersDataManager manager = createProposersDataManager(proposerPreferencesManager);
+    when(specMock.areProposerAndBuilderPreferencesRequiredAtEpoch(any())).thenReturn(true);
+    // the cached fee recipient came from preferences accepted for another dependent root
+    when(proposerPreferencesManager.getProposerPreferences(
+            blockSlot, dataStructureUtil.randomBytes32()))
+        .thenReturn(Optional.of(proposerPreferencesWithFeeRecipient(proposerIndex, feeRecipient)));
+
+    assertThat(
+            manager.getFeeRecipient(
+                preparedProposerInfo(feeRecipient),
+                blockSlot,
+                proposerIndex,
+                Optional.of(dataStructureUtil.randomBytes32())))
+        .isEqualTo(defaultFeeRecipient.orElseThrow());
+  }
+
+  private PreparedProposerInfo preparedProposerInfo(final Eth1Address feeRecipient) {
+    return new PreparedProposerInfo(UInt64.MAX_VALUE, feeRecipient);
+  }
+
+  private ProposerPreferences proposerPreferencesWithFeeRecipient(
+      final UInt64 validatorIndex, final Eth1Address feeRecipient) {
+    return new ProposerPreferencesSchema()
+        .create(
+            dataStructureUtil.randomBytes32(),
+            dataStructureUtil.randomSlot(),
+            validatorIndex,
+            feeRecipient,
+            dataStructureUtil.randomUInt64());
+  }
+
   private ProposersDataManager createProposersDataManager(
       final ProposerPreferencesManager proposerPreferencesManager) {
     return new ProposersDataManager(
@@ -239,7 +359,8 @@ public class ProposerDataManagerTest {
         recentChainData,
         defaultFeeRecipient,
         false,
-        proposerPreferencesManager);
+        proposerPreferencesManager,
+        new InclusionListStore(4));
   }
 
   private ProposerPreferences proposerPreferences(

@@ -1,5 +1,5 @@
 /*
- * Copyright Consensys Software Inc., 2026
+ * Copyright (c) 2026 Consensys Incorporated. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with
  * the License. You may obtain a copy of the License at
@@ -748,6 +748,140 @@ class ValidatorLoaderTest {
     assertThat(validator).isPresent();
     assertThat(validator.orElseThrow().getSigner()).isInstanceOf(DeletableSigner.class);
     assertThat(validator.get().getGraffitiProvider()).isInstanceOf(UpdatableGraffitiProvider.class);
+    assertThat(validatorLoader.getHashChainPasswordProvider().getPassword(PUBLIC_KEY1))
+        .contains("testpassword");
+  }
+
+  @Test
+  void shouldRegisterPasswordSupplierForLocalKeystores(@TempDir final Path tempDir)
+      throws Exception {
+    writeKeystore(tempDir);
+
+    final ValidatorConfig config =
+        ValidatorConfig.builder()
+            .validatorKeys(
+                List.of(tempDir.toAbsolutePath() + File.pathSeparator + tempDir.toAbsolutePath()))
+            .build();
+    final ValidatorLoader validatorLoader =
+        ValidatorLoader.create(
+            spec,
+            config,
+            disabledInteropConfig,
+            httpClientFactory,
+            slashingProtector,
+            slashingProtectionLogger,
+            publicKeyLoader,
+            asyncRunner,
+            metricsSystem,
+            Optional.empty(),
+            (publicKey) -> Optional.empty());
+
+    validatorLoader.loadValidators();
+
+    assertThat(validatorLoader.getHashChainPasswordProvider().getPassword(PUBLIC_KEY1))
+        .contains("testpassword");
+  }
+
+  @Test
+  void shouldRegisterEmptyPasswordSupplierForInteropKeys() {
+    final InteropConfig interopConfig =
+        InteropConfig.builder()
+            .specProvider(spec)
+            .interopEnabled(true)
+            .interopGenesisTime(0)
+            .interopOwnedValidatorCount(2)
+            .interopOwnedValidatorStartIndex(0)
+            .build();
+
+    final ValidatorConfig config = ValidatorConfig.builder().build();
+    final ValidatorLoader validatorLoader =
+        ValidatorLoader.create(
+            spec,
+            config,
+            interopConfig,
+            httpClientFactory,
+            slashingProtector,
+            slashingProtectionLogger,
+            publicKeyLoader,
+            asyncRunner,
+            metricsSystem,
+            Optional.empty(),
+            (publicKey) -> Optional.empty());
+
+    validatorLoader.loadValidators();
+
+    for (final Validator v : validatorLoader.getOwnedValidators().getValidators()) {
+      assertThat(validatorLoader.getHashChainPasswordProvider().getPassword(v.getPublicKey()))
+          .contains("");
+    }
+  }
+
+  @Test
+  void shouldRemovePasswordSupplierWhenDeletingMutableValidator(@TempDir final Path tempDir)
+      throws Exception {
+    final ValidatorConfig config = ValidatorConfig.builder().build();
+    final ValidatorLoader validatorLoader =
+        ValidatorLoader.create(
+            spec,
+            config,
+            disabledInteropConfig,
+            httpClientFactory,
+            slashingProtector,
+            slashingProtectionLogger,
+            publicKeyLoader,
+            asyncRunner,
+            metricsSystem,
+            Optional.of(new SimpleDataDirLayout(tempDir)),
+            (publicKey) -> Optional.empty());
+    validatorLoader.loadValidators();
+
+    final String keystoreString =
+        Resources.toString(Resources.getResource("pbkdf2TestVector.json"), StandardCharsets.UTF_8);
+    final ValidatorImportResult result =
+        validatorLoader.loadLocalMutableValidator(
+            KeyStoreLoader.loadFromString(keystoreString), "testpassword", Optional.empty(), true);
+    assertThat(result.getPostKeyResult().getImportStatus()).isEqualTo(ImportStatus.IMPORTED);
+
+    assertThat(validatorLoader.getHashChainPasswordProvider().getPassword(PUBLIC_KEY1))
+        .contains("testpassword");
+
+    final DeleteKeyResult deleteResult = validatorLoader.deleteLocalMutableValidator(PUBLIC_KEY1);
+    assertThat(deleteResult.getStatus()).isEqualTo(DeletionStatus.DELETED);
+
+    assertThat(validatorLoader.getHashChainPasswordProvider().getPassword(PUBLIC_KEY1)).isEmpty();
+  }
+
+  @Test
+  void shouldNotRegisterPasswordSupplierWhenInitialLoadFails(@TempDir final Path tempDir)
+      throws Exception {
+    writeKeystore(tempDir);
+    writeBadKeystore(tempDir);
+
+    final ValidatorConfig config =
+        ValidatorConfig.builder()
+            .validatorKeys(
+                List.of(tempDir.toAbsolutePath() + File.pathSeparator + tempDir.toAbsolutePath()))
+            .build();
+    final ValidatorLoader validatorLoader =
+        ValidatorLoader.create(
+            spec,
+            config,
+            disabledInteropConfig,
+            httpClientFactory,
+            slashingProtector,
+            slashingProtectionLogger,
+            publicKeyLoader,
+            asyncRunner,
+            metricsSystem,
+            Optional.empty(),
+            (publicKey) -> Optional.empty());
+
+    assertThatThrownBy(validatorLoader::loadValidators)
+        .isExactlyInstanceOf(InvalidConfigurationException.class);
+
+    assertThat(validatorLoader.getOwnedValidators().getValidatorCount()).isEqualTo(0);
+    assertThat(validatorLoader.getHashChainPasswordProvider().getPassword(PUBLIC_KEY1)).isEmpty();
+    assertThat(validatorLoader.getHashChainPasswordProvider().getPassword(PUBLIC_KEY2)).isEmpty();
   }
 
   @Test

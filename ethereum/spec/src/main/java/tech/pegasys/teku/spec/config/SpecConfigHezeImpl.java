@@ -1,5 +1,5 @@
 /*
- * Copyright Consensys Software Inc., 2026
+ * Copyright (c) 2026 Consensys Incorporated. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with
  * the License. You may obtain a copy of the License at
@@ -15,26 +15,36 @@ package tech.pegasys.teku.spec.config;
 
 import java.util.Objects;
 import java.util.Optional;
+import tech.pegasys.teku.infrastructure.unsigned.UInt64;
 import tech.pegasys.teku.spec.SpecMilestone;
 
 public class SpecConfigHezeImpl extends DelegatingSpecConfigGloas implements SpecConfigHeze {
 
   private final int inclusionListDueBps;
   private final int maxRequestInclusionList;
+  private final int minSlotsForInclusionListsRequests;
   private final int maxTransactionsBytesPerInclusionList;
+  private final int maxSignedInclusionListSize;
   private final int inclusionListCommitteeSize;
+  private final UInt64 minBlobDataRetentionMs;
 
   public SpecConfigHezeImpl(
       final SpecConfigGloas specConfig,
       final int inclusionListDueBps,
       final int maxRequestInclusionList,
+      final int minSlotsForInclusionListsRequests,
       final int maxTransactionsBytesPerInclusionList,
-      final int inclusionListCommitteeSize) {
+      final int maxSignedInclusionListSize,
+      final int inclusionListCommitteeSize,
+      final UInt64 minBlobDataRetentionMs) {
     super(specConfig);
     this.inclusionListDueBps = inclusionListDueBps;
     this.maxRequestInclusionList = maxRequestInclusionList;
+    this.minSlotsForInclusionListsRequests = minSlotsForInclusionListsRequests;
     this.maxTransactionsBytesPerInclusionList = maxTransactionsBytesPerInclusionList;
+    this.maxSignedInclusionListSize = maxSignedInclusionListSize;
     this.inclusionListCommitteeSize = inclusionListCommitteeSize;
+    this.minBlobDataRetentionMs = minBlobDataRetentionMs;
   }
 
   @Override
@@ -53,13 +63,28 @@ public class SpecConfigHezeImpl extends DelegatingSpecConfigGloas implements Spe
   }
 
   @Override
+  public int getMinSlotsForInclusionListsRequests() {
+    return minSlotsForInclusionListsRequests;
+  }
+
+  @Override
   public int getMaxTransactionsBytesPerInclusionList() {
     return maxTransactionsBytesPerInclusionList;
   }
 
   @Override
+  public int getMaxSignedInclusionListSize() {
+    return maxSignedInclusionListSize;
+  }
+
+  @Override
   public int getInclusionListCommitteeSize() {
     return inclusionListCommitteeSize;
+  }
+
+  @Override
+  public UInt64 getMinBlobDataRetentionMs() {
+    return minBlobDataRetentionMs;
   }
 
   @Override
@@ -78,8 +103,11 @@ public class SpecConfigHezeImpl extends DelegatingSpecConfigGloas implements Spe
     SpecConfigHezeImpl that = (SpecConfigHezeImpl) o;
     return inclusionListDueBps == that.inclusionListDueBps
         && maxRequestInclusionList == that.maxRequestInclusionList
+        && minSlotsForInclusionListsRequests == that.minSlotsForInclusionListsRequests
         && maxTransactionsBytesPerInclusionList == that.maxTransactionsBytesPerInclusionList
-        && inclusionListCommitteeSize == that.inclusionListCommitteeSize;
+        && maxSignedInclusionListSize == that.maxSignedInclusionListSize
+        && inclusionListCommitteeSize == that.inclusionListCommitteeSize
+        && Objects.equals(minBlobDataRetentionMs, that.minBlobDataRetentionMs);
   }
 
   @Override
@@ -88,7 +116,10 @@ public class SpecConfigHezeImpl extends DelegatingSpecConfigGloas implements Spe
         super.hashCode(),
         inclusionListDueBps,
         maxRequestInclusionList,
+        minSlotsForInclusionListsRequests,
         maxTransactionsBytesPerInclusionList,
-        inclusionListCommitteeSize);
+        maxSignedInclusionListSize,
+        inclusionListCommitteeSize,
+        minBlobDataRetentionMs);
   }
 }

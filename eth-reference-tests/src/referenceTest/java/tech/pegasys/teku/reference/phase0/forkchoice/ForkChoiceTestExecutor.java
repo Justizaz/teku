@@ -1,5 +1,5 @@
 /*
- * Copyright Consensys Software Inc., 2026
+ * Copyright (c) 2026 Consensys Incorporated. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with
  * the License. You may obtain a copy of the License at
@@ -76,6 +76,7 @@ import tech.pegasys.teku.spec.datastructures.execution.PowBlock;
 import tech.pegasys.teku.spec.datastructures.forkchoice.FastConfirmationStore;
 import tech.pegasys.teku.spec.datastructures.forkchoice.ForkChoiceNode;
 import tech.pegasys.teku.spec.datastructures.forkchoice.ForkChoicePayloadStatus;
+import tech.pegasys.teku.spec.datastructures.forkchoice.InclusionListStore;
 import tech.pegasys.teku.spec.datastructures.forkchoice.ProtoNodeData;
 import tech.pegasys.teku.spec.datastructures.forkchoice.ReadOnlyForkChoiceStrategy;
 import tech.pegasys.teku.spec.datastructures.forkchoice.ReadOnlyStore;
@@ -120,6 +121,7 @@ import tech.pegasys.teku.storage.client.RecentChainData;
 import tech.pegasys.teku.storage.protoarray.ForkChoiceStrategy;
 import tech.pegasys.teku.storage.storageSystem.InMemoryStorageSystemBuilder;
 import tech.pegasys.teku.storage.storageSystem.StorageSystem;
+import tech.pegasys.teku.storage.store.StoreConfig;
 import tech.pegasys.teku.storage.store.UpdatableStore;
 
 public class ForkChoiceTestExecutor implements TestExecutor {
@@ -128,6 +130,7 @@ public class ForkChoiceTestExecutor implements TestExecutor {
   public static final ImmutableMap<String, TestExecutor> FORK_CHOICE_TEST_TYPES =
       ImmutableMap.<String, TestExecutor>builder()
           .put("fork_choice/get_head", new ForkChoiceTestExecutor())
+          .put("fork_choice/filter_node_tree_variants", new ForkChoiceTestExecutor())
           .put("fork_choice/ex_ante", new ForkChoiceTestExecutor())
           .put("fork_choice/reorg", new ForkChoiceTestExecutor())
           .put("fork_choice/on_block", new ForkChoiceTestExecutor())
@@ -142,6 +145,7 @@ public class ForkChoiceTestExecutor implements TestExecutor {
           .put("fork_choice/on_payload_attestation_message", new ForkChoiceTestExecutor())
           .put("fork_choice/payload_data_availability", new ForkChoiceTestExecutor())
           .put("fork_choice/payload_timeliness", new ForkChoiceTestExecutor())
+          .put("fork_choice/slot_duration", new ForkChoiceTestExecutor())
           .put(
               "fork_choice/should_apply_proposer_boost",
               new ForkChoiceTestExecutor(
@@ -219,7 +223,8 @@ public class ForkChoiceTestExecutor implements TestExecutor {
     final MergeTransitionBlockValidator transitionBlockValidator =
         new MergeTransitionBlockValidator(spec, recentChainData);
     final InlineEventThread eventThread = new InlineEventThread();
-    final KZG kzg = KzgRetriever.getKzgWithLoadedTrustedSetup(spec, testDefinition.getConfigName());
+    final KZG kzg =
+        KzgRetriever.getKzgWithLoadedTrustedSetup(spec, testDefinition.getNetwork().configName());
     final StubBlobSidecarManager blobSidecarManager = new StubBlobSidecarManager(kzg);
     final CurrentSlotProvider currentSlotProvider =
         CurrentSlotProvider.create(spec, recentChainData.getStore());
@@ -240,7 +245,7 @@ public class ForkChoiceTestExecutor implements TestExecutor {
             64,
             (block, level, origin) -> new SafeFuture<>());
     final StubDataColumnSidecarManager dataColumnSidecarManager =
-        new StubDataColumnSidecarManager(spec, recentChainData, dasSampler);
+        new StubDataColumnSidecarManager(spec, storageSystem.combinedChainDataClient(), dasSampler);
     spec.reinitializeForTesting(blobSidecarManager, dataColumnSidecarManager, kzg);
     final AsyncBLSSignatureVerifier signatureVerifier =
         AsyncBLSSignatureVerifier.wrap(
@@ -276,11 +281,14 @@ public class ForkChoiceTestExecutor implements TestExecutor {
                 fastConfirmationTracker
                     .getFastConfirmationStore()
                     .map(FastConfirmationStore::confirmedRoot));
+    final InclusionListStore inclusionListStore =
+        new InclusionListStore(StoreConfig.DEFAULT_INCLUSION_LIST_CACHE_SIZE);
     final ForkChoice forkChoice =
         new ForkChoice(
             spec,
             eventThread,
             recentChainData,
+            inclusionListStore,
             new NoopForkChoiceNotifier(),
             forkChoiceStateProvider,
             new TickProcessor(spec, recentChainData),
@@ -790,6 +798,18 @@ public class ForkChoiceTestExecutor implements TestExecutor {
             assertThat(recentChainData.getBestBlockRoot())
                 .describedAs("best block root")
                 .contains(expectedRoot);
+            // Post-Gloas the head is a (root, payload_status) fork choice node
+            if (expectedHead.containsKey("payload_status")) {
+              final int expectedPayloadStatus =
+                  Integer.parseInt(expectedHead.get("payload_status").toString());
+              assertThat(
+                      recentChainData
+                          .getChainHead()
+                          .map(ChainHead::getPayloadStatus)
+                          .map(ForkChoicePayloadStatus::getValue))
+                  .describedAs("head payload_status")
+                  .contains(expectedPayloadStatus);
+            }
           }
 
           case "time" -> {
@@ -872,15 +892,6 @@ public class ForkChoiceTestExecutor implements TestExecutor {
               UInt64 actualWeight = chainHeadRootsAndWeights.get(root);
               assertThat(actualWeight).describedAs("block %s's weight", root).isEqualTo(weight);
             }
-          }
-
-          case "head_payload_status" -> {
-            final int expectedValue = ((Number) checks.get(checkType)).intValue();
-            final ForkChoicePayloadStatus headStatus =
-                recentChainData.getChainHead().map(ChainHead::getPayloadStatus).orElseThrow();
-            assertThat(headStatus.getValue())
-                .describedAs("head_payload_status")
-                .isEqualTo(expectedValue);
           }
 
           case "payload_timeliness_vote" ->

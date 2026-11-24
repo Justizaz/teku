@@ -1,5 +1,5 @@
 /*
- * Copyright Consensys Software Inc., 2026
+ * Copyright (c) 2026 Consensys Incorporated. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with
  * the License. You may obtain a copy of the License at
@@ -27,6 +27,7 @@ import tech.pegasys.teku.ethereum.json.types.beacon.StateValidatorData;
 import tech.pegasys.teku.ethereum.json.types.node.PeerCount;
 import tech.pegasys.teku.ethereum.json.types.validator.AttesterDuties;
 import tech.pegasys.teku.ethereum.json.types.validator.BeaconCommitteeSelectionProof;
+import tech.pegasys.teku.ethereum.json.types.validator.InclusionListDuties;
 import tech.pegasys.teku.ethereum.json.types.validator.PayloadTimelinessCommitteeDuties;
 import tech.pegasys.teku.ethereum.json.types.validator.ProposerDuties;
 import tech.pegasys.teku.ethereum.json.types.validator.SyncCommitteeDuties;
@@ -46,11 +47,15 @@ import tech.pegasys.teku.spec.datastructures.epbs.versions.gloas.SignedExecution
 import tech.pegasys.teku.spec.datastructures.epbs.versions.gloas.SignedExecutionPayloadEnvelope;
 import tech.pegasys.teku.spec.datastructures.epbs.versions.gloas.SignedExecutionPayloadEnvelopeContents;
 import tech.pegasys.teku.spec.datastructures.epbs.versions.gloas.SignedProposerPreferences;
+import tech.pegasys.teku.spec.datastructures.execution.Transaction;
+import tech.pegasys.teku.spec.datastructures.execution.versions.heze.InclusionList;
+import tech.pegasys.teku.spec.datastructures.execution.versions.heze.SignedInclusionList;
 import tech.pegasys.teku.spec.datastructures.genesis.GenesisData;
 import tech.pegasys.teku.spec.datastructures.metadata.BlockContainerAndMetaData;
 import tech.pegasys.teku.spec.datastructures.operations.Attestation;
 import tech.pegasys.teku.spec.datastructures.operations.AttestationData;
 import tech.pegasys.teku.spec.datastructures.operations.SignedAggregateAndProof;
+import tech.pegasys.teku.spec.datastructures.operations.SignedRandaoCommitmentRegistration;
 import tech.pegasys.teku.spec.datastructures.operations.versions.altair.SignedContributionAndProof;
 import tech.pegasys.teku.spec.datastructures.operations.versions.altair.SyncCommitteeContribution;
 import tech.pegasys.teku.spec.datastructures.operations.versions.altair.SyncCommitteeMessage;
@@ -120,6 +125,12 @@ public class SentryValidatorApiChannel implements ValidatorApiChannel {
   }
 
   @Override
+  public SafeFuture<Optional<InclusionListDuties>> getInclusionListDuties(
+      final UInt64 epoch, final IntCollection validatorIndices) {
+    return dutiesProviderChannel.getInclusionListDuties(epoch, validatorIndices);
+  }
+
+  @Override
   public SafeFuture<Optional<PeerCount>> getPeerCount() {
     return dutiesProviderChannel.getPeerCount();
   }
@@ -128,12 +139,18 @@ public class SentryValidatorApiChannel implements ValidatorApiChannel {
   public SafeFuture<Optional<BlockContainerAndMetaData>> createUnsignedBlock(
       final UInt64 slot,
       final BLSSignature randaoReveal,
+      final Optional<Bytes32> hashChainReveal,
       final Optional<Bytes32> graffiti,
       final boolean includePayload,
       final Optional<BuilderConfig> builderConfig) {
-    return blockHandlerChannel
-        .orElse(dutiesProviderChannel)
-        .createUnsignedBlock(slot, randaoReveal, graffiti, includePayload, builderConfig);
+    return hashChainReveal.isPresent() && !hashChainReveal.get().isZero()
+        ? blockHandlerChannel
+            .orElse(dutiesProviderChannel)
+            .createUnsignedBlock(
+                slot, randaoReveal, hashChainReveal, graffiti, includePayload, builderConfig)
+        : blockHandlerChannel
+            .orElse(dutiesProviderChannel)
+            .createUnsignedBlock(slot, randaoReveal, graffiti, includePayload, builderConfig);
   }
 
   @Override
@@ -166,6 +183,19 @@ public class SentryValidatorApiChannel implements ValidatorApiChannel {
     return attestationPublisherChannel
         .orElse(dutiesProviderChannel)
         .createPayloadAttestationData(slot);
+  }
+
+  @Override
+  public SafeFuture<Optional<InclusionList>> createInclusionList(
+      final UInt64 slot, final UInt64 validatorIndex) {
+    return attestationPublisherChannel
+        .orElse(dutiesProviderChannel)
+        .createInclusionList(slot, validatorIndex);
+  }
+
+  @Override
+  public SafeFuture<Optional<List<Transaction>>> getInclusionList(final UInt64 slot) {
+    return attestationPublisherChannel.orElse(dutiesProviderChannel).getInclusionList(slot);
   }
 
   @Override
@@ -243,6 +273,14 @@ public class SentryValidatorApiChannel implements ValidatorApiChannel {
   }
 
   @Override
+  public SafeFuture<List<SubmitDataError>> sendSignedInclusionLists(
+      final List<SignedInclusionList> signedInclusionLists) {
+    return attestationPublisherChannel
+        .orElse(dutiesProviderChannel)
+        .sendSignedInclusionLists(signedInclusionLists);
+  }
+
+  @Override
   public SafeFuture<List<SubmitDataError>> sendSignedProposerPreferences(
       final List<SignedProposerPreferences> signedProposerPreferences) {
     return blockHandlerChannel
@@ -272,6 +310,17 @@ public class SentryValidatorApiChannel implements ValidatorApiChannel {
     return blockHandlerChannel
         .orElse(dutiesProviderChannel)
         .registerValidators(validatorRegistrations);
+  }
+
+  @Override
+  public SafeFuture<Void> sendSignedRandaoCommitmentRegistration(
+      final SignedRandaoCommitmentRegistration registration) {
+    return dutiesProviderChannel.sendSignedRandaoCommitmentRegistration(registration);
+  }
+
+  @Override
+  public SafeFuture<Optional<Bytes32>> getValidatorRandaoCommitment(final BLSPublicKey publicKey) {
+    return dutiesProviderChannel.getValidatorRandaoCommitment(publicKey);
   }
 
   @Override

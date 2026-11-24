@@ -1,5 +1,5 @@
 /*
- * Copyright Consensys Software Inc., 2026
+ * Copyright (c) 2026 Consensys Incorporated. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with
  * the License. You may obtain a copy of the License at
@@ -56,8 +56,10 @@ import tech.pegasys.teku.spec.datastructures.epbs.versions.gloas.ExecutionPayloa
 import tech.pegasys.teku.spec.datastructures.epbs.versions.gloas.ExecutionPayloadEnvelope;
 import tech.pegasys.teku.spec.datastructures.epbs.versions.gloas.PayloadAttestationData;
 import tech.pegasys.teku.spec.datastructures.epbs.versions.gloas.ProposerPreferences;
+import tech.pegasys.teku.spec.datastructures.execution.versions.heze.InclusionList;
 import tech.pegasys.teku.spec.datastructures.operations.AggregateAndProof;
 import tech.pegasys.teku.spec.datastructures.operations.AttestationData;
+import tech.pegasys.teku.spec.datastructures.operations.RandaoCommitmentRegistration;
 import tech.pegasys.teku.spec.datastructures.operations.VoluntaryExit;
 import tech.pegasys.teku.spec.datastructures.operations.versions.altair.ContributionAndProof;
 import tech.pegasys.teku.spec.datastructures.operations.versions.altair.SyncAggregatorSelectionData;
@@ -348,6 +350,33 @@ public class ExternalSigner implements Signer {
             SignType.BUILDER_REQUEST_AUTH.getName(),
             new VersionedWrapper<>(milestone, builderRequestAuth)),
         slashableGenericMessage("builder request auth"));
+  }
+
+  @Override
+  public SafeFuture<BLSSignature> signInclusionList(
+      final InclusionList inclusionList, final ForkInfo forkInfo) {
+    return sign(
+        signingRootUtil.signingRootForSignInclusionList(inclusionList, forkInfo),
+        SignType.INCLUSION_LIST,
+        Map.of(SignType.INCLUSION_LIST.getName(), inclusionList, FORK_INFO, forkInfo),
+        slashableGenericMessage("inclusion list"));
+  }
+
+  @Override
+  public SafeFuture<BLSSignature> signRandaoCommitmentRegistration(
+      final RandaoCommitmentRegistration registration, final Bytes32 genesisValidatorsRoot) {
+    return taskQueue.queueTask(
+        () ->
+            sign(
+                signingRootUtil.signingRootForRandaoCommitmentRegistration(
+                    registration, genesisValidatorsRoot),
+                SignType.RANDAO_COMMITMENT_REGISTRATION,
+                Map.of(
+                    SignType.RANDAO_COMMITMENT_REGISTRATION.getName(),
+                    registration,
+                    "genesis_validators_root",
+                    genesisValidatorsRoot),
+                slashableGenericMessage("randao commitment registration")));
   }
 
   @Override

@@ -1,5 +1,5 @@
 /*
- * Copyright Consensys Software Inc., 2026
+ * Copyright (c) 2026 Consensys Incorporated. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with
  * the License. You may obtain a copy of the License at
@@ -28,6 +28,7 @@ import tech.pegasys.teku.infrastructure.metrics.StubMetricsSystem;
 import tech.pegasys.teku.infrastructure.unsigned.UInt64;
 import tech.pegasys.teku.spec.Spec;
 import tech.pegasys.teku.spec.datastructures.blocks.SignedBeaconBlock;
+import tech.pegasys.teku.spec.datastructures.forkchoice.InclusionListStore;
 import tech.pegasys.teku.spec.datastructures.state.AnchorPoint;
 import tech.pegasys.teku.spec.datastructures.state.Checkpoint;
 import tech.pegasys.teku.spec.datastructures.state.beaconstate.BeaconState;
@@ -46,6 +47,7 @@ import tech.pegasys.teku.storage.api.LateBlockReorgPreparationHandler;
 import tech.pegasys.teku.storage.client.RecentChainData;
 import tech.pegasys.teku.storage.server.StateStorageMode;
 import tech.pegasys.teku.storage.storageSystem.InMemoryStorageSystemBuilder;
+import tech.pegasys.teku.storage.store.StoreConfig;
 
 final class GossipTestContext {
 
@@ -55,6 +57,7 @@ final class GossipTestContext {
   final ForkChoice forkChoice;
   final ExecutionLayerChannelStub executionLayer;
   final StubMetricsSystem metricsSystem;
+  final InclusionListStore inclusionListStore;
 
   private GossipTestContext(
       final Spec spec,
@@ -62,13 +65,15 @@ final class GossipTestContext {
       final RecentChainData recentChainData,
       final ForkChoice forkChoice,
       final ExecutionLayerChannelStub executionLayer,
-      final StubMetricsSystem metricsSystem) {
+      final StubMetricsSystem metricsSystem,
+      final InclusionListStore inclusionListStore) {
     this.spec = spec;
     this.anchorPoint = anchorPoint;
     this.recentChainData = recentChainData;
     this.forkChoice = forkChoice;
     this.executionLayer = executionLayer;
     this.metricsSystem = metricsSystem;
+    this.inclusionListStore = inclusionListStore;
   }
 
   static GossipTestContext create(
@@ -86,11 +91,14 @@ final class GossipTestContext {
     final InlineEventThread eventThread = new InlineEventThread();
     final MergeTransitionBlockValidator transitionBlockValidator =
         new MergeTransitionBlockValidator(spec, recentChainData);
+    final InclusionListStore inclusionListStore =
+        new InclusionListStore(StoreConfig.DEFAULT_INCLUSION_LIST_CACHE_SIZE);
     final ForkChoice forkChoice =
         new ForkChoice(
             spec,
             eventThread,
             recentChainData,
+            inclusionListStore,
             new NoopForkChoiceNotifier(),
             new ForkChoiceStateProvider(eventThread, recentChainData),
             new TickProcessor(spec, recentChainData),
@@ -103,7 +111,13 @@ final class GossipTestContext {
             AsyncBLSSignatureVerifier.wrap(BLSSignatureVerifier.NOOP));
     final ExecutionLayerChannelStub executionLayer = new ExecutionLayerChannelStub(spec, false);
     return new GossipTestContext(
-        spec, anchorPoint, recentChainData, forkChoice, executionLayer, metricsSystem);
+        spec,
+        anchorPoint,
+        recentChainData,
+        forkChoice,
+        executionLayer,
+        metricsSystem,
+        inclusionListStore);
   }
 
   static List<SignedBeaconBlock> loadBlocks(

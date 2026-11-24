@@ -1,5 +1,5 @@
 /*
- * Copyright Consensys Software Inc., 2026
+ * Copyright (c) 2026 Consensys Incorporated. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with
  * the License. You may obtain a copy of the License at
@@ -42,6 +42,7 @@ import tech.pegasys.teku.networking.p2p.discovery.DiscoveryConfig;
 import tech.pegasys.teku.networking.p2p.gossip.config.GossipConfig;
 import tech.pegasys.teku.networking.p2p.libp2p.MultiaddrPeerAddress;
 import tech.pegasys.teku.networking.p2p.network.config.NetworkConfig;
+import tech.pegasys.teku.statetransition.validation.signatures.SignatureVerificationMode;
 
 public class P2POptions {
   @Mixin private final NatOptions natOptions = new NatOptions();
@@ -497,6 +498,15 @@ public class P2POptions {
   private Integer peerBlobSidecarsRateLimit = P2PConfig.DEFAULT_PEER_BLOB_SIDECARS_RATE_LIMIT;
 
   @Option(
+      names = {"--Xpeer-inclusion-list-rate-limit"},
+      paramLabel = "<NUMBER>",
+      description =
+          "The number of requested inclusion list per peer to allow per minute before disconnecting the peer.",
+      arity = "1",
+      hidden = true)
+  private Integer peerInclusionListsRateLimit = P2PConfig.DEFAULT_PEER_INCLUSION_LISTS_RATE_LIMIT;
+
+  @Option(
       names = {"--Xp2p-gossip-blobs-after-block-enabled"},
       paramLabel = "<BOOLEAN>",
       showDefaultValue = Visibility.ALWAYS,
@@ -574,6 +584,31 @@ public class P2POptions {
       fallbackValue = "true")
   private boolean batchVerifyStrictThreadLimitEnabled =
       P2PConfig.DEFAULT_BATCH_VERIFY_STRICT_THREAD_LIMIT_ENABLED;
+
+  @Option(
+      names = {"--Xp2p-batch-verify-signatures-mode"},
+      paramLabel = "<MODE>",
+      showDefaultValue = Visibility.ALWAYS,
+      description =
+          "Signature verification batching: LEGACY drains whatever is queued; GATHER_AND_GROUP"
+              + " gathers a batch for up to the gather timeout and verifies signatures over the"
+              + " same message together",
+      arity = "1",
+      hidden = true)
+  private SignatureVerificationMode batchVerifyMode = P2PConfig.DEFAULT_BATCH_VERIFY_MODE;
+
+  @Option(
+      names = {"--Xp2p-batch-verify-signatures-gather-timeout-ms"},
+      paramLabel = "<NUMBER>",
+      showDefaultValue = Visibility.ALWAYS,
+      description =
+          "After the first task of a signature verification batch arrives, keep gathering tasks for"
+              + " up to this many milliseconds (at most 100) so that batches are large enough to"
+              + " amortise the pairing cost. Applies only in GATHER_AND_GROUP mode and is ignored in"
+              + " LEGACY mode",
+      arity = "1",
+      hidden = true)
+  private int batchVerifyGatherTimeoutMillis = P2PConfig.DEFAULT_BATCH_VERIFY_GATHER_TIMEOUT_MILLIS;
 
   @Option(
       names = {"--p2p-discovery-site-local-addresses-enabled"},
@@ -766,10 +801,13 @@ public class P2POptions {
                   .batchVerifyMaxThreads(batchVerifyMaxThreads)
                   .batchVerifyMaxBatchSize(batchVerifyMaxBatchSize)
                   .batchVerifyStrictThreadLimitEnabled(batchVerifyStrictThreadLimitEnabled)
+                  .batchVerifyMode(batchVerifyMode)
+                  .batchVerifyGatherTimeoutMillis(batchVerifyGatherTimeoutMillis)
                   .targetSubnetSubscriberCount(p2pTargetSubnetSubscriberCount)
                   .isGossipScoringEnabled(gossipScoringEnabled)
                   .peerBlocksRateLimit(peerBlocksRateLimit)
                   .peerBlobSidecarsRateLimit(peerBlobSidecarsRateLimit)
+                  .peerInclusionListsRateLimit(peerInclusionListsRateLimit)
                   .allTopicsFilterEnabled(allTopicsFilterEnabled)
                   .peerRequestLimit(peerRequestLimit)
                   .floodPublishMaxMessageSizeThreshold(floodPublishMaxMessageSizeThreshold)

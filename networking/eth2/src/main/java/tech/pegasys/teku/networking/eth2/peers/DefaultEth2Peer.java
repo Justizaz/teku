@@ -1,5 +1,5 @@
 /*
- * Copyright Consensys Software Inc., 2026
+ * Copyright (c) 2026 Consensys Incorporated. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with
  * the License. You may obtain a copy of the License at
@@ -61,10 +61,12 @@ import tech.pegasys.teku.spec.SpecMilestone;
 import tech.pegasys.teku.spec.config.SpecConfigDeneb;
 import tech.pegasys.teku.spec.config.SpecConfigFulu;
 import tech.pegasys.teku.spec.config.SpecConfigGloas;
+import tech.pegasys.teku.spec.config.SpecConfigHeze;
 import tech.pegasys.teku.spec.datastructures.blobs.DataColumnSidecar;
 import tech.pegasys.teku.spec.datastructures.blobs.versions.deneb.BlobSidecar;
 import tech.pegasys.teku.spec.datastructures.blocks.SignedBeaconBlock;
 import tech.pegasys.teku.spec.datastructures.epbs.versions.gloas.SignedExecutionPayloadEnvelope;
+import tech.pegasys.teku.spec.datastructures.execution.versions.heze.SignedInclusionList;
 import tech.pegasys.teku.spec.datastructures.networking.libp2p.rpc.BeaconBlocksByRangeRequestMessage;
 import tech.pegasys.teku.spec.datastructures.networking.libp2p.rpc.BeaconBlocksByRootRequestMessage;
 import tech.pegasys.teku.spec.datastructures.networking.libp2p.rpc.BlobIdentifier;
@@ -80,6 +82,7 @@ import tech.pegasys.teku.spec.datastructures.networking.libp2p.rpc.ExecutionPayl
 import tech.pegasys.teku.spec.datastructures.networking.libp2p.rpc.ExecutionPayloadEnvelopesByRootRequestMessage;
 import tech.pegasys.teku.spec.datastructures.networking.libp2p.rpc.ExecutionPayloadEnvelopesByRootRequestMessage.ExecutionPayloadEnvelopesByRootRequestMessageSchema;
 import tech.pegasys.teku.spec.datastructures.networking.libp2p.rpc.GoodbyeMessage;
+import tech.pegasys.teku.spec.datastructures.networking.libp2p.rpc.InclusionListByCommitteeRequestMessage;
 import tech.pegasys.teku.spec.datastructures.networking.libp2p.rpc.PingMessage;
 import tech.pegasys.teku.spec.datastructures.networking.libp2p.rpc.RpcRequest;
 import tech.pegasys.teku.spec.datastructures.networking.libp2p.rpc.bodyselector.RpcRequestBodySelector;
@@ -143,6 +146,8 @@ class DefaultEth2Peer extends DelegatingPeer implements Eth2Peer {
       final RateTracker blobSidecarsRequestTracker,
       final RateTracker dataColumnSidecarsRequestTracker,
       final RateTracker executionPayloadEnvelopesRequestTracker,
+      final RateTracker lightClientUpdatesRequestTracker,
+      final RateTracker inclusionListRequestTracker,
       final RateTracker requestTracker,
       final MetricsSystem metricsSystem,
       final TimeProvider timeProvider,
@@ -162,6 +167,8 @@ class DefaultEth2Peer extends DelegatingPeer implements Eth2Peer {
     requestObjectsTrackers.put(RequestObject.DATA_COLUMN_SIDECAR, dataColumnSidecarsRequestTracker);
     requestObjectsTrackers.put(
         RequestObject.EXECUTION_PAYLOAD_ENVELOPE, executionPayloadEnvelopesRequestTracker);
+    requestObjectsTrackers.put(RequestObject.LIGHT_CLIENT_UPDATE, lightClientUpdatesRequestTracker);
+    requestObjectsTrackers.put(RequestObject.INCLUSION_LIST, inclusionListRequestTracker);
     checkState(
         requestObjectsTrackers.size() == RequestObject.values().length,
         "NOT all request objects trackers have been configured");
@@ -598,6 +605,24 @@ class DefaultEth2Peer extends DelegatingPeer implements Eth2Peer {
   }
 
   @Override
+  public SafeFuture<Void> requestInclusionListsByCommitteeIndices(
+      final UInt64 slot,
+      final Bytes32 dependentRoot,
+      final SszBitvector committeeIndices,
+      final RpcResponseListener<SignedInclusionList> listener) {
+    return rpcMethods
+        .inclusionListByCommitteeIndices()
+        .map(
+            method ->
+                requestStream(
+                    method,
+                    new InclusionListByCommitteeRequestMessage(
+                        slot, dependentRoot, committeeIndices, getSpecConfigHeze()),
+                    listener))
+        .orElse(failWithUnsupportedMethodException("InclusionListsByCommitteeIndices"));
+  }
+
+  @Override
   public SafeFuture<MetadataMessage> requestMetadata() {
     return requestSingleItem(rpcMethods.getMetadata(), EmptyMessage.EMPTY_MESSAGE);
   }
@@ -736,6 +761,10 @@ class DefaultEth2Peer extends DelegatingPeer implements Eth2Peer {
 
   private SpecConfigGloas getSpecConfigGloas() {
     return SpecConfigGloas.required(spec.forMilestone(SpecMilestone.GLOAS).getConfig());
+  }
+
+  private SpecConfigHeze getSpecConfigHeze() {
+    return SpecConfigHeze.required(spec.forMilestone(SpecMilestone.HEZE).getConfig());
   }
 
   private <T> SafeFuture<T> failWithUnsupportedMethodException(final String method) {

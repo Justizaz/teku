@@ -1,5 +1,5 @@
 /*
- * Copyright Consensys Software Inc., 2026
+ * Copyright (c) 2026 Consensys Incorporated. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with
  * the License. You may obtain a copy of the License at
@@ -14,7 +14,6 @@
 package tech.pegasys.teku.reference.altair.fork;
 
 import static tech.pegasys.teku.infrastructure.ssz.SszDataAssert.assertThatSszData;
-import static tech.pegasys.teku.spec.SpecMilestone.BELLATRIX;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.collect.ImmutableMap;
@@ -85,6 +84,8 @@ public class ForkUpgradeTestExecutor implements TestExecutor {
               BeaconStateSchemaGloas.create(
                   previousMilestoneSpecVersion.getConfig(),
                   previousMilestoneSpecVersion.getSchemaDefinitions().getSchemaRegistry());
+          case EIP8321 ->
+              previousMilestoneSpecVersion.getSchemaDefinitions().getBeaconStateSchema();
           default ->
               throw new IllegalStateException(
                   "Unhandled fork upgrade for test "

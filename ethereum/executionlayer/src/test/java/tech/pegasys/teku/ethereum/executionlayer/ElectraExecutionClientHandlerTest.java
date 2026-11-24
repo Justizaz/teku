@@ -1,5 +1,5 @@
 /*
- * Copyright Consensys Software Inc., 2026
+ * Copyright (c) 2026 Consensys Incorporated. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with
  * the License. You may obtain a copy of the License at
@@ -139,9 +139,11 @@ public class ElectraExecutionClientHandlerTest extends ExecutionHandlerClientTes
             dataStructureUtil.randomUInt64(),
             dataStructureUtil.randomBytes32(),
             dataStructureUtil.randomEth1Address(),
+            dataStructureUtil.randomUInt64(),
             Optional.empty(),
             Optional.of(List.of()),
-            ForkChoiceNode.createBase(dataStructureUtil.randomBytes32()));
+            ForkChoiceNode.createBase(dataStructureUtil.randomBytes32()),
+            List.of());
     final Optional<PayloadAttributesV3> payloadAttributes =
         PayloadAttributesV3.fromInternalPayloadBuildingAttributesV3(Optional.of(attributes));
     final ForkChoiceUpdatedResult responseData =

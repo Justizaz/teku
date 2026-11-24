@@ -1,5 +1,5 @@
 /*
- * Copyright Consensys Software Inc., 2026
+ * Copyright (c) 2026 Consensys Incorporated. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with
  * the License. You may obtain a copy of the License at
@@ -135,6 +135,7 @@ public class Eth2NetworkConfiguration {
   private final Optional<UInt64> fuluForkEpoch;
   private final Optional<UInt64> gloasForkEpoch;
   private final Optional<UInt64> hezeForkEpoch;
+  private final Optional<UInt64> eip8321ForkEpoch;
   private final Eth1Address eth1DepositContractAddress;
   private final Optional<UInt64> eth1DepositContractDeployBlock;
   private final Optional<String> trustedSetup;
@@ -180,6 +181,7 @@ public class Eth2NetworkConfiguration {
       final Optional<UInt64> fuluForkEpoch,
       final Optional<UInt64> gloasForkEpoch,
       final Optional<UInt64> hezeForkEpoch,
+      final Optional<UInt64> eip8321ForkEpoch,
       final Optional<Bytes32> terminalBlockHashOverride,
       final Optional<UInt256> totalTerminalDifficultyOverride,
       final Optional<UInt64> terminalBlockHashEpochOverride,
@@ -217,6 +219,7 @@ public class Eth2NetworkConfiguration {
     this.fuluForkEpoch = fuluForkEpoch;
     this.gloasForkEpoch = gloasForkEpoch;
     this.hezeForkEpoch = hezeForkEpoch;
+    this.eip8321ForkEpoch = eip8321ForkEpoch;
     this.eth1DepositContractAddress =
         eth1DepositContractAddress == null
             ? spec.getGenesisSpecConfig().getDepositContractAddress()
@@ -319,6 +322,7 @@ public class Eth2NetworkConfiguration {
       case FULU -> fuluForkEpoch;
       case GLOAS -> gloasForkEpoch;
       case HEZE -> hezeForkEpoch;
+      case EIP8321 -> eip8321ForkEpoch;
       default -> Optional.empty();
     };
   }
@@ -456,6 +460,7 @@ public class Eth2NetworkConfiguration {
         && Objects.equals(fuluForkEpoch, that.fuluForkEpoch)
         && Objects.equals(gloasForkEpoch, that.gloasForkEpoch)
         && Objects.equals(hezeForkEpoch, that.hezeForkEpoch)
+        && Objects.equals(eip8321ForkEpoch, that.eip8321ForkEpoch)
         && Objects.equals(eth1DepositContractAddress, that.eth1DepositContractAddress)
         && Objects.equals(eth1DepositContractDeployBlock, that.eth1DepositContractDeployBlock)
         && Objects.equals(trustedSetup, that.trustedSetup)
@@ -482,6 +487,7 @@ public class Eth2NetworkConfiguration {
         fuluForkEpoch,
         gloasForkEpoch,
         hezeForkEpoch,
+        eip8321ForkEpoch,
         eth1DepositContractAddress,
         eth1DepositContractDeployBlock,
         trustedSetup,
@@ -530,6 +536,7 @@ public class Eth2NetworkConfiguration {
     private Optional<UInt64> fuluForkEpoch = Optional.empty();
     private Optional<UInt64> gloasForkEpoch = Optional.empty();
     private Optional<UInt64> hezeForkEpoch = Optional.empty();
+    private Optional<UInt64> eip8321ForkEpoch = Optional.empty();
     private Optional<Bytes32> terminalBlockHashOverride = Optional.empty();
     private Optional<UInt256> totalTerminalDifficultyOverride = Optional.empty();
     private Optional<UInt64> terminalBlockHashEpochOverride = Optional.empty();
@@ -582,6 +589,7 @@ public class Eth2NetworkConfiguration {
                   fuluForkEpoch.ifPresent(builder::fuluForkEpoch);
                   gloasForkEpoch.ifPresent(builder::gloasForkEpoch);
                   hezeForkEpoch.ifPresent(builder::hezeForkEpoch);
+                  eip8321ForkEpoch.ifPresent(builder::eip8321ForkEpoch);
                   builder.bellatrixBuilder(
                       bellatrixBuilder -> {
                         bellatrixBuilder.safeSlotsToImportOptimistically(
@@ -637,6 +645,7 @@ public class Eth2NetworkConfiguration {
           fuluForkEpoch,
           gloasForkEpoch,
           hezeForkEpoch,
+          eip8321ForkEpoch,
           terminalBlockHashOverride,
           totalTerminalDifficultyOverride,
           terminalBlockHashEpochOverride,
@@ -941,6 +950,12 @@ public class Eth2NetworkConfiguration {
     public Builder hezeForkEpoch(final UInt64 hezeForkEpoch) {
       checkNotNull(hezeForkEpoch);
       this.hezeForkEpoch = Optional.of(hezeForkEpoch);
+      return this;
+    }
+
+    public Builder eip8321ForkEpoch(final UInt64 eip8321ForkEpoch) {
+      checkNotNull(eip8321ForkEpoch);
+      this.eip8321ForkEpoch = Optional.of(eip8321ForkEpoch);
       return this;
     }
 

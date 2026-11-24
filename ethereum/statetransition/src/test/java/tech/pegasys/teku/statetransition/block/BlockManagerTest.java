@@ -1,5 +1,5 @@
 /*
- * Copyright Consensys Software Inc., 2026
+ * Copyright (c) 2026 Consensys Incorporated. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with
  * the License. You may obtain a copy of the License at
@@ -78,6 +78,7 @@ import tech.pegasys.teku.infrastructure.collections.LimitedMap;
 import tech.pegasys.teku.infrastructure.logging.EventLogger;
 import tech.pegasys.teku.infrastructure.metrics.SettableLabelledGauge;
 import tech.pegasys.teku.infrastructure.metrics.StubMetricsSystem;
+import tech.pegasys.teku.infrastructure.metrics.TekuMetricCategory;
 import tech.pegasys.teku.infrastructure.ssz.InvalidValueSchemaException;
 import tech.pegasys.teku.infrastructure.ssz.sos.SszDeserializeException;
 import tech.pegasys.teku.infrastructure.time.StubTimeProvider;
@@ -92,6 +93,7 @@ import tech.pegasys.teku.spec.datastructures.blocks.SignedBeaconBlock;
 import tech.pegasys.teku.spec.datastructures.blocks.SignedBlockAndState;
 import tech.pegasys.teku.spec.datastructures.blocks.SlotAndBlockRoot;
 import tech.pegasys.teku.spec.datastructures.epbs.versions.gloas.SignedExecutionPayloadEnvelope;
+import tech.pegasys.teku.spec.datastructures.forkchoice.InclusionListStore;
 import tech.pegasys.teku.spec.datastructures.validator.BroadcastValidationLevel;
 import tech.pegasys.teku.spec.executionlayer.ExecutionLayerChannelStub;
 import tech.pegasys.teku.spec.executionlayer.PayloadStatus;
@@ -111,7 +113,6 @@ import tech.pegasys.teku.statetransition.forkchoice.ForkChoice;
 import tech.pegasys.teku.statetransition.forkchoice.ForkChoiceNotifier;
 import tech.pegasys.teku.statetransition.forkchoice.MergeTransitionBlockValidator;
 import tech.pegasys.teku.statetransition.forkchoice.NoopForkChoiceNotifier;
-import tech.pegasys.teku.statetransition.util.FutureItems;
 import tech.pegasys.teku.statetransition.util.PendingBlockPool;
 import tech.pegasys.teku.statetransition.util.PendingPool;
 import tech.pegasys.teku.statetransition.util.PoolFactory;
@@ -123,6 +124,7 @@ import tech.pegasys.teku.storage.client.ChainHead;
 import tech.pegasys.teku.storage.client.RecentChainData;
 import tech.pegasys.teku.storage.storageSystem.InMemoryStorageSystemBuilder;
 import tech.pegasys.teku.storage.storageSystem.StorageSystem;
+import tech.pegasys.teku.storage.store.StoreConfig;
 import tech.pegasys.teku.weaksubjectivity.WeakSubjectivityFactory;
 
 @SuppressWarnings("FutureReturnValueIgnored")
@@ -143,8 +145,14 @@ public class BlockManagerTest {
       mock(ExecutionPayloadEventsListener.class);
   private PendingPool<SignedBeaconBlock> pendingBlocks;
   private PendingBlockPool pendingBlockPool;
-  private final FutureItems<SignedBeaconBlock> futureBlocks =
-      FutureItems.create(SignedBeaconBlock::getSlot, mock(SettableLabelledGauge.class), "blocks");
+  private final StubMetricsSystem futureBlocksMetricsSystem = new StubMetricsSystem();
+  private final FutureBlockPool futureBlocks =
+      new FutureBlockPool(
+          4,
+          Long.MAX_VALUE,
+          block -> 0L,
+          mock(SettableLabelledGauge.class),
+          FutureBlockPool.createResultCounter(futureBlocksMetricsSystem));
   private final Map<Bytes32, BlockImportResult> invalidBlockRoots =
       LimitedMap.createSynchronizedLRU(500);
 
@@ -154,6 +162,8 @@ public class BlockManagerTest {
   private final ForkChoiceNotifier forkChoiceNotifier = new NoopForkChoiceNotifier();
   private MergeTransitionBlockValidator transitionBlockValidator;
   private final BlobSidecarManager blobSidecarManager = mock(BlobSidecarManager.class);
+  private final InclusionListStore inclusionListStore =
+      new InclusionListStore(StoreConfig.DEFAULT_INCLUSION_LIST_CACHE_SIZE);
   private ForkChoice forkChoice;
 
   private ExecutionLayerChannelStub executionLayer;
@@ -200,6 +210,7 @@ public class BlockManagerTest {
             spec,
             new InlineEventThread(),
             localRecentChainData,
+            inclusionListStore,
             forkChoiceNotifier,
             transitionBlockValidator,
             metricsSystem);
@@ -426,7 +437,6 @@ public class BlockManagerTest {
     setupWithSpec(
         TestSpecFactory.createMinimalGloas(
             builder -> builder.blsSignatureVerifier(BLSSignatureVerifier.NOOP)));
-    forkChoice.applyGenesisExecutionPayloadForGloas().join();
 
     final List<ParentExecutionPayloadDependency> requiredParentExecutionPayloads =
         new ArrayList<>();
@@ -474,6 +484,25 @@ public class BlockManagerTest {
     assertThat(pendingBlocks.size()).isEqualTo(0);
     assertThat(futureBlocks.size()).isEqualTo(1);
     assertThat(futureBlocks.contains(nextBlock)).isTrue();
+  }
+
+  @Test
+  public void onGossipedBlock_rejectedFutureBlockShouldNotBeQueued() {
+    final UInt64 nextSlot = GENESIS_SLOT.plus(UInt64.ONE);
+    final SignedBeaconBlock nextBlock =
+        localChain.chainBuilder().generateBlockAtSlot(nextSlot).getBlock();
+    when(blockValidator.validateGossip(eq(nextBlock)))
+        .thenReturn(
+            SafeFuture.completedFuture(
+                InternalValidationResult.reject("Block signature is invalid")));
+
+    assertThat(blockManager.validateAndImportBlock(nextBlock, Optional.empty()))
+        .isCompletedWithValueMatching(InternalValidationResult::isReject);
+
+    assertThat(futureBlocks.size()).isZero();
+    assertThat(pendingBlocks.size()).isZero();
+    verify(blockEventsListenerRouter).removeAllForBlock(nextBlock.getSlotAndBlockRoot());
+    verify(blockEventsListenerRouter, never()).onNewBlock(eq(nextBlock), any());
   }
 
   @Test
@@ -609,6 +638,29 @@ public class BlockManagerTest {
     Waiter.waitFor(() -> assertThat(invalidBlockRoots).isEmpty());
     Waiter.waitFor(() -> assertThat(futureBlocks.size()).isEqualTo(0));
     verify(blockEventsListenerRouter).onBlockImported(futureBlock);
+  }
+
+  @Test
+  public void onProposedBlock_tooFarInFuture_shouldNotQueueOrRetryGossipValidation() {
+    incrementSlot();
+    final UInt64 tooFarSlot = currentSlot.plus(FutureBlockPool.FUTURE_SLOT_TOLERANCE).plus(1);
+    final SignedBeaconBlock futureBlock =
+        localChain.chainBuilder().generateBlockAtSlot(tooFarSlot).getBlock();
+
+    when(blockValidator.validateGossip(eq(futureBlock)))
+        .thenReturn(SafeFuture.completedFuture(InternalValidationResult.SAVE_FOR_FUTURE));
+
+    assertThatSafeFuture(blockManager.validateAndImportBlock(futureBlock, Optional.empty()))
+        .isCompletedWithValue(InternalValidationResult.SAVE_FOR_FUTURE);
+    Waiter.waitFor(() -> assertThat(futureBlocksResultCount("dropped")).isEqualTo(1));
+    assertThat(futureBlocks.size()).isZero();
+    assertThat(futureBlocks.contains(futureBlock)).isFalse();
+
+    incrementSlotTo(tooFarSlot);
+
+    // the dropped block is neither dequeued nor re-validated once its slot arrives
+    assertThat(futureBlocksResultCount("dequeued")).isZero();
+    verify(blockValidator, times(1)).validateGossip(eq(futureBlock));
   }
 
   @Test
@@ -1281,6 +1333,11 @@ public class BlockManagerTest {
 
   private void assertImportBlockSuccessfully(final SignedBeaconBlock block) {
     assertThatBlockImport(block).isCompletedWithValueMatching(BlockImportResult::isSuccessful);
+  }
+
+  private long futureBlocksResultCount(final String result) {
+    return futureBlocksMetricsSystem.getLabelledCounterValue(
+        TekuMetricCategory.BEACON, "future_blocks_total", result);
   }
 
   private void incrementSlotTo(final UInt64 toSlotInclusive) {

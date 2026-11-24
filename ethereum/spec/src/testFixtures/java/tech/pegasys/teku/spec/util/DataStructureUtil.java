@@ -1,5 +1,5 @@
 /*
- * Copyright Consensys Software Inc., 2026
+ * Copyright (c) 2026 Consensys Incorporated. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with
  * the License. You may obtain a copy of the License at
@@ -108,8 +108,10 @@ import tech.pegasys.teku.spec.config.SpecConfigAltair;
 import tech.pegasys.teku.spec.config.SpecConfigBellatrix;
 import tech.pegasys.teku.spec.config.SpecConfigCapella;
 import tech.pegasys.teku.spec.config.SpecConfigDeneb;
+import tech.pegasys.teku.spec.config.SpecConfigEip8321;
 import tech.pegasys.teku.spec.config.SpecConfigFulu;
 import tech.pegasys.teku.spec.config.SpecConfigGloas;
+import tech.pegasys.teku.spec.config.SpecConfigHeze;
 import tech.pegasys.teku.spec.constants.Domain;
 import tech.pegasys.teku.spec.datastructures.blobs.BlobKzgCommitmentsSchema;
 import tech.pegasys.teku.spec.datastructures.blobs.DataColumnSchema;
@@ -141,6 +143,7 @@ import tech.pegasys.teku.spec.datastructures.blocks.blockbody.versions.capella.B
 import tech.pegasys.teku.spec.datastructures.blocks.blockbody.versions.capella.BlindedBeaconBlockBodySchemaCapella;
 import tech.pegasys.teku.spec.datastructures.blocks.blockbody.versions.deneb.BeaconBlockBodyDeneb;
 import tech.pegasys.teku.spec.datastructures.blocks.blockbody.versions.deneb.BeaconBlockBodySchemaDeneb;
+import tech.pegasys.teku.spec.datastructures.blocks.blockbody.versions.eip8321.BeaconBlockBodySchemaEip8321;
 import tech.pegasys.teku.spec.datastructures.blocks.blockbody.versions.gloas.BeaconBlockBodyGloas;
 import tech.pegasys.teku.spec.datastructures.blocks.blockbody.versions.gloas.BeaconBlockBodySchemaGloas;
 import tech.pegasys.teku.spec.datastructures.builder.BlobsBundleSchema;
@@ -192,6 +195,7 @@ import tech.pegasys.teku.spec.datastructures.execution.versions.fulu.BlobsBundle
 import tech.pegasys.teku.spec.datastructures.execution.versions.gloas.BuilderDepositRequest;
 import tech.pegasys.teku.spec.datastructures.execution.versions.gloas.BuilderExitRequest;
 import tech.pegasys.teku.spec.datastructures.execution.versions.heze.InclusionList;
+import tech.pegasys.teku.spec.datastructures.execution.versions.heze.SignedInclusionList;
 import tech.pegasys.teku.spec.datastructures.forkchoice.ForkChoiceNode;
 import tech.pegasys.teku.spec.datastructures.forkchoice.ForkChoicePayloadStatus;
 import tech.pegasys.teku.spec.datastructures.forkchoice.VoteTracker;
@@ -225,8 +229,10 @@ import tech.pegasys.teku.spec.datastructures.operations.DepositWithIndex;
 import tech.pegasys.teku.spec.datastructures.operations.IndexedAttestation;
 import tech.pegasys.teku.spec.datastructures.operations.IndexedAttestationSchema;
 import tech.pegasys.teku.spec.datastructures.operations.ProposerSlashing;
+import tech.pegasys.teku.spec.datastructures.operations.RandaoCommitmentRegistration;
 import tech.pegasys.teku.spec.datastructures.operations.SignedAggregateAndProof;
 import tech.pegasys.teku.spec.datastructures.operations.SignedBlsToExecutionChange;
+import tech.pegasys.teku.spec.datastructures.operations.SignedRandaoCommitmentRegistration;
 import tech.pegasys.teku.spec.datastructures.operations.SignedVoluntaryExit;
 import tech.pegasys.teku.spec.datastructures.operations.SingleAttestation;
 import tech.pegasys.teku.spec.datastructures.operations.VoluntaryExit;
@@ -274,6 +280,7 @@ import tech.pegasys.teku.spec.schemas.SchemaDefinitionsAltair;
 import tech.pegasys.teku.spec.schemas.SchemaDefinitionsBellatrix;
 import tech.pegasys.teku.spec.schemas.SchemaDefinitionsCapella;
 import tech.pegasys.teku.spec.schemas.SchemaDefinitionsDeneb;
+import tech.pegasys.teku.spec.schemas.SchemaDefinitionsEip8321;
 import tech.pegasys.teku.spec.schemas.SchemaDefinitionsElectra;
 import tech.pegasys.teku.spec.schemas.SchemaDefinitionsFulu;
 import tech.pegasys.teku.spec.schemas.SchemaDefinitionsGloas;
@@ -291,6 +298,8 @@ public final class DataStructureUtil {
   private static final int MAX_EP_RANDOM_CONSOLIDATION_REQUESTS = 1;
   private static final int MAX_EP_RANDOM_BUILDER_DEPOSIT_REQUESTS = 4;
   private static final int MAX_EP_RANDOM_BUILDER_EXIT_REQUESTS = 2;
+
+  private static final int MAX_IL_RANDOM_TRANSACTIONS_SIZE = 32;
 
   private final Spec spec;
 
@@ -896,10 +905,12 @@ public final class DataStructureUtil {
   }
 
   public Transaction randomExecutionPayloadTransaction() {
+    return randomExecutionPayloadTransaction(randomSlot());
+  }
+
+  private Transaction randomExecutionPayloadTransaction(final UInt64 slot) {
     final SszByteListSchema<Transaction> schema =
-        getBellatrixSchemaDefinitions(randomSlot())
-            .getExecutionPayloadSchema()
-            .getTransactionSchema();
+        getBellatrixSchemaDefinitions(slot).getExecutionPayloadSchema().getTransactionSchema();
     return schema.fromBytes(Bytes.wrap(randomBytes(randomInt(MAX_EP_RANDOM_TRANSACTIONS_SIZE))));
   }
 
@@ -1617,6 +1628,13 @@ public final class DataStructureUtil {
               if (builder.supportsParentExecutionRequests()) {
                 builder.parentExecutionRequests(randomExecutionRequests(slot));
               }
+              if (builder.supportsRandaoCommitmentRegistrations()) {
+                builder.randaoCommitmentRegistrations(
+                    randomSignedRandaoCommitmentRegistrationsList(
+                        slot,
+                        BeaconBlockBodySchemaEip8321.required(schema)
+                            .getRandaoCommitmentRegistrationsSchema()));
+              }
               builderModifier.accept(builder);
               return SafeFuture.COMPLETE;
             })
@@ -1774,6 +1792,13 @@ public final class DataStructureUtil {
               if (builder.supportsParentExecutionRequests()) {
                 builder.parentExecutionRequests(randomExecutionRequests(slot));
               }
+              if (builder.supportsRandaoCommitmentRegistrations()) {
+                builder.randaoCommitmentRegistrations(
+                    randomSignedRandaoCommitmentRegistrationsList(
+                        slot,
+                        BeaconBlockBodySchemaEip8321.required(schema)
+                            .getRandaoCommitmentRegistrationsSchema()));
+              }
               builderModifier.accept(builder);
               return SafeFuture.COMPLETE;
             })
@@ -1843,6 +1868,13 @@ public final class DataStructureUtil {
               }
               if (builder.supportsParentExecutionRequests()) {
                 builder.parentExecutionRequests(randomExecutionRequests(slot));
+              }
+              if (builder.supportsRandaoCommitmentRegistrations()) {
+                builder.randaoCommitmentRegistrations(
+                    randomSignedRandaoCommitmentRegistrationsList(
+                        slot,
+                        BeaconBlockBodySchemaEip8321.required(schema)
+                            .getRandaoCommitmentRegistrationsSchema()));
               }
               builderModifier.accept(builder);
               return SafeFuture.COMPLETE;
@@ -2120,9 +2152,10 @@ public final class DataStructureUtil {
 
   public PayloadBuildingAttributes randomPayloadBuildingAttributes(
       final boolean withValidatorRegistration) {
+    final UInt64 proposalSlot = randomUInt64();
     return new PayloadBuildingAttributes(
         randomUInt64(),
-        randomUInt64(),
+        proposalSlot,
         randomUInt64(),
         randomBytes32(),
         randomEth1Address(),
@@ -2131,7 +2164,8 @@ public final class DataStructureUtil {
             ? Optional.of(randomSignedValidatorRegistration())
             : Optional.empty(),
         randomWithdrawalList(),
-        new ForkChoiceNode(randomBytes32(), ForkChoicePayloadStatus.PAYLOAD_STATUS_PENDING));
+        new ForkChoiceNode(randomBytes32(), ForkChoicePayloadStatus.PAYLOAD_STATUS_PENDING),
+        randomInclusionListTransactionsIfSupported(proposalSlot));
   }
 
   public ClientVersion randomClientVersion() {
@@ -2333,7 +2367,8 @@ public final class DataStructureUtil {
       case DENEB -> stateBuilderDeneb(validatorCount, numItemsInSszLists);
       case ELECTRA -> stateBuilderElectra(validatorCount, numItemsInSszLists);
       case FULU -> stateBuilderFulu(validatorCount, numItemsInSszLists);
-      case GLOAS, HEZE -> stateBuilderGloas(validatorCount, builderCount, numItemsInSszLists);
+      case GLOAS -> stateBuilderGloas(validatorCount, builderCount, numItemsInSszLists);
+      case HEZE, EIP8321 -> stateBuilderHeze(validatorCount, builderCount, numItemsInSszLists);
     };
   }
 
@@ -2395,6 +2430,18 @@ public final class DataStructureUtil {
       final int defaultItemsInSSZLists) {
     return BeaconStateBuilderGloas.create(
         this, spec, defaultValidatorCount, defaultBuilderCount, defaultItemsInSSZLists);
+  }
+
+  public BeaconStateBuilderGloas stateBuilderHeze(
+      final int defaultValidatorCount,
+      final int defaultBuilderCount,
+      final int defaultItemsInSSZLists) {
+    return BeaconStateBuilderGloas.create(
+        this,
+        spec.forMilestone(SpecMilestone.HEZE),
+        defaultValidatorCount,
+        defaultBuilderCount,
+        defaultItemsInSSZLists);
   }
 
   public BeaconState randomBeaconState(final UInt64 slot) {
@@ -2726,6 +2773,38 @@ public final class DataStructureUtil {
         .create(randomBlsToExecutionChange(), randomSignature());
   }
 
+  public RandaoCommitmentRegistration randomRandaoCommitmentRegistration() {
+    return new RandaoCommitmentRegistration(randomValidatorIndex(), randomBytes32());
+  }
+
+  public SignedRandaoCommitmentRegistration randomSignedRandaoCommitmentRegistration() {
+    return new SignedRandaoCommitmentRegistration(
+        randomRandaoCommitmentRegistration(), randomSignature());
+  }
+
+  public SszList<SignedRandaoCommitmentRegistration>
+      randomSignedRandaoCommitmentRegistrationsList() {
+    final UInt64 slot = randomSlot();
+    final BeaconBlockBodySchema<?> schema =
+        getEip8321SchemaDefinitions(slot).getBeaconBlockBodySchema();
+    return randomSignedRandaoCommitmentRegistrationsList(
+        slot,
+        BeaconBlockBodySchemaEip8321.required(schema).getRandaoCommitmentRegistrationsSchema());
+  }
+
+  public SszList<SignedRandaoCommitmentRegistration> randomSignedRandaoCommitmentRegistrationsList(
+      final UInt64 slot,
+      final SszListSchema<SignedRandaoCommitmentRegistration, ?>
+          signedRandaoCommitmentRegistrationSchema) {
+    final int maxRegistrations =
+        SpecConfigEip8321.required(spec.atSlot(slot).getConfig())
+            .getMaxRandaoCommitmentRegistrations();
+    return randomSszList(
+        signedRandaoCommitmentRegistrationSchema,
+        maxRegistrations,
+        this::randomSignedRandaoCommitmentRegistration);
+  }
+
   public Bytes32 randomBlsWithdrawalCredentials() {
     return Bytes32.wrap(
         Bytes.concatenate(
@@ -3024,6 +3103,29 @@ public final class DataStructureUtil {
         count);
   }
 
+  public SignedInclusionList randomSignedInclusionList() {
+    final InclusionList inclusionList = randomInclusionList();
+    return getHezeSchemaDefinitions(inclusionList.getSlot())
+        .getSignedInclusionListSchema()
+        .create(inclusionList, randomSignature());
+  }
+
+  public InclusionList randomInclusionList() {
+    return randomInclusionList(MAX_IL_RANDOM_TRANSACTIONS_SIZE);
+  }
+
+  public InclusionList randomInclusionList(final int numberOfTransactionPerInclusionList) {
+    final UInt64 slot = randomSlot();
+    final List<Transaction> transactions = new ArrayList<>();
+    for (int i = 0; i < numberOfTransactionPerInclusionList; i++) {
+      transactions.add(randomExecutionPayloadTransaction(slot));
+    }
+
+    return getHezeSchemaDefinitions(slot)
+        .getInclusionListSchema()
+        .create(slot, randomValidatorIndex(), randomBytes32(), transactions);
+  }
+
   public class RandomLightClientUpdateBuilder {
 
     private final SchemaDefinitionsAltair schemaDefinitions;
@@ -3080,7 +3182,9 @@ public final class DataStructureUtil {
           lightClientHeaderAtSlot(attestedSlot),
           randomSyncCommittee(),
           branch(schema.getSyncCommitteeBranchSchema(), syncCommitteeBranch),
-          lightClientHeaderAtSlot(finalizedSlot),
+          getAltairSchemaDefinitions(attestedSlot)
+              .getLightClientHeaderSchema()
+              .create(randomBeaconBlockHeader(finalizedSlot, UInt64.ZERO)),
           branch(schema.getFinalityBranchSchema(), finalityBranch),
           syncAggregate(),
           SszUInt64.of(signatureSlot));
@@ -3416,7 +3520,7 @@ public final class DataStructureUtil {
     return randomSszList(getBlobKzgCommitmentsSchema(), count, this::randomSszKZGCommitment);
   }
 
-  private SszList<SszKZGCommitment> randomBlobKzgCommitments(
+  public SszList<SszKZGCommitment> randomBlobKzgCommitments(
       final SszListSchema<SszKZGCommitment, ?> schema) {
     return randomBlobKzgCommitments(schema, randomNumberOfBlobsPerBlock());
   }
@@ -3647,7 +3751,7 @@ public final class DataStructureUtil {
       final UInt64 builderIndex,
       final Bytes32 blockHash,
       final Bytes32 executionRequestsRoot) {
-    final ExecutionPayloadBidSchema schema =
+    final ExecutionPayloadBidSchema<? extends ExecutionPayloadBid> schema =
         getGloasSchemaDefinitions(slot).getExecutionPayloadBidSchema();
     return schema.create(
         randomBytes32(),
@@ -3676,7 +3780,7 @@ public final class DataStructureUtil {
       final UInt64 builderIndex,
       final UInt64 value,
       final UInt64 executionPayment) {
-    final ExecutionPayloadBidSchema schema =
+    final ExecutionPayloadBidSchema<? extends ExecutionPayloadBid> schema =
         getGloasSchemaDefinitions(slot).getExecutionPayloadBidSchema();
     return schema.create(
         parentBlockHash,
@@ -3826,13 +3930,36 @@ public final class DataStructureUtil {
         executionProofSchema.getProofDataSchema().fromBytes(randomBytes(5)));
   }
 
-  public InclusionList randomInclusionList() {
-    final UInt64 slot = randomSlot();
-    final SchemaDefinitionsHeze schemaDefinitionsHeze = getHezeSchemaDefinitions(slot);
-    return schemaDefinitionsHeze
-        .getInclusionListSchema()
-        .create(
-            slot, randomValidatorIndex(), randomBytes32(), randomExecutionPayloadTransactions());
+  public List<Bytes> randomInclusionListTransactions(final UInt64 slot) {
+    final SpecConfigHeze specConfigHeze =
+        spec.atSlot(slot).getConfig().toVersionHeze().orElseThrow();
+    return randomInclusionListTransactions(specConfigHeze);
+  }
+
+  private List<Bytes> randomInclusionListTransactionsIfSupported(final UInt64 slot) {
+    return spec.atSlot(slot)
+        .getConfig()
+        .toVersionHeze()
+        .map(this::randomInclusionListTransactions)
+        .orElse(List.of());
+  }
+
+  private List<Bytes> randomInclusionListTransactions(final SpecConfigHeze specConfigHeze) {
+    final int maxTransactionsSize = specConfigHeze.getMaxTransactionsBytesPerInclusionList();
+    final List<Bytes> transactions = new ArrayList<>();
+    int currentTransactionsSize = 0;
+    while (transactions.size() < MAX_IL_RANDOM_TRANSACTIONS_SIZE
+        && currentTransactionsSize < maxTransactionsSize) {
+      final Bytes transaction = Bytes.random(randomInt(10, maxTransactionsSize + 1));
+      final int remainingSize = maxTransactionsSize - currentTransactionsSize;
+      if (transaction.size() <= remainingSize) {
+        transactions.add(transaction);
+        currentTransactionsSize += transaction.size();
+      } else if (!transactions.isEmpty()) {
+        break;
+      }
+    }
+    return transactions;
   }
 
   private int randomInt(final int origin, final int bound) {
@@ -3873,6 +4000,10 @@ public final class DataStructureUtil {
 
   private SchemaDefinitionsHeze getHezeSchemaDefinitions(final UInt64 slot) {
     return SchemaDefinitionsHeze.required(spec.atSlot(slot).getSchemaDefinitions());
+  }
+
+  private SchemaDefinitionsEip8321 getEip8321SchemaDefinitions(final UInt64 slot) {
+    return SchemaDefinitionsEip8321.required(spec.atSlot(slot).getSchemaDefinitions());
   }
 
   int getEpochsPerEth1VotingPeriod() {

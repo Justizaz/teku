@@ -1,5 +1,5 @@
 /*
- * Copyright Consensys Software Inc., 2026
+ * Copyright (c) 2026 Consensys Incorporated. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with
  * the License. You may obtain a copy of the License at
@@ -28,6 +28,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Supplier;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.tuweni.bytes.Bytes32;
 import org.apache.tuweni.bytes.Bytes48;
@@ -228,6 +229,11 @@ public class LocalValidatorSource extends AbstractValidatorSource implements Val
     @Override
     public boolean isReadOnly() {
       return readOnly;
+    }
+
+    @Override
+    public Optional<Supplier<String>> getPasswordSupplier() {
+      return Optional.of(() -> password);
     }
 
     @Override

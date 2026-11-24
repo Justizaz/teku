@@ -1,5 +1,5 @@
 /*
- * Copyright Consensys Software Inc., 2026
+ * Copyright (c) 2026 Consensys Incorporated. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with
  * the License. You may obtain a copy of the License at
@@ -82,7 +82,7 @@ class EpochAttestationRewardsCalculatorTest {
     expectedMaximumReward.addSource(7);
     expectedMaximumReward.addHead(7);
 
-    when(beaconStateAccessorsAltair.getBaseRewardPerIncrement(any())).thenReturn(UInt64.ONE);
+    when(beaconStateAccessorsAltair.getBaseRewardPerIncrement(any(), any())).thenReturn(UInt64.ONE);
     when(specConfig.getEffectiveBalanceIncrement()).thenReturn(UInt64.ONE);
 
     final BeaconState beaconState = dataStructureUtil.randomBeaconState();

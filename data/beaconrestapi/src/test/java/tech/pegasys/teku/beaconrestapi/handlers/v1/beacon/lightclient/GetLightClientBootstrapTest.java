@@ -1,5 +1,5 @@
 /*
- * Copyright Consensys Software Inc., 2026
+ * Copyright (c) 2026 Consensys Incorporated. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with
  * the License. You may obtain a copy of the License at
@@ -135,7 +135,7 @@ public class GetLightClientBootstrapTest extends AbstractMigratedBeaconHandlerTe
   private static Set<String> expectedHeaderFields(final SpecMilestone milestone) {
     return switch (milestone) {
       case ALTAIR, BELLATRIX -> Set.of("beacon");
-      case GLOAS, HEZE -> Set.of("beacon", "execution_block_hash", "execution_branch");
+      case GLOAS, HEZE, EIP8321 -> Set.of("beacon", "execution_block_hash", "execution_branch");
       default -> Set.of("beacon", "execution", "execution_branch");
     };
   }
@@ -143,7 +143,7 @@ public class GetLightClientBootstrapTest extends AbstractMigratedBeaconHandlerTe
   private static int expectedSyncCommitteeBranchLength(final SpecMilestone milestone) {
     return switch (milestone) {
       case ELECTRA, FULU -> 6;
-      case GLOAS, HEZE -> 11;
+      case GLOAS, HEZE, EIP8321 -> 11;
       default -> 5;
     };
   }

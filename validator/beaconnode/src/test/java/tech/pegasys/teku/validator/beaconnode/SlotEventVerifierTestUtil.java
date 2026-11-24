@@ -1,5 +1,5 @@
 /*
- * Copyright Consensys Software Inc., 2026
+ * Copyright (c) 2026 Consensys Incorporated. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with
  * the License. You may obtain a copy of the License at
@@ -76,6 +76,14 @@ class SlotEventVerifierTestUtil {
           () -> verify(validatorTimingChannel, times(1)).onPayloadAttestationCreationDue(slot));
     }
 
+    // HEZE: inclusion list production
+    if (milestone.isGreaterThanOrEqualTo(SpecMilestone.HEZE)) {
+      addExpected(
+          expectedByOffset,
+          spec.getAttestationDueMillis(slot),
+          () -> verify(validatorTimingChannel, times(1)).onInclusionListCreationDue(slot));
+    }
+
     // Walk through the slot, advancing to each unique offset and verifying
     long advancedMillis = 0;
     for (final Map.Entry<Integer, List<Runnable>> entry : expectedByOffset.entrySet()) {
@@ -93,6 +101,9 @@ class SlotEventVerifierTestUtil {
     }
     if (!milestone.isGreaterThanOrEqualTo(SpecMilestone.GLOAS)) {
       verify(validatorTimingChannel, never()).onPayloadAttestationCreationDue(slot);
+    }
+    if (!milestone.isGreaterThanOrEqualTo(SpecMilestone.HEZE)) {
+      verify(validatorTimingChannel, never()).onInclusionListCreationDue(slot);
     }
 
     return advancedMillis;

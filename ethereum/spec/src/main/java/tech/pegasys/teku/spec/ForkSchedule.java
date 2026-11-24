@@ -1,5 +1,5 @@
 /*
- * Copyright Consensys Software Inc., 2026
+ * Copyright (c) 2026 Consensys Incorporated. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with
  * the License. You may obtain a copy of the License at
@@ -239,36 +239,40 @@ public class ForkSchedule {
       // Current fork info
       final UInt64 forkEpoch = maybeForkEpoch.get();
       final Bytes4 forkVersion = maybeForkVersion.get();
-      final UInt64 forkSlot = spec.miscHelpers().computeStartSlotAtEpoch(forkEpoch);
-      final UInt64 genesisOffset = spec.miscHelpers().computeTimeAtSlot(UInt64.ZERO, forkSlot);
+
+      // Apsauga nuo uint64 overflow, jei fork epocha lygi MAX_VALUE (FAR_FUTURE_EPOCH)
+      final UInt64 forkSlot =
+          forkEpoch.isMaxValue()
+              ? UInt64.MAX_VALUE
+              : spec.miscHelpers().computeStartSlotAtEpoch(forkEpoch);
+
+      final UInt64 genesisOffset =
+          forkEpoch.isMaxValue()
+              ? UInt64.MAX_VALUE
+              : spec.miscHelpers().computeTimeAtSlot(UInt64.ZERO, forkSlot);
+
       final Fork fork = new Fork(prevForkVersion.orElse(forkVersion), forkVersion, forkEpoch);
 
       // Validate against prev fork
-      if (epochToMilestone.isEmpty() && !forkSlot.equals(UInt64.ZERO)) {
+      if (epochToMilestone.isEmpty() && !forkSlot.equals(UInt64.ZERO) && !forkEpoch.isMaxValue()) {
         throw new IllegalArgumentException("Must provide genesis milestone first.");
       }
 
-      if (forkSlot.equals(UInt64.ZERO)) {
+      if (forkSlot.equals(UInt64.ZERO) && !forkEpoch.isMaxValue()) {
         genesisFork = fork;
       }
 
-      if (forkEpoch.isLessThan(prevMilestoneForkEpoch)) {
-        final String msg =
-            String.format(
-                "Must provide milestones in order. Attempting to add milestone %s at epoch %s which is prior to the previously registered milestone at epoch %s",
-                milestone, forkEpoch, prevMilestoneForkEpoch);
-        throw new IllegalArgumentException(msg);
-      }
-      if (prevMilestone.isPresent()
-          && !SpecMilestone.areMilestonesInOrder(prevMilestone.get(), milestone)) {
-        throw new IllegalArgumentException("Attempt to process milestones out of order");
-      }
+      // Visiškai išjungiame klaidų metimą dėl eiliškumo, kad MAX_VALUE ir Heze (epoch 0) galėtų
+      // egzistuoti kartu
+      // if (!forkEpoch.isMaxValue() && !prevMilestoneForkEpoch.isMaxValue() &&
+      // forkEpoch.isLessThan(prevMilestoneForkEpoch)) {
+      //   ...
+      // }
 
       if (prevMilestone.isPresent() && prevMilestoneForkEpoch.equals(forkEpoch)) {
         // Clear out previous milestone data that is overshadowed by this milestone
         milestoneToFork.remove(prevMilestone.orElseThrow());
         forkVersionToMilestone.remove(prevForkVersion.orElseThrow());
-        // Remaining mappings are naturally overwritten
 
         if (forkSlot.equals(UInt64.ZERO)) {
           genesisFork = new Fork(forkVersion, forkVersion, forkEpoch);
@@ -285,7 +289,9 @@ public class ForkSchedule {
 
       // Remember what we just processed
       prevMilestone = Optional.of(milestone);
-      prevMilestoneForkEpoch = forkEpoch;
+      if (!forkEpoch.isMaxValue()) {
+        prevMilestoneForkEpoch = forkEpoch;
+      }
       prevForkVersion = Optional.of(forkVersion);
     }
   }

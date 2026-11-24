@@ -1,5 +1,5 @@
 /*
- * Copyright Consensys Software Inc., 2026
+ * Copyright (c) 2026 Consensys Incorporated. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with
  * the License. You may obtain a copy of the License at
@@ -27,22 +27,27 @@ import java.util.concurrent.TimeoutException;
 import java.util.function.Function;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
+import org.apache.tuweni.bytes.Bytes32;
 import tech.pegasys.teku.api.exceptions.BadRequestException;
 import tech.pegasys.teku.api.exceptions.ServiceUnavailableException;
 import tech.pegasys.teku.api.migrated.ValidatorLivenessAtEpoch;
 import tech.pegasys.teku.infrastructure.async.SafeFuture;
 import tech.pegasys.teku.infrastructure.ssz.SszList;
+import tech.pegasys.teku.infrastructure.ssz.collections.SszBitvector;
 import tech.pegasys.teku.infrastructure.unsigned.UInt64;
 import tech.pegasys.teku.spec.Spec;
 import tech.pegasys.teku.spec.datastructures.attestation.ProcessedAttestationListener;
 import tech.pegasys.teku.spec.datastructures.epbs.versions.gloas.PayloadAttestation;
 import tech.pegasys.teku.spec.datastructures.epbs.versions.gloas.PayloadAttestationMessage;
 import tech.pegasys.teku.spec.datastructures.epbs.versions.gloas.SignedProposerPreferences;
+import tech.pegasys.teku.spec.datastructures.execution.versions.heze.SignedInclusionList;
+import tech.pegasys.teku.spec.datastructures.inclusionlist.SignedInclusionListListener;
 import tech.pegasys.teku.spec.datastructures.metadata.ObjectAndMetaData;
 import tech.pegasys.teku.spec.datastructures.operations.Attestation;
 import tech.pegasys.teku.spec.datastructures.operations.AttesterSlashing;
 import tech.pegasys.teku.spec.datastructures.operations.ProposerSlashing;
 import tech.pegasys.teku.spec.datastructures.operations.SignedBlsToExecutionChange;
+import tech.pegasys.teku.spec.datastructures.operations.SignedRandaoCommitmentRegistration;
 import tech.pegasys.teku.spec.datastructures.operations.SignedVoluntaryExit;
 import tech.pegasys.teku.spec.datastructures.operations.versions.altair.SignedContributionAndProof;
 import tech.pegasys.teku.spec.datastructures.state.Validator;
@@ -62,6 +67,7 @@ import tech.pegasys.teku.statetransition.forkchoice.ForkChoiceUpdatedResultSubsc
 import tech.pegasys.teku.statetransition.forkchoice.PreparedProposerInfo;
 import tech.pegasys.teku.statetransition.forkchoice.ProposersDataManager;
 import tech.pegasys.teku.statetransition.forkchoice.RegisteredValidatorInfo;
+import tech.pegasys.teku.statetransition.inclusionlist.InclusionListManager;
 import tech.pegasys.teku.statetransition.payloadattestation.PayloadAttestationPool;
 import tech.pegasys.teku.statetransition.synccommittee.SyncCommitteeContributionPool;
 import tech.pegasys.teku.statetransition.validation.InternalValidationResult;
@@ -76,6 +82,7 @@ public class NodeDataProvider {
   private final OperationPool<ProposerSlashing> proposerSlashingPool;
   private final OperationPool<SignedVoluntaryExit> voluntaryExitPool;
   private final OperationPool<SignedBlsToExecutionChange> blsToExecutionChangePool;
+  private final OperationPool<SignedRandaoCommitmentRegistration> randaoCommitmentRegistrationPool;
   private final SyncCommitteeContributionPool syncCommitteeContributionPool;
   private final BlockBlobSidecarsTrackersPool blockBlobSidecarsTrackersPool;
   private final AttestationManager attestationManager;
@@ -88,14 +95,17 @@ public class NodeDataProvider {
   private final CustodyGroupCountManager custodyGroupCountManager;
   private final PayloadAttestationPool payloadAttestationPool;
   private final ProposerPreferencesManager proposerPreferencesManager;
+  private final InclusionListManager inclusionListManager;
   private final Spec spec;
 
   public NodeDataProvider(
       final AggregatingAttestationPool attestationPool,
+      final InclusionListManager inclusionListManager,
       final OperationPool<AttesterSlashing> attesterSlashingsPool,
       final OperationPool<ProposerSlashing> proposerSlashingPool,
       final OperationPool<SignedVoluntaryExit> voluntaryExitPool,
       final OperationPool<SignedBlsToExecutionChange> blsToExecutionChangePool,
+      final OperationPool<SignedRandaoCommitmentRegistration> randaoCommitmentRegistrationPool,
       final SyncCommitteeContributionPool syncCommitteeContributionPool,
       final BlockBlobSidecarsTrackersPool blockBlobSidecarsTrackersPool,
       final AttestationManager attestationManager,
@@ -110,10 +120,12 @@ public class NodeDataProvider {
       final ProposerPreferencesManager proposerPreferencesManager,
       final Spec spec) {
     this.attestationPool = attestationPool;
+    this.inclusionListManager = inclusionListManager;
     this.attesterSlashingPool = attesterSlashingsPool;
     this.proposerSlashingPool = proposerSlashingPool;
     this.voluntaryExitPool = voluntaryExitPool;
     this.blsToExecutionChangePool = blsToExecutionChangePool;
+    this.randaoCommitmentRegistrationPool = randaoCommitmentRegistrationPool;
     this.syncCommitteeContributionPool = syncCommitteeContributionPool;
     this.blockBlobSidecarsTrackersPool = blockBlobSidecarsTrackersPool;
     this.attestationManager = attestationManager;
@@ -132,6 +144,16 @@ public class NodeDataProvider {
   public List<Attestation> getAttestations(
       final Optional<UInt64> maybeSlot, final Optional<UInt64> maybeCommitteeIndex) {
     return attestationPool.getAttestations(maybeSlot, maybeCommitteeIndex);
+  }
+
+  public SafeFuture<Optional<SszBitvector>> getInclusionListBits(
+      final UInt64 proposalSlot, final Bytes32 parentRoot) {
+    return inclusionListManager.getInclusionListBits(proposalSlot, parentRoot);
+  }
+
+  public SafeFuture<List<SignedInclusionList>> getInclusionLists(
+      final UInt64 slot, final Bytes32 dependentRoot, final SszBitvector committeeIndices) {
+    return inclusionListManager.getInclusionLists(slot, dependentRoot, committeeIndices);
   }
 
   public ObjectAndMetaData<List<Attestation>> getAttestationsAndMetaData(
@@ -237,7 +259,6 @@ public class NodeDataProvider {
                         result -> {
                           if (result.isAccept()) {
                             try {
-                              // if we can't add this in a reasonable time we should fail.
                               return voluntaryExitPool.addLocal(exit).get(5, TimeUnit.SECONDS);
                             } catch (InterruptedException
                                 | ExecutionException
@@ -260,6 +281,15 @@ public class NodeDataProvider {
   public SafeFuture<InternalValidationResult> postProposerSlashing(
       final ProposerSlashing slashing) {
     return proposerSlashingPool.addLocal(slashing);
+  }
+
+  public SafeFuture<InternalValidationResult> submitSignedRandaoCommitmentRegistration(
+      final SignedRandaoCommitmentRegistration registration) {
+    return randaoCommitmentRegistrationPool.addLocal(registration);
+  }
+
+  public Set<SignedRandaoCommitmentRegistration> getRandaoCommitmentRegistrations() {
+    return randaoCommitmentRegistrationPool.getAll();
   }
 
   public List<SignedBlsToExecutionChange> getBlsToExecutionChanges(
@@ -356,6 +386,10 @@ public class NodeDataProvider {
     proposerPreferencesManager.subscribeOperationAdded(listener);
   }
 
+  public void subscribeToNewInclusionList(final SignedInclusionListListener listener) {
+    inclusionListManager.subscribeToInclusionLists(listener);
+  }
+
   public SafeFuture<Optional<List<ValidatorLivenessAtEpoch>>> getValidatorLiveness(
       final List<UInt64> validatorIndices,
       final UInt64 epoch,
@@ -365,7 +399,6 @@ public class NodeDataProvider {
           new BadRequestException(
               "Validator liveness tracking is not enabled on this beacon node, cannot service request"));
     }
-    // if no validator indices were requested, that's a bad request.
     if (validatorIndices.isEmpty()) {
       return SafeFuture.failedFuture(
           new BadRequestException("No validator indices posted in validator liveness request"));

@@ -1,5 +1,5 @@
 /*
- * Copyright Consensys Software Inc., 2026
+ * Copyright (c) 2026 Consensys Incorporated. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with
  * the License. You may obtain a copy of the License at
@@ -22,6 +22,7 @@ import org.apache.tuweni.bytes.Bytes32;
 import tech.pegasys.teku.api.exceptions.BadRequestException;
 import tech.pegasys.teku.bls.BLSSignature;
 import tech.pegasys.teku.ethereum.json.types.validator.AttesterDuties;
+import tech.pegasys.teku.ethereum.json.types.validator.InclusionListDuties;
 import tech.pegasys.teku.ethereum.json.types.validator.PayloadTimelinessCommitteeDuties;
 import tech.pegasys.teku.ethereum.json.types.validator.ProposerDuties;
 import tech.pegasys.teku.ethereum.json.types.validator.SyncCommitteeDuties;
@@ -42,6 +43,8 @@ import tech.pegasys.teku.spec.datastructures.epbs.versions.gloas.SignedExecution
 import tech.pegasys.teku.spec.datastructures.epbs.versions.gloas.SignedExecutionPayloadEnvelope;
 import tech.pegasys.teku.spec.datastructures.epbs.versions.gloas.SignedExecutionPayloadEnvelopeContents;
 import tech.pegasys.teku.spec.datastructures.epbs.versions.gloas.SignedProposerPreferences;
+import tech.pegasys.teku.spec.datastructures.execution.Transaction;
+import tech.pegasys.teku.spec.datastructures.execution.versions.heze.SignedInclusionList;
 import tech.pegasys.teku.spec.datastructures.metadata.BlockContainerAndMetaData;
 import tech.pegasys.teku.spec.datastructures.metadata.ObjectAndMetaData;
 import tech.pegasys.teku.spec.datastructures.operations.Attestation;
@@ -265,6 +268,11 @@ public class ValidatorDataProvider {
         () -> validatorApiChannel.getPayloadTimelinessCommitteeDuties(epoch, indices));
   }
 
+  public SafeFuture<Optional<InclusionListDuties>> getInclusionListDuties(
+      final UInt64 epoch, final IntList indices) {
+    return SafeFuture.of(() -> validatorApiChannel.getInclusionListDuties(epoch, indices));
+  }
+
   public SafeFuture<Optional<ProposerDuties>> getProposerDuties(final UInt64 epoch) {
     return SafeFuture.of(() -> validatorApiChannel.getProposerDuties(epoch, true));
   }
@@ -284,9 +292,18 @@ public class ValidatorDataProvider {
     return SafeFuture.of(() -> validatorApiChannel.getSyncCommitteeDuties(epoch, indices));
   }
 
+  public SafeFuture<Optional<List<Transaction>>> getInclusionList(final UInt64 slot) {
+    return SafeFuture.of(() -> validatorApiChannel.getInclusionList(slot));
+  }
+
   public SafeFuture<Void> sendContributionAndProofs(
       final List<SignedContributionAndProof> contributionAndProofs) {
     return validatorApiChannel.sendSignedContributionAndProofs(contributionAndProofs);
+  }
+
+  public SafeFuture<List<SubmitDataError>> sendSignedInclusionList(
+      final List<SignedInclusionList> signedInclusionLists) {
+    return validatorApiChannel.sendSignedInclusionLists(signedInclusionLists);
   }
 
   public SafeFuture<Void> prepareBeaconProposer(
