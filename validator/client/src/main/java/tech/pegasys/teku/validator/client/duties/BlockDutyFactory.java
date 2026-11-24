@@ -21,6 +21,7 @@ import tech.pegasys.teku.validator.client.BuilderConfigProvider;
 import tech.pegasys.teku.validator.client.ForkProvider;
 import tech.pegasys.teku.validator.client.Validator;
 import tech.pegasys.teku.validator.client.duties.execution.ExecutionPayloadBidEventsChannel;
+import tech.pegasys.teku.validator.client.hashchain.HashChainPasswordProvider;
 import tech.pegasys.teku.validator.client.hashchain.HashChainStore;
 import tech.pegasys.teku.validator.client.signer.BlockContainerSigner;
 
@@ -34,6 +35,7 @@ public class BlockDutyFactory implements DutyFactory<BlockProductionDuty, Duty> 
   private final ExecutionPayloadBidEventsChannel executionPayloadBidEventsChannelPublisher;
   private final BuilderConfigProvider builderConfigProvider;
   private final Optional<HashChainStore> hashChainStore;
+  private final HashChainPasswordProvider hashChainPasswordProvider;
 
   public BlockDutyFactory(
       final ForkProvider forkProvider,
@@ -51,7 +53,8 @@ public class BlockDutyFactory implements DutyFactory<BlockProductionDuty, Duty> 
         validatorDutyMetrics,
         executionPayloadBidEventsChannelPublisher,
         builderConfigProvider,
-        Optional.empty());
+        Optional.empty(),
+        HashChainPasswordProvider.NOOP);
   }
 
   public BlockDutyFactory(
@@ -63,6 +66,28 @@ public class BlockDutyFactory implements DutyFactory<BlockProductionDuty, Duty> 
       final ExecutionPayloadBidEventsChannel executionPayloadBidEventsChannelPublisher,
       final BuilderConfigProvider builderConfigProvider,
       final Optional<HashChainStore> hashChainStore) {
+    this(
+        forkProvider,
+        validatorApiChannel,
+        blockContainerSigner,
+        spec,
+        validatorDutyMetrics,
+        executionPayloadBidEventsChannelPublisher,
+        builderConfigProvider,
+        hashChainStore,
+        HashChainPasswordProvider.NOOP);
+  }
+
+  public BlockDutyFactory(
+      final ForkProvider forkProvider,
+      final ValidatorApiChannel validatorApiChannel,
+      final BlockContainerSigner blockContainerSigner,
+      final Spec spec,
+      final ValidatorDutyMetrics validatorDutyMetrics,
+      final ExecutionPayloadBidEventsChannel executionPayloadBidEventsChannelPublisher,
+      final BuilderConfigProvider builderConfigProvider,
+      final Optional<HashChainStore> hashChainStore,
+      final HashChainPasswordProvider hashChainPasswordProvider) {
     this.forkProvider = forkProvider;
     this.validatorApiChannel = validatorApiChannel;
     this.blockContainerSigner = blockContainerSigner;
@@ -71,6 +96,7 @@ public class BlockDutyFactory implements DutyFactory<BlockProductionDuty, Duty> 
     this.executionPayloadBidEventsChannelPublisher = executionPayloadBidEventsChannelPublisher;
     this.builderConfigProvider = builderConfigProvider;
     this.hashChainStore = hashChainStore;
+    this.hashChainPasswordProvider = hashChainPasswordProvider;
   }
 
   @Override
@@ -85,7 +111,8 @@ public class BlockDutyFactory implements DutyFactory<BlockProductionDuty, Duty> 
         validatorDutyMetrics,
         executionPayloadBidEventsChannelPublisher,
         builderConfigProvider,
-        hashChainStore);
+        hashChainStore,
+        hashChainPasswordProvider);
   }
 
   @Override

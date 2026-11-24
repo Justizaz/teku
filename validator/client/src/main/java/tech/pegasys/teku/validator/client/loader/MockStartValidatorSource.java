@@ -134,6 +134,11 @@ public class MockStartValidatorSource implements ValidatorSource {
     public Signer createSigner() {
       return new LocalSigner(spec, keyPair, asyncRunner);
     }
+
+    @Override
+    public Optional<Supplier<String>> getPasswordSupplier() {
+      return Optional.of(() -> "");
+    }
   }
 
   public static class Builder {

@@ -29,6 +29,7 @@ import static tech.pegasys.teku.infrastructure.async.SafeFutureAssert.safeJoin;
 import static tech.pegasys.teku.infrastructure.unsigned.UInt64.ZERO;
 import static tech.pegasys.teku.spec.config.SpecConfigGloas.BUILDER_INDEX_SELF_BUILD;
 
+import java.nio.file.Path;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
@@ -37,6 +38,7 @@ import org.apache.tuweni.bytes.Bytes32;
 import org.apache.tuweni.units.bigints.UInt256;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
@@ -78,6 +80,8 @@ import tech.pegasys.teku.validator.client.Validator;
 import tech.pegasys.teku.validator.client.duties.execution.ExecutionPayloadBidEventsChannel;
 import tech.pegasys.teku.validator.client.hashchain.HashChain;
 import tech.pegasys.teku.validator.client.hashchain.HashChainGenerator;
+import tech.pegasys.teku.validator.client.hashchain.HashChainPasswordProvider;
+import tech.pegasys.teku.validator.client.hashchain.HashChainStore;
 import tech.pegasys.teku.validator.client.signer.BlockContainerSigner;
 import tech.pegasys.teku.validator.client.signer.MilestoneBasedBlockContainerSigner;
 
@@ -845,6 +849,158 @@ class BlockProductionDutyTest {
             Optional.of(hashChain));
 
     final SafeFuture<DutyResult> result = dutyWithMismatchedChain.performDuty();
+    assertThat(result).isCompleted();
+    result.join().report(TYPE, CAPELLA_SLOT, validatorLogger);
+
+    verify(validatorLogger)
+        .dutyFailed(
+            eq(TYPE),
+            eq(CAPELLA_SLOT),
+            eq(Set.of(validator.getPublicKey().toAbbreviatedString())),
+            any(IllegalStateException.class));
+  }
+
+  @Test
+  public void shouldLoadHashChainFromStoreWithPasswordFromProviderAndProduceBlock(
+      @TempDir final Path tempDir) throws Exception {
+    final HashChainStore hashChainStore = new HashChainStore(tempDir);
+    final String password = "validator_secret_pass";
+    final HashChain hashChain =
+        HashChainGenerator.generateFromSeed(dataStructureUtil.randomBytes32(), 10);
+    hashChainStore.storeHashChain(validator.getPublicKey(), hashChain, password);
+
+    final HashChainPasswordProvider passwordProvider =
+        pk -> pk.equals(validator.getPublicKey()) ? Optional.of(password) : Optional.empty();
+
+    final Bytes32 currentCommitment = hashChain.getCommitment();
+    final Bytes32 expectedPreimage =
+        hashChain.getRevealForCommitment(currentCommitment).orElseThrow();
+
+    final BLSSignature blockSignature = dataStructureUtil.randomSignature();
+    final BlockContainerAndMetaData blockContainerAndMetaData =
+        dataStructureUtil.randomBlockContainerAndMetaData(CAPELLA_SLOT);
+    final BeaconBlock unsignedBlock = blockContainerAndMetaData.blockContainer().getBlock();
+
+    final BlockProductionDuty duty =
+        new BlockProductionDuty(
+            validator,
+            CAPELLA_SLOT,
+            forkProvider,
+            validatorApiChannel,
+            blockContainerSigner,
+            spec,
+            validatorDutyMetrics,
+            executionPayloadBidEventsChannelPublisher,
+            builderConfigProvider,
+            Optional.of(hashChainStore),
+            Optional.empty(),
+            passwordProvider);
+
+    when(validatorApiChannel.getValidatorRandaoCommitment(validator.getPublicKey()))
+        .thenReturn(completedFuture(Optional.of(currentCommitment)));
+    when(validatorApiChannel.createUnsignedBlock(
+            CAPELLA_SLOT,
+            BLSSignature.infinity(),
+            Optional.of(expectedPreimage),
+            Optional.of(graffiti),
+            false,
+            Optional.empty()))
+        .thenReturn(completedFuture(Optional.of(blockContainerAndMetaData)));
+    when(signer.signBlock(unsignedBlock, fork)).thenReturn(completedFuture(blockSignature));
+    when(validatorApiChannel.sendSignedBlock(any(), any(), any()))
+        .thenReturn(completedFuture(SendSignedBlockResult.success(unsignedBlock.getRoot())));
+
+    final SafeFuture<DutyResult> result = duty.performDuty();
+    assertThat(result).isCompleted();
+    safeJoin(result).report(TYPE, CAPELLA_SLOT, validatorLogger);
+
+    verify(validatorApiChannel)
+        .createUnsignedBlock(
+            CAPELLA_SLOT,
+            BLSSignature.infinity(),
+            Optional.of(expectedPreimage),
+            Optional.of(graffiti),
+            false,
+            Optional.empty());
+  }
+
+  @Test
+  public void shouldFailWhenHashChainStoreCannotDecryptWithWrongPasswordFromProvider(
+      @TempDir final Path tempDir) throws Exception {
+    final HashChainStore hashChainStore = new HashChainStore(tempDir);
+    final String password = "validator_secret_pass";
+    final HashChain hashChain =
+        HashChainGenerator.generateFromSeed(dataStructureUtil.randomBytes32(), 10);
+    hashChainStore.storeHashChain(validator.getPublicKey(), hashChain, password);
+
+    final HashChainPasswordProvider wrongPasswordProvider =
+        pk ->
+            pk.equals(validator.getPublicKey()) ? Optional.of("wrong_password") : Optional.empty();
+
+    final Bytes32 currentCommitment = hashChain.getCommitment();
+
+    final BlockProductionDuty duty =
+        new BlockProductionDuty(
+            validator,
+            CAPELLA_SLOT,
+            forkProvider,
+            validatorApiChannel,
+            blockContainerSigner,
+            spec,
+            validatorDutyMetrics,
+            executionPayloadBidEventsChannelPublisher,
+            builderConfigProvider,
+            Optional.of(hashChainStore),
+            Optional.empty(),
+            wrongPasswordProvider);
+
+    when(validatorApiChannel.getValidatorRandaoCommitment(validator.getPublicKey()))
+        .thenReturn(completedFuture(Optional.of(currentCommitment)));
+
+    final SafeFuture<DutyResult> result = duty.performDuty();
+    assertThat(result).isCompleted();
+    result.join().report(TYPE, CAPELLA_SLOT, validatorLogger);
+
+    verify(validatorLogger)
+        .dutyFailed(
+            eq(TYPE),
+            eq(CAPELLA_SLOT),
+            eq(Set.of(validator.getPublicKey().toAbbreviatedString())),
+            any(IllegalStateException.class));
+  }
+
+  @Test
+  public void shouldFailWhenNoPasswordFromProviderToLoadFromHashChainStore(
+      @TempDir final Path tempDir) throws Exception {
+    final HashChainStore hashChainStore = new HashChainStore(tempDir);
+    final String password = "validator_secret_pass";
+    final HashChain hashChain =
+        HashChainGenerator.generateFromSeed(dataStructureUtil.randomBytes32(), 10);
+    hashChainStore.storeHashChain(validator.getPublicKey(), hashChain, password);
+
+    final HashChainPasswordProvider noPasswordProvider = HashChainPasswordProvider.NOOP;
+
+    final Bytes32 currentCommitment = hashChain.getCommitment();
+
+    final BlockProductionDuty duty =
+        new BlockProductionDuty(
+            validator,
+            CAPELLA_SLOT,
+            forkProvider,
+            validatorApiChannel,
+            blockContainerSigner,
+            spec,
+            validatorDutyMetrics,
+            executionPayloadBidEventsChannelPublisher,
+            builderConfigProvider,
+            Optional.of(hashChainStore),
+            Optional.empty(),
+            noPasswordProvider);
+
+    when(validatorApiChannel.getValidatorRandaoCommitment(validator.getPublicKey()))
+        .thenReturn(completedFuture(Optional.of(currentCommitment)));
+
+    final SafeFuture<DutyResult> result = duty.performDuty();
     assertThat(result).isCompleted();
     result.join().report(TYPE, CAPELLA_SLOT, validatorLogger);
 

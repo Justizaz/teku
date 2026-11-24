@@ -103,6 +103,7 @@ import tech.pegasys.teku.spec.datastructures.genesis.GenesisData;
 import tech.pegasys.teku.spec.datastructures.metadata.BlockContainerAndMetaData;
 import tech.pegasys.teku.spec.datastructures.operations.Attestation;
 import tech.pegasys.teku.spec.datastructures.operations.AttestationData;
+import tech.pegasys.teku.spec.datastructures.operations.PendingRandaoCommitment;
 import tech.pegasys.teku.spec.datastructures.operations.SignedAggregateAndProof;
 import tech.pegasys.teku.spec.datastructures.operations.SignedRandaoCommitmentRegistration;
 import tech.pegasys.teku.spec.datastructures.operations.versions.altair.SignedContributionAndProof;
@@ -110,6 +111,7 @@ import tech.pegasys.teku.spec.datastructures.operations.versions.altair.SyncComm
 import tech.pegasys.teku.spec.datastructures.operations.versions.altair.SyncCommitteeMessage;
 import tech.pegasys.teku.spec.datastructures.operations.versions.altair.ValidatableSyncCommitteeMessage;
 import tech.pegasys.teku.spec.datastructures.state.beaconstate.BeaconState;
+import tech.pegasys.teku.spec.datastructures.state.beaconstate.versions.eip8321.BeaconStateEip8321;
 import tech.pegasys.teku.spec.datastructures.validator.BeaconPreparableProposer;
 import tech.pegasys.teku.spec.datastructures.validator.BroadcastValidationLevel;
 import tech.pegasys.teku.spec.datastructures.validator.SubnetSubscription;
@@ -138,6 +140,7 @@ import tech.pegasys.teku.validator.api.PublishSignedExecutionPayloadResult;
 import tech.pegasys.teku.validator.api.SendSignedBlockResult;
 import tech.pegasys.teku.validator.api.SubmitDataError;
 import tech.pegasys.teku.validator.api.ValidatorApiChannel;
+import tech.pegasys.teku.validator.api.ValidatorRandaoCommitmentStatus;
 import tech.pegasys.teku.validator.coordinator.duties.AttesterDutiesGenerator;
 import tech.pegasys.teku.validator.coordinator.duties.InclusionListDutiesGenerator;
 import tech.pegasys.teku.validator.coordinator.performance.PerformanceTracker;
@@ -1222,6 +1225,80 @@ public class ValidatorApiHandler implements ValidatorApiChannel, SlotEventsChann
                           }
                           return Optional.of(Bytes32.ZERO);
                         }));
+  }
+
+  @Override
+  public SafeFuture<ValidatorRandaoCommitmentStatus> getValidatorRandaoCommitmentStatus(
+      final BLSPublicKey publicKey) {
+    if (isSyncActive()) {
+      return NodeSyncingException.failedFuture();
+    }
+    return combinedChainDataClient
+        .getBestState()
+        .orElseGet(
+            () ->
+                SafeFuture.failedFuture(
+                    new IllegalStateException("Head state is not yet available")))
+        .thenCompose(
+            state -> {
+              final Optional<BeaconStateEip8321> maybeStateEip8321 = state.toVersionEip8321();
+              if (maybeStateEip8321.isEmpty()) {
+                return SafeFuture.failedFuture(
+                    new IllegalStateException("Head state is not at EIP-8321 milestone"));
+              }
+              final BeaconStateEip8321 stateEip8321 = maybeStateEip8321.get();
+              final Optional<Integer> maybeIndex = spec.getValidatorIndex(state, publicKey);
+              if (maybeIndex.isEmpty()) {
+                return SafeFuture.completedFuture(ValidatorRandaoCommitmentStatus.NOT_REGISTERED);
+              }
+              final int validatorIndexInt = maybeIndex.get();
+              final UInt64 validatorIndex = UInt64.valueOf(validatorIndexInt);
+
+              Optional<Bytes32> activeCommitment = Optional.empty();
+              boolean hasActive = false;
+              if (validatorIndexInt < stateEip8321.getRandaoCommitments().size()) {
+                final Bytes32 commitment =
+                    stateEip8321.getRandaoCommitments().get(validatorIndexInt).get();
+                if (!commitment.isZero()) {
+                  hasActive = true;
+                  activeCommitment = Optional.of(commitment);
+                }
+              }
+
+              Optional<Bytes32> pendingCommitment = Optional.empty();
+              Optional<UInt64> activationEpoch = Optional.empty();
+              boolean hasPending = false;
+              for (final PendingRandaoCommitment pending :
+                  stateEip8321.getPendingRandaoCommitments()) {
+                if (pending.getValidatorIndex().equals(validatorIndex)) {
+                  hasPending = true;
+                  pendingCommitment = Optional.of(pending.getCommitment());
+                  activationEpoch = Optional.of(pending.getActivationEpoch());
+                  break;
+                }
+              }
+
+              Optional<Bytes32> poolCommitment = Optional.empty();
+              boolean hasPool = false;
+              for (final SignedRandaoCommitmentRegistration reg :
+                  nodeDataProvider.getRandaoCommitmentRegistrations()) {
+                if (reg.getMessage().getValidatorIndex().equals(validatorIndex)) {
+                  hasPool = true;
+                  poolCommitment = Optional.of(reg.getMessage().getCommitment());
+                  break;
+                }
+              }
+
+              return SafeFuture.completedFuture(
+                  new ValidatorRandaoCommitmentStatus(
+                      hasActive,
+                      activeCommitment,
+                      hasPending,
+                      pendingCommitment,
+                      activationEpoch,
+                      hasPool,
+                      poolCommitment));
+            });
   }
 
   @Override

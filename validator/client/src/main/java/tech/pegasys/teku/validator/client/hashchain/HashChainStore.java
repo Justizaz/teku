@@ -27,10 +27,9 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializerProvider;
 import com.fasterxml.jackson.databind.module.SimpleModule;
 import java.io.IOException;
-import java.nio.file.AtomicMoveNotSupportedException;
+import java.nio.file.FileAlreadyExistsException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.StandardCopyOption;
 import java.security.SecureRandom;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -109,6 +108,11 @@ public class HashChainStore {
     checkNotNull(hashChain, "Hash chain cannot be null");
     checkNotNull(password, "Password cannot be null");
 
+    if (hasHashChain(publicKey)) {
+      throw new InvalidHashChainException(
+          "Cannot overwrite existing hash chain file for " + publicKey);
+    }
+
     if (!hashChain.verify()) {
       throw new InvalidHashChainException("Cannot store an invalid hash chain");
     }
@@ -139,30 +143,42 @@ public class HashChainStore {
             keyStoreData);
 
     final Path targetPath = getPathForPublicKey(publicKey);
-    final String tempFileName = "." + targetPath.getFileName().toString() + ".tmp";
-    final Path tempPath = storageDirectory.resolve(tempFileName);
+    Path tempPath = null;
 
     try {
       Files.createDirectories(storageDirectory);
+      tempPath =
+          Files.createTempFile(
+              storageDirectory, "." + targetPath.getFileName().toString() + "-", ".tmp");
       final String json =
           objectMapper.writerWithDefaultPrettyPrinter().writeValueAsString(hashChainData);
       Files.writeString(tempPath, json, UTF_8);
       try {
-        Files.move(
-            tempPath,
-            targetPath,
-            StandardCopyOption.ATOMIC_MOVE,
-            StandardCopyOption.REPLACE_EXISTING);
-      } catch (final AtomicMoveNotSupportedException e) {
-        Files.move(tempPath, targetPath, StandardCopyOption.REPLACE_EXISTING);
+        Files.createLink(targetPath, tempPath);
+      } catch (final FileAlreadyExistsException e) {
+        throw new InvalidHashChainException(
+            "Cannot overwrite existing hash chain file for " + publicKey, e);
+      } catch (final UnsupportedOperationException e) {
+        throw new InvalidHashChainException(
+            "Filesystem does not support atomic link creation; failing closed to prevent overwrite",
+            e);
       }
+    } catch (final InvalidHashChainException e) {
+      throw e;
     } catch (final IOException e) {
-      try {
-        Files.deleteIfExists(tempPath);
-      } catch (final IOException ignored) {
-        // ignore cleanup error
+      if (hasHashChain(publicKey)) {
+        throw new InvalidHashChainException(
+            "Cannot overwrite existing hash chain file for " + publicKey, e);
       }
       throw new InvalidHashChainException("Failed to persist hash chain for " + publicKey, e);
+    } finally {
+      if (tempPath != null) {
+        try {
+          Files.deleteIfExists(tempPath);
+        } catch (final IOException ignored) {
+          // ignore cleanup error
+        }
+      }
     }
   }
 

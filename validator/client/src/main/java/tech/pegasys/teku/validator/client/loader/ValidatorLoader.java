@@ -44,6 +44,7 @@ import tech.pegasys.teku.validator.api.ValidatorConfig;
 import tech.pegasys.teku.validator.client.ExternalValidatorImportResult;
 import tech.pegasys.teku.validator.client.LocalValidatorImportResult;
 import tech.pegasys.teku.validator.client.Validator;
+import tech.pegasys.teku.validator.client.hashchain.DefaultHashChainPasswordProvider;
 import tech.pegasys.teku.validator.client.loader.ValidatorSource.ValidatorProvider;
 import tech.pegasys.teku.validator.client.restapi.apis.schema.DeleteKeyResult;
 import tech.pegasys.teku.validator.client.restapi.apis.schema.PostKeyResult;
@@ -55,6 +56,8 @@ public class ValidatorLoader {
   private final Optional<ValidatorSource> mutableLocalValidatorSource;
   private final Optional<ValidatorSource> mutableExternalValidatorSource;
   private final OwnedValidators ownedValidators = new OwnedValidators();
+  private final DefaultHashChainPasswordProvider hashChainPasswordProvider =
+      new DefaultHashChainPasswordProvider();
   private final GraffitiProvider defaultGraffitiProvider;
   private final Function<BLSPublicKey, Optional<Bytes32>> updatableGraffitiProvider;
   private final Optional<DataDirLayout> maybeDataDirLayout;
@@ -87,6 +90,19 @@ public class ValidatorLoader {
         defaultGraffitiProvider,
         updatableGraffitiProvider,
         maybeDataDirLayout);
+    ownedValidators
+        .getPublicKeys()
+        .forEach(
+            pubkey -> {
+              final ValidatorProvider provider = validatorProviders.get(pubkey);
+              if (provider != null) {
+                provider
+                    .getPasswordSupplier()
+                    .ifPresent(
+                        supplier ->
+                            hashChainPasswordProvider.addPasswordSupplier(pubkey, supplier));
+              }
+            });
     slashingProtectionLogger.protectionSummary(ownedValidators.getValidators());
   }
 
@@ -95,7 +111,11 @@ public class ValidatorLoader {
       return DeleteKeyResult.error(
           "Unable to delete validator, could not determine the storage location.");
     }
-    return mutableLocalValidatorSource.get().deleteValidator(publicKey);
+    final DeleteKeyResult result = mutableLocalValidatorSource.get().deleteValidator(publicKey);
+    if (result.equals(DeleteKeyResult.success())) {
+      hashChainPasswordProvider.removePasswordSupplier(publicKey);
+    }
+    return result;
   }
 
   public synchronized LocalValidatorImportResult loadLocalMutableValidator(
@@ -163,6 +183,7 @@ public class ValidatorLoader {
           .keyStoreData(Optional.of(keyStoreData))
           .build();
     }
+    hashChainPasswordProvider.addPasswordSupplier(publicKey, () -> password);
     addToOwnedValidators(validatorAddResult.getSigner().get(), publicKey);
     return new LocalValidatorImportResult.Builder(PostKeyResult.success(), password)
         .publicKey(Optional.of(publicKey))
@@ -175,7 +196,11 @@ public class ValidatorLoader {
       return DeleteKeyResult.error(
           "Unable to delete external validator, could not determine the storage location.");
     }
-    return mutableExternalValidatorSource.get().deleteValidator(publicKey);
+    final DeleteKeyResult result = mutableExternalValidatorSource.get().deleteValidator(publicKey);
+    if (result.equals(DeleteKeyResult.success())) {
+      hashChainPasswordProvider.removePasswordSupplier(publicKey);
+    }
+    return result;
   }
 
   public synchronized ExternalValidatorImportResult loadExternalMutableValidator(
@@ -306,5 +331,9 @@ public class ValidatorLoader {
 
   public SlashingProtectionLogger getSlashingProtectionLogger() {
     return slashingProtectionLogger;
+  }
+
+  public DefaultHashChainPasswordProvider getHashChainPasswordProvider() {
+    return hashChainPasswordProvider;
   }
 }

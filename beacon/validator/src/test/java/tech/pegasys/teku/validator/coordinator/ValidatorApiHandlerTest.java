@@ -154,6 +154,7 @@ import tech.pegasys.teku.validator.api.NodeSyncingException;
 import tech.pegasys.teku.validator.api.PublishSignedExecutionPayloadResult;
 import tech.pegasys.teku.validator.api.SendSignedBlockResult;
 import tech.pegasys.teku.validator.api.SubmitDataError;
+import tech.pegasys.teku.validator.api.ValidatorRandaoCommitmentStatus;
 import tech.pegasys.teku.validator.coordinator.duties.InclusionListDutiesGenerator;
 import tech.pegasys.teku.validator.coordinator.performance.DefaultPerformanceTracker;
 import tech.pegasys.teku.validator.coordinator.publisher.BlockPublisher;
@@ -1642,6 +1643,57 @@ class ValidatorApiHandlerTest {
     assertThatSafeFuture(
             validatorApiHandler.getValidatorIndices(List.of(dataStructureUtil.randomPublicKey())))
         .isCompletedExceptionallyWith(IllegalStateException.class);
+  }
+
+  @Test
+  void getValidatorRandaoCommitmentStatus_shouldFailWhenSyncActive() {
+    when(syncStateProvider.getCurrentSyncState()).thenReturn(SyncState.SYNCING);
+
+    assertThatSafeFuture(
+            validatorApiHandler.getValidatorRandaoCommitmentStatus(
+                dataStructureUtil.randomPublicKey()))
+        .isCompletedExceptionallyWith(NodeSyncingException.class);
+  }
+
+  @Test
+  void getValidatorRandaoCommitmentStatus_shouldFailWhenHeadStateNotAvailable() {
+    when(chainDataClient.getBestState()).thenReturn(Optional.empty());
+
+    assertThatSafeFuture(
+            validatorApiHandler.getValidatorRandaoCommitmentStatus(
+                dataStructureUtil.randomPublicKey()))
+        .isCompletedExceptionallyWith(IllegalStateException.class);
+  }
+
+  @Test
+  void getValidatorRandaoCommitmentStatus_shouldFailWhenHeadStateNotAtEip8321() {
+    final BeaconState state = dataStructureUtil.randomBeaconState();
+    when(chainDataClient.getBestState()).thenReturn(Optional.of(SafeFuture.completedFuture(state)));
+
+    assertThatSafeFuture(
+            validatorApiHandler.getValidatorRandaoCommitmentStatus(
+                dataStructureUtil.randomPublicKey()))
+        .isCompletedExceptionallyWith(IllegalStateException.class);
+  }
+
+  @Test
+  void getValidatorRandaoCommitmentStatus_shouldSucceedWhenEip8321StateAvailable() {
+    final Spec specEip8321 = TestSpecFactory.createMinimalEip8321();
+    final DataStructureUtil dataStructureUtilEip8321 = new DataStructureUtil(specEip8321);
+    setUp(specEip8321);
+
+    final BeaconState baseState = dataStructureUtilEip8321.randomBeaconState();
+    final BeaconState state =
+        specEip8321.getGenesisSpec().getStateUpgrade().orElseThrow().upgrade(baseState);
+    final BLSPublicKey knownValidator =
+        BLSPublicKey.fromBytesCompressed(state.getValidators().get(0).getPubkeyBytes());
+    when(chainDataClient.getBestState()).thenReturn(Optional.of(SafeFuture.completedFuture(state)));
+
+    final SafeFuture<ValidatorRandaoCommitmentStatus> result =
+        validatorApiHandler.getValidatorRandaoCommitmentStatus(knownValidator);
+
+    assertThatSafeFuture(result).isCompleted();
+    assertThat(safeJoin(result)).isEqualTo(ValidatorRandaoCommitmentStatus.NOT_REGISTERED);
   }
 
   @Test

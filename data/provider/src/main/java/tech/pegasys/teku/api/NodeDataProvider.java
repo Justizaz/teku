@@ -288,6 +288,10 @@ public class NodeDataProvider {
     return randaoCommitmentRegistrationPool.addLocal(registration);
   }
 
+  public Set<SignedRandaoCommitmentRegistration> getRandaoCommitmentRegistrations() {
+    return randaoCommitmentRegistrationPool.getAll();
+  }
+
   public List<SignedBlsToExecutionChange> getBlsToExecutionChanges(
       final Optional<Boolean> locallySubmitted) {
     if (locallySubmitted.isPresent() && locallySubmitted.get()) {

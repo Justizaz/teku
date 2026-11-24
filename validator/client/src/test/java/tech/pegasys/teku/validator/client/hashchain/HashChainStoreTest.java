@@ -22,6 +22,13 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import java.util.stream.Stream;
 import org.apache.tuweni.bytes.Bytes32;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -240,6 +247,18 @@ public class HashChainStoreTest {
   }
 
   @Test
+  void storeHashChain_whenFileAlreadyExists_shouldThrowInvalidHashChainException() {
+    store.storeHashChain(publicKey, hashChain, PASSWORD);
+
+    final HashChain newChain =
+        HashChainGenerator.generateFromSeed(Bytes32.fromHexString("0x99"), 5);
+
+    assertThatThrownBy(() -> store.storeHashChain(publicKey, newChain, PASSWORD))
+        .isInstanceOf(InvalidHashChainException.class)
+        .hasMessageContaining("Cannot overwrite existing hash chain file");
+  }
+
+  @Test
   void storeHashChain_withInvalidLinksChain_shouldThrowInvalidHashChainException() {
     final HashChain corruptedChain =
         new HashChain(
@@ -253,6 +272,79 @@ public class HashChainStoreTest {
     assertThatThrownBy(() -> store.storeHashChain(publicKey, corruptedChain, PASSWORD))
         .isInstanceOf(InvalidHashChainException.class)
         .hasMessageContaining("Cannot store an invalid hash chain");
+  }
+
+  @Test
+  void storeHashChain_concurrentStoreAttempts_shouldAllowExactlyOneAndPreserveValidChain()
+      throws Exception {
+    final HashChain chain1 =
+        HashChainGenerator.generateFromSeed(
+            Bytes32.fromHexString(
+                "0x1111111111111111111111111111111111111111111111111111111111111111"),
+            10);
+    final HashChain chain2 =
+        HashChainGenerator.generateFromSeed(
+            Bytes32.fromHexString(
+                "0x2222222222222222222222222222222222222222222222222222222222222222"),
+            10);
+
+    final ExecutorService executor = Executors.newFixedThreadPool(2);
+    try {
+      final CountDownLatch startLatch = new CountDownLatch(1);
+      final Future<Boolean> future1 =
+          executor.submit(
+              () -> {
+                startLatch.await();
+                store.storeHashChain(publicKey, chain1, PASSWORD);
+                return true;
+              });
+      final Future<Boolean> future2 =
+          executor.submit(
+              () -> {
+                startLatch.await();
+                store.storeHashChain(publicKey, chain2, PASSWORD);
+                return true;
+              });
+
+      startLatch.countDown();
+
+      int successCount = 0;
+      int failureCount = 0;
+
+      for (final Future<Boolean> future : List.of(future1, future2)) {
+        try {
+          future.get(10, TimeUnit.SECONDS);
+          successCount++;
+        } catch (final ExecutionException e) {
+          assertThat(e.getCause())
+              .isInstanceOf(InvalidHashChainException.class)
+              .hasMessageContaining("Cannot overwrite existing hash chain file");
+          failureCount++;
+        }
+      }
+
+      assertThat(successCount).isEqualTo(1);
+      assertThat(failureCount).isEqualTo(1);
+
+      final Optional<HashChain> loaded = store.loadHashChain(publicKey, PASSWORD);
+      assertThat(loaded).isPresent();
+      final Bytes32 loadedCommitment = loaded.get().getCommitment();
+      assertThat(loadedCommitment).isIn(chain1.getCommitment(), chain2.getCommitment());
+
+      // Verify no temporary files remain in tempDir
+      try (final Stream<Path> files = Files.list(tempDir)) {
+        final List<Path> tempFiles =
+            files
+                .filter(
+                    p ->
+                        p.getFileName().toString().endsWith(".tmp")
+                            || p.getFileName().toString().startsWith("."))
+                .toList();
+        assertThat(tempFiles).isEmpty();
+      }
+    } finally {
+      executor.shutdownNow();
+    }
   }
 
   @Test

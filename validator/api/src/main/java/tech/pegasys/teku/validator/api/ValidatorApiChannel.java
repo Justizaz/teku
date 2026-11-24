@@ -438,6 +438,11 @@ public interface ValidatorApiChannel extends BuilderApiChannel, ChannelInterface
     return SafeFuture.completedFuture(Optional.empty());
   }
 
+  default SafeFuture<ValidatorRandaoCommitmentStatus> getValidatorRandaoCommitmentStatus(
+      final BLSPublicKey publicKey) {
+    return SafeFuture.completedFuture(ValidatorRandaoCommitmentStatus.NOT_REGISTERED);
+  }
+
   SafeFuture<Optional<List<ValidatorLivenessAtEpoch>>> getValidatorsLiveness(
       List<UInt64> validatorIndices, UInt64 epoch);
 

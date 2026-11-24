@@ -47,6 +47,7 @@ import tech.pegasys.teku.validator.client.ForkProvider;
 import tech.pegasys.teku.validator.client.Validator;
 import tech.pegasys.teku.validator.client.duties.execution.ExecutionPayloadBidEventsChannel;
 import tech.pegasys.teku.validator.client.hashchain.HashChain;
+import tech.pegasys.teku.validator.client.hashchain.HashChainPasswordProvider;
 import tech.pegasys.teku.validator.client.hashchain.HashChainStore;
 import tech.pegasys.teku.validator.client.signer.BlockContainerSigner;
 
@@ -65,6 +66,7 @@ public class BlockProductionDuty implements Duty {
   private final BuilderConfigProvider builderConfigProvider;
   private final Optional<HashChainStore> hashChainStore;
   private final Optional<HashChain> maybeHashChain;
+  private final HashChainPasswordProvider hashChainPasswordProvider;
 
   public BlockProductionDuty(
       final Validator validator,
@@ -87,7 +89,8 @@ public class BlockProductionDuty implements Duty {
         executionPayloadBidEventsChannelPublisher,
         builderConfigProvider,
         Optional.empty(),
-        Optional.empty());
+        Optional.empty(),
+        HashChainPasswordProvider.NOOP);
   }
 
   public BlockProductionDuty(
@@ -112,7 +115,35 @@ public class BlockProductionDuty implements Duty {
         executionPayloadBidEventsChannelPublisher,
         builderConfigProvider,
         hashChainStore,
-        Optional.empty());
+        Optional.empty(),
+        HashChainPasswordProvider.NOOP);
+  }
+
+  public BlockProductionDuty(
+      final Validator validator,
+      final UInt64 slot,
+      final ForkProvider forkProvider,
+      final ValidatorApiChannel validatorApiChannel,
+      final BlockContainerSigner blockContainerSigner,
+      final Spec spec,
+      final ValidatorDutyMetrics validatorDutyMetrics,
+      final ExecutionPayloadBidEventsChannel executionPayloadBidEventsChannelPublisher,
+      final BuilderConfigProvider builderConfigProvider,
+      final Optional<HashChainStore> hashChainStore,
+      final HashChainPasswordProvider hashChainPasswordProvider) {
+    this(
+        validator,
+        slot,
+        forkProvider,
+        validatorApiChannel,
+        blockContainerSigner,
+        spec,
+        validatorDutyMetrics,
+        executionPayloadBidEventsChannelPublisher,
+        builderConfigProvider,
+        hashChainStore,
+        Optional.empty(),
+        hashChainPasswordProvider);
   }
 
   public BlockProductionDuty(
@@ -127,6 +158,34 @@ public class BlockProductionDuty implements Duty {
       final BuilderConfigProvider builderConfigProvider,
       final Optional<HashChainStore> hashChainStore,
       final Optional<HashChain> maybeHashChain) {
+    this(
+        validator,
+        slot,
+        forkProvider,
+        validatorApiChannel,
+        blockContainerSigner,
+        spec,
+        validatorDutyMetrics,
+        executionPayloadBidEventsChannelPublisher,
+        builderConfigProvider,
+        hashChainStore,
+        maybeHashChain,
+        HashChainPasswordProvider.NOOP);
+  }
+
+  public BlockProductionDuty(
+      final Validator validator,
+      final UInt64 slot,
+      final ForkProvider forkProvider,
+      final ValidatorApiChannel validatorApiChannel,
+      final BlockContainerSigner blockContainerSigner,
+      final Spec spec,
+      final ValidatorDutyMetrics validatorDutyMetrics,
+      final ExecutionPayloadBidEventsChannel executionPayloadBidEventsChannelPublisher,
+      final BuilderConfigProvider builderConfigProvider,
+      final Optional<HashChainStore> hashChainStore,
+      final Optional<HashChain> maybeHashChain,
+      final HashChainPasswordProvider hashChainPasswordProvider) {
     this.validator = validator;
     this.slot = slot;
     this.forkProvider = forkProvider;
@@ -138,6 +197,7 @@ public class BlockProductionDuty implements Duty {
     this.builderConfigProvider = builderConfigProvider;
     this.hashChainStore = hashChainStore;
     this.maybeHashChain = maybeHashChain;
+    this.hashChainPasswordProvider = hashChainPasswordProvider;
   }
 
   @Override
@@ -247,8 +307,16 @@ public class BlockProductionDuty implements Duty {
       return maybeHashChain;
     }
     if (hashChainStore.isPresent()) {
+      final Optional<String> maybePassword =
+          hashChainPasswordProvider.getPassword(validator.getPublicKey());
+      if (maybePassword.isEmpty()) {
+        LOG.warn(
+            "Cannot load hash chain: no password available for validator {}",
+            validator.getPublicKey());
+        return Optional.empty();
+      }
       try {
-        return hashChainStore.get().loadHashChain(validator.getPublicKey(), "");
+        return hashChainStore.get().loadHashChain(validator.getPublicKey(), maybePassword.get());
       } catch (final Exception e) {
         LOG.debug("Could not load hash chain for validator {}", validator.getPublicKey(), e);
       }

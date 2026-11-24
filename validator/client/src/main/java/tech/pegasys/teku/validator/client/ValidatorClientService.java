@@ -72,7 +72,9 @@ import tech.pegasys.teku.validator.client.duties.inclusionlists.InclusionListDut
 import tech.pegasys.teku.validator.client.duties.payloadattestations.PayloadAttestationDutyFactory;
 import tech.pegasys.teku.validator.client.duties.synccommittee.ChainHeadTracker;
 import tech.pegasys.teku.validator.client.duties.synccommittee.SyncCommitteeScheduledDuties;
+import tech.pegasys.teku.validator.client.hashchain.HashChainGenerator;
 import tech.pegasys.teku.validator.client.hashchain.HashChainStore;
+import tech.pegasys.teku.validator.client.hashchain.RandaoCommitmentRegistrator;
 import tech.pegasys.teku.validator.client.loader.HttpClientExternalSignerFactory;
 import tech.pegasys.teku.validator.client.loader.OwnedValidators;
 import tech.pegasys.teku.validator.client.loader.PublicKeyLoader;
@@ -496,7 +498,8 @@ public class ValidatorClientService extends Service {
             validatorDutyMetrics,
             eventChannels.getPublisher(ExecutionPayloadBidEventsChannel.class),
             builderConfigProvider,
-            hashChainStore);
+            hashChainStore,
+            validatorLoader.getHashChainPasswordProvider());
     final boolean dvtSelectionsEndpointEnabled =
         config.getValidatorConfig().isDvtSelectionsEndpointEnabled();
     final AttestationDutyFactory attestationDutyFactory =
@@ -660,6 +663,23 @@ public class ValidatorClientService extends Service {
               proposerConfigManager.orElseThrow(),
               builderConfigProvider);
       validatorTimingChannels.add(builderPreferencesPublisher);
+    }
+
+    if (spec.isMilestoneSupported(SpecMilestone.EIP8321)) {
+      final GenesisDataProvider genesisDataProvider =
+          new GenesisDataProvider(asyncRunner, validatorApiChannel);
+      final RandaoCommitmentRegistrator randaoCommitmentRegistrator =
+          new RandaoCommitmentRegistrator(
+              validatorApiChannel,
+              validatorIndexProvider,
+              genesisDataProvider,
+              hashChainStore,
+              Optional.of(validators),
+              Optional.of(spec),
+              Optional.of(asyncRunner),
+              new HashChainGenerator(),
+              validatorLoader.getHashChainPasswordProvider());
+      validatorTimingChannels.add(randaoCommitmentRegistrator);
     }
 
     final ValidatorStatusLogger validatorStatusLogger = new ValidatorStatusLogger(validators);
